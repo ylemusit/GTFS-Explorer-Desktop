@@ -1,0 +1,15 @@
+{
+  "product": "GTFS Explorer Desktop",
+  "version": "0.1.0",
+  "format": "nsis-per-user-v1",
+  "installer": {
+    "file": "GTFS-Explorer-Setup-0.1.0-win-x64.exe",
+    "sha256": "b5369c8839407455d10066e3631e5c5eb57c4d8cb8eeefd61e21e8010170fbe4",
+    "bytes": 100046278
+  },
+  "portable_source": {
+    "file": "GTFS-Explorer-Portable-0.1.0-win-x64.zip",
+    "sha256": "006d4131c8150113c5b034a1c3bc05b62017cb5c08cf9bb2d6ad3731dfcccfee"
+  },
+  "workspace_policy": "preserved-under-localappdata"
+}

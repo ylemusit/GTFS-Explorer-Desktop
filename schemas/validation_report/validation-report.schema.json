@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gtfs-explorer.local/schemas/validation-report/1.0.0",
+  "title": "GTFS Explorer validation report",
+  "type": "object",
+  "required": ["schema_version", "report_type", "batch", "filter", "summary_by_severity", "issues"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "report_type": {"const": "gtfs-explorer.validation"},
+    "batch": {"type": "object"},
+    "filter": {"type": "object"},
+    "summary_by_severity": {"type": "object"},
+    "issues": {"type": "array"}
+  },
+  "additionalProperties": false
+}

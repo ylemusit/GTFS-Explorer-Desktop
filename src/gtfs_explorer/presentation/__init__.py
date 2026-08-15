@@ -1,0 +1,1 @@
+"""Presentación de escritorio."""

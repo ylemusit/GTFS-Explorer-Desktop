@@ -1,0 +1,2582 @@
+{
+  "revision": "2026-04-27",
+  "source": {
+    "url": "https://gtfs.org/documentation/schedule/reference/",
+    "revised": "2026-04-27",
+    "sha256": "3a093d6ff19b99e7104c25650783760a515806fc03118a0a334e480d4feb33ee"
+  },
+  "files": {
+    "agency.txt": {
+      "presence": "required",
+      "rule_id": "GTFS_FILE_AGENCY_TXT_REQUIRED",
+      "source": "https://gtfs.org/documentation/schedule/reference/#agencytxt",
+      "condition": null,
+      "fields": {
+        "agency_id": {
+          "presence": "conditionally_required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_AGENCY_TXT_AGENCY_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#agencytxt",
+          "references": [],
+          "enum": null,
+          "condition": "Identifies a transit brand which is often synonymous with a transit agency. Note that in some cases, such as when a single agency operates multiple separate services, agencies and brands are distinct. This document uses the term \"agency\" in place of \"brand\". A dataset may contain data from multiple agencies. <br><br>Conditionally Required:<br>- **Required** when the dataset contains data for multiple transit agencies. <br>- Recommended otherwise."
+        },
+        "agency_name": {
+          "presence": "required",
+          "type": "Text",
+          "rule_id": "GTFS_AGENCY_TXT_AGENCY_NAME_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#agencytxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "agency_url": {
+          "presence": "required",
+          "type": "URL",
+          "rule_id": "GTFS_AGENCY_TXT_AGENCY_URL_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#agencytxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "agency_timezone": {
+          "presence": "required",
+          "type": "Timezone",
+          "rule_id": "GTFS_AGENCY_TXT_AGENCY_TIMEZONE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#agencytxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "agency_lang": {
+          "presence": "optional",
+          "type": "Language code",
+          "rule_id": "GTFS_AGENCY_TXT_AGENCY_LANG_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#agencytxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "agency_phone": {
+          "presence": "optional",
+          "type": "Phone number",
+          "rule_id": "GTFS_AGENCY_TXT_AGENCY_PHONE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#agencytxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "agency_fare_url": {
+          "presence": "optional",
+          "type": "URL",
+          "rule_id": "GTFS_AGENCY_TXT_AGENCY_FARE_URL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#agencytxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "agency_email": {
+          "presence": "optional",
+          "type": "Email",
+          "rule_id": "GTFS_AGENCY_TXT_AGENCY_EMAIL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#agencytxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "cemv_support": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_AGENCY_TXT_CEMV_SUPPORT_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#agencytxt",
+          "references": [],
+          "enum": "GTFS_ENUM_AGENCY_TXT_CEMV_SUPPORT",
+          "condition": null
+        }
+      }
+    },
+    "stops.txt": {
+      "presence": "conditionally_required",
+      "rule_id": "GTFS_FILE_STOPS_TXT_CONDITIONALLY_REQUIRED",
+      "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+      "condition": "required unless locations.geojson defines demand-responsive zones",
+      "fields": {
+        "stop_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_STOPS_TXT_STOP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "stop_code": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_STOPS_TXT_STOP_CODE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "stop_name": {
+          "presence": "conditionally_required",
+          "type": "Text",
+          "rule_id": "GTFS_STOPS_TXT_STOP_NAME_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": "Name of the location. The `stop_name` should match the agency's rider-facing name for the location as printed on a timetable, published online, or represented on signage. For translations into other languages, use [translations.txt](#translationstxt).<br><br>When the location is a boarding area (`location_type=4`), the `stop_name` should contains the name of the boarding area as displayed by the agency. It could be just one letter (like on some European intercity railway stations), or text like “Wheelchair boarding area” (NYC’s Subway) or “Head of short trains” (Paris’ RER).<br><br>Conditionally Required:<br>- **Required** for locations which are stops (`location_type=0`), stations (`location_type=1`) or entrances/exits (`location_type=2`).<br>- Optional for locations which are generic nodes (`location_type=3`) or boarding areas (`location_type=4`)."
+        },
+        "tts_stop_name": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_STOPS_TXT_TTS_STOP_NAME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "stop_desc": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_STOPS_TXT_STOP_DESC_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "stop_lat": {
+          "presence": "conditionally_required",
+          "type": "Latitude",
+          "rule_id": "GTFS_STOPS_TXT_STOP_LAT_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": "Latitude of the location.<br><br>For stops/platforms (`location_type=0`) and boarding area (`location_type=4`), the coordinates must be the ones of the bus pole — if exists — and otherwise of where the travelers are boarding the vehicle (on the sidewalk or the platform, and not on the roadway or the track where the vehicle stops). <br><br>Conditionally Required:<br>- **Required** for locations which are stops (`location_type=0`), stations (`location_type=1`) or entrances/exits (`location_type=2`).<br>- Optional for locations which are generic nodes (`location_type=3`) or boarding areas (`location_type=4`)."
+        },
+        "stop_lon": {
+          "presence": "conditionally_required",
+          "type": "Longitude",
+          "rule_id": "GTFS_STOPS_TXT_STOP_LON_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": "Longitude of the location.<br><br>For stops/platforms (`location_type=0`) and boarding area (`location_type=4`), the coordinates must be the ones of the bus pole — if exists — and otherwise of where the travelers are boarding the vehicle (on the sidewalk or the platform, and not on the roadway or the track where the vehicle stops). <br><br>Conditionally Required:<br>- **Required** for locations which are stops (`location_type=0`), stations (`location_type=1`) or entrances/exits (`location_type=2`).<br>- Optional for locations which are generic nodes (`location_type=3`) or boarding areas (`location_type=4`)."
+        },
+        "zone_id": {
+          "presence": "optional",
+          "type": "ID",
+          "rule_id": "GTFS_STOPS_TXT_ZONE_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "stop_url": {
+          "presence": "optional",
+          "type": "URL",
+          "rule_id": "GTFS_STOPS_TXT_STOP_URL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "location_type": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_STOPS_TXT_LOCATION_TYPE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_STOPS_TXT_LOCATION_TYPE",
+          "condition": null
+        },
+        "parent_station": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `stops.stop_id`",
+          "rule_id": "GTFS_STOPS_TXT_PARENT_STATION_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [
+            "stops.stop_id"
+          ],
+          "enum": null,
+          "condition": "Defines hierarchy between the different locations defined in [stops.txt](#stopstxt). It contains the ID of the parent location, as followed:<br><br>- **Stop/platform** (`location_type=0`): the `parent_station` field contains the ID of a station.<br>- **Station** (`location_type=1`): this field must be empty.<br>- **Entrance/exit** (`location_type=2`) or **generic node** (`location_type=3`): the `parent_station` field contains the ID of a station (`location_type=1`)<br>- **Boarding Area** (`location_type=4`): the `parent_station` field contains ID of a platform.<br><br>Conditionally Required:<br>- **Required** for locations which are entrances (`location_type=2`), generic nodes (`location_type=3`) or boarding areas (`location_type=4`).<br>- Optional for stops/platforms (`location_type=0`).<br>- Forbidden for stations (`location_type=1`)."
+        },
+        "stop_timezone": {
+          "presence": "optional",
+          "type": "Timezone",
+          "rule_id": "GTFS_STOPS_TXT_STOP_TIMEZONE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "wheelchair_boarding": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_STOPS_TXT_WHEELCHAIR_BOARDING_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_STOPS_TXT_WHEELCHAIR_BOARDING",
+          "condition": null
+        },
+        "level_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `levels.level_id`",
+          "rule_id": "GTFS_STOPS_TXT_LEVEL_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [
+            "levels.level_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "platform_code": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_STOPS_TXT_PLATFORM_CODE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "stop_access": {
+          "presence": "conditionally_forbidden",
+          "type": "Enum",
+          "rule_id": "GTFS_STOPS_TXT_STOP_ACCESS_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_STOPS_TXT_STOP_ACCESS",
+          "condition": "Indicates how the stop is accessed for a particular station. Valid options are: <br><br>`0` - The stop/platform cannot be directly accessed from the street network. It must be accessed from a station entrance if there is one defined for the station, otherwise the station itself. If there are pathways defined for the station, they must be used to access the stop/platform.<br>`1` - Consuming applications should generate directions for access directly to the stop, independent of any entrances or pathways of the parent station.<br><br>When `stop_access` is empty, the access for the specified stop or platform is considered undefined.<br><br>**Conditionally Forbidden**:<br>- **Forbidden** for locations which are stations (`location_type=1`), entrances (`location_type=2`), generic nodes (`location_type=3`) or boarding areas (`location_type=4`).<br>- **Forbidden** if `parent_station` is empty.<br> - Optional otherwise."
+        }
+      }
+    },
+    "routes.txt": {
+      "presence": "required",
+      "rule_id": "GTFS_FILE_ROUTES_TXT_REQUIRED",
+      "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+      "condition": null,
+      "fields": {
+        "route_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_ROUTES_TXT_ROUTE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "agency_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `agency.agency_id`",
+          "rule_id": "GTFS_ROUTES_TXT_AGENCY_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [
+            "agency.agency_id"
+          ],
+          "enum": null,
+          "condition": "Agency for the specified route.<br><br>Conditionally Required:<br>- **Required** if multiple agencies are defined in [agency.txt](#agency). <br>- Recommended otherwise."
+        },
+        "route_short_name": {
+          "presence": "conditionally_required",
+          "type": "Text",
+          "rule_id": "GTFS_ROUTES_TXT_ROUTE_SHORT_NAME_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Short name of a route. Often a short, abstract identifier (e.g., \"32\", \"100X\", \"Green\") that riders use to identify a route. Both `route_short_name` and `route_long_name` may be defined.<br><br>Conditionally Required:<br>- **Required** if `routes.route_long_name` is empty.<br>- Recommended if there is a brief service designation. This should be the commonly-known passenger name of the service, and should be no longer than 12 characters."
+        },
+        "route_long_name": {
+          "presence": "conditionally_required",
+          "type": "Text",
+          "rule_id": "GTFS_ROUTES_TXT_ROUTE_LONG_NAME_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Full name of a route. This name is generally more descriptive than the `route_short_name` and often includes the route's destination or stop. Both `route_short_name` and `route_long_name` may be defined.<br><br>Conditionally Required:<br>- **Required** if `routes.route_short_name` is empty.<br>- Optional otherwise."
+        },
+        "route_desc": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_ROUTES_TXT_ROUTE_DESC_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "route_type": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_ROUTES_TXT_ROUTE_TYPE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_ROUTES_TXT_ROUTE_TYPE",
+          "condition": null
+        },
+        "route_url": {
+          "presence": "optional",
+          "type": "URL",
+          "rule_id": "GTFS_ROUTES_TXT_ROUTE_URL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "route_color": {
+          "presence": "optional",
+          "type": "Color",
+          "rule_id": "GTFS_ROUTES_TXT_ROUTE_COLOR_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "route_text_color": {
+          "presence": "optional",
+          "type": "Color",
+          "rule_id": "GTFS_ROUTES_TXT_ROUTE_TEXT_COLOR_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "route_sort_order": {
+          "presence": "optional",
+          "type": "Non-negative integer",
+          "rule_id": "GTFS_ROUTES_TXT_ROUTE_SORT_ORDER_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "continuous_pickup": {
+          "presence": "conditionally_forbidden",
+          "type": "Enum",
+          "rule_id": "GTFS_ROUTES_TXT_CONTINUOUS_PICKUP_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_ROUTES_TXT_CONTINUOUS_PICKUP",
+          "condition": "Indicates that the rider can board the transit vehicle at any point along the vehicle’s travel path as described by [shapes.txt](#shapestxt), on every trip of the route. Valid options are: <br><br>`0` - Continuous stopping pickup. <br>`1` or empty - No continuous stopping pickup. <br>`2` - Must phone agency to arrange continuous stopping pickup. <br>`3` - Must coordinate with driver to arrange continuous stopping pickup.  <br><br>Values for `routes.continuous_pickup` may be overridden by defining values in `stop_times.continuous_pickup` for specific `stop_time`s along the route. <br><br>**Conditionally Forbidden**:<br>- Any value other than `1` or empty is **Forbidden** if `stop_times.start_pickup_drop_off_window` or `stop_times.end_pickup_drop_off_window` are defined for any trip of this route.<br> - Optional otherwise."
+        },
+        "continuous_drop_off": {
+          "presence": "conditionally_forbidden",
+          "type": "Enum",
+          "rule_id": "GTFS_ROUTES_TXT_CONTINUOUS_DROP_OFF_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_ROUTES_TXT_CONTINUOUS_DROP_OFF",
+          "condition": "Indicates that the rider can alight from the transit vehicle at any point along the vehicle’s travel path as described by [shapes.txt](#shapestxt), on every trip of the route. Valid options are: <br><br>`0` - Continuous stopping drop off. <br>`1` or empty - No continuous stopping drop off. <br>`2` - Must phone agency to arrange continuous stopping drop off. <br>`3` - Must coordinate with driver to arrange continuous stopping drop off. <br><br>Values for `routes.continuous_drop_off` may be overridden by defining values in `stop_times.continuous_drop_off` for specific `stop_time`s along the route. <br><br>**Conditionally Forbidden**:<br>- Any value other than `1` or empty is **Forbidden** if `stop_times.start_pickup_drop_off_window` or `stop_times.end_pickup_drop_off_window` are defined for any trip of this route.<br> - Optional otherwise."
+        },
+        "network_id": {
+          "presence": "conditionally_forbidden",
+          "type": "ID",
+          "rule_id": "GTFS_ROUTES_TXT_NETWORK_ID_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Identifies a group of routes. Multiple rows in [routes.txt](#routestxt) may have the same `network_id`.<br><br>Conditionally Forbidden:<br>- **Forbidden** if the [route_networks.txt](#route_networkstxt) or [networks.txt](#networkstxt) file exists.<br>- Optional otherwise."
+        },
+        "cemv_support": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_ROUTES_TXT_CEMV_SUPPORT_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_ROUTES_TXT_CEMV_SUPPORT",
+          "condition": null
+        }
+      }
+    },
+    "trips.txt": {
+      "presence": "required",
+      "rule_id": "GTFS_FILE_TRIPS_TXT_REQUIRED",
+      "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+      "condition": null,
+      "fields": {
+        "route_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `routes.route_id`",
+          "rule_id": "GTFS_TRIPS_TXT_ROUTE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [
+            "routes.route_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "service_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `calendar.service_id` or `calendar_dates.service_id`",
+          "rule_id": "GTFS_TRIPS_TXT_SERVICE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [
+            "calendar.service_id",
+            "calendar_dates.service_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "trip_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_TRIPS_TXT_TRIP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "trip_headsign": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_TRIPS_TXT_TRIP_HEADSIGN_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "trip_short_name": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_TRIPS_TXT_TRIP_SHORT_NAME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "direction_id": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_TRIPS_TXT_DIRECTION_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_TRIPS_TXT_DIRECTION_ID",
+          "condition": null
+        },
+        "block_id": {
+          "presence": "optional",
+          "type": "ID",
+          "rule_id": "GTFS_TRIPS_TXT_BLOCK_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "shape_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `shapes.shape_id`",
+          "rule_id": "GTFS_TRIPS_TXT_SHAPE_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [
+            "shapes.shape_id"
+          ],
+          "enum": null,
+          "condition": "Identifies a geospatial shape describing the vehicle travel path for a trip. <br><br>Conditionally Required: <br>- **Required** if the trip has a continuous pickup or drop-off behavior defined either in [routes.txt](#routestxt) or in [stop_times.txt](#stop_timestxt). <br>- Optional otherwise."
+        },
+        "wheelchair_accessible": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_TRIPS_TXT_WHEELCHAIR_ACCESSIBLE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_TRIPS_TXT_WHEELCHAIR_ACCESSIBLE",
+          "condition": null
+        },
+        "bikes_allowed": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_TRIPS_TXT_BIKES_ALLOWED_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_TRIPS_TXT_BIKES_ALLOWED",
+          "condition": null
+        },
+        "cars_allowed": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_TRIPS_TXT_CARS_ALLOWED_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_TRIPS_TXT_CARS_ALLOWED",
+          "condition": null
+        },
+        "safe_duration_factor": {
+          "presence": "optional",
+          "type": "Float",
+          "rule_id": "GTFS_TRIPS_TXT_SAFE_DURATION_FACTOR_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "safe_duration_offset": {
+          "presence": "optional",
+          "type": "Float",
+          "rule_id": "GTFS_TRIPS_TXT_SAFE_DURATION_OFFSET_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#tripstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "stop_times.txt": {
+      "presence": "required",
+      "rule_id": "GTFS_FILE_STOP_TIMES_TXT_REQUIRED",
+      "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+      "condition": null,
+      "fields": {
+        "trip_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `trips.trip_id`",
+          "rule_id": "GTFS_STOP_TIMES_TXT_TRIP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [
+            "trips.trip_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "arrival_time": {
+          "presence": "conditionally_required",
+          "type": "Time",
+          "rule_id": "GTFS_STOP_TIMES_TXT_ARRIVAL_TIME_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Arrival time at the stop (defined by `stop_times.stop_id`) for a specific trip (defined by `stop_times.trip_id`) in the time zone specified by `agency.agency_timezone`, not `stops.stop_timezone`. <br><br>If there are not separate times for arrival and departure at a stop, `arrival_time` and `departure_time` should be the same. <br><br>For times occurring after midnight on the service day, enter the time as a value greater than 24:00:00 in HH:MM:SS.<br><br> If exact arrival and departure times (`timepoint=1`) are not available, estimated or interpolated arrival and departure times (`timepoint=0`) should be provided.<br><br>Conditionally Required:<br>- **Required** for the first and last stop in a trip (defined by `stop_times.stop_sequence`). <br>- **Required** for `timepoint=1`.<br>-&nbsp;**Forbidden** when `start_pickup_drop_off_window` or `end_pickup_drop_off_window` are defined.<br>- Optional otherwise."
+        },
+        "departure_time": {
+          "presence": "conditionally_required",
+          "type": "Time",
+          "rule_id": "GTFS_STOP_TIMES_TXT_DEPARTURE_TIME_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Departure time from the stop (defined by `stop_times.stop_id`) for a specific trip (defined by `stop_times.trip_id`) in the time zone specified by `agency.agency_timezone`, not `stops.stop_timezone`.<br><br>If there are not separate times for arrival and departure at a stop, `arrival_time` and `departure_time` should be the same. <br><br>For times occurring after midnight on the service day, enter the time as a value greater than 24:00:00 in HH:MM:SS.<br><br> If exact arrival and departure times (`timepoint=1`) are not available, estimated or interpolated arrival and departure times (`timepoint=0`) should be provided.<br><br>Conditionally Required:<br>- **Required** for `timepoint=1`.<br>-&nbsp;**Forbidden** when `start_pickup_drop_off_window` or `end_pickup_drop_off_window` are defined.<br>- Optional otherwise."
+        },
+        "stop_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `stops.stop_id`",
+          "rule_id": "GTFS_STOP_TIMES_TXT_STOP_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [
+            "stops.stop_id"
+          ],
+          "enum": null,
+          "condition": "Identifies the serviced stop. All stops serviced during a trip must have a record in [stop_times.txt](#stop_timestxt). Referenced locations must be stops/platforms, i.e. their `stops.location_type` value must be `0` or empty. A stop may be serviced multiple times in the same trip, and multiple trips and routes may service the same stop.<br><br>On-demand service using stops should be referenced in the sequence in which service is available at those stops. A data consumer should assume that travel is possible from one stop or location to any stop or location later in the trip, provided that the `pickup/drop_off_type` of each stop_time and the time constraints of each `start/end_pickup_drop_off_window` do not forbid it.<br><br>Conditionally Required:<br>- **Required** if `stop_times.location_group_id` AND `stop_times.location_id` are NOT defined.<br>- **Forbidden** if `stop_times.location_group_id` or `stop_times.location_id` are defined."
+        },
+        "location_group_id": {
+          "presence": "conditionally_forbidden",
+          "type": "Foreign ID referencing `location_groups.location_group_id`",
+          "rule_id": "GTFS_STOP_TIMES_TXT_LOCATION_GROUP_ID_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [
+            "location_groups.location_group_id"
+          ],
+          "enum": null,
+          "condition": "Identifies the serviced location group that indicates groups of stops where riders may request pickup or drop off. All location groups serviced during a trip must have a record in [stop_times.txt](#stop_timestxt). Multiple trips and routes may service the same location group.<br><br>On-demand service using location groups should be referenced in the sequence in which service is available at those location groups. A data consumer should assume that travel is possible from one stop or location to any stop or location later in the trip, provided that the `pickup/drop_off_type` of each stop_time and the time constraints of each `start/end_pickup_drop_off_window` do not forbid it.<br><br>**Conditionally Forbidden**:<br>- **Forbidden** if `stop_times.stop_id` or `stop_times.location_id` are defined."
+        },
+        "location_id": {
+          "presence": "conditionally_forbidden",
+          "type": "Foreign ID referencing `id` from `locations.geojson`",
+          "rule_id": "GTFS_STOP_TIMES_TXT_LOCATION_ID_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [
+            "locations.geojson"
+          ],
+          "enum": null,
+          "condition": "Identifies the GeoJSON location that corresponds to serviced zone where riders may request pickup or drop off. All GeoJSON locations serviced during a trip must have a record in [stop_times.txt](#stop_timestxt). Multiple trips and routes may service the same GeoJSON location.<br><br>On-demand service within locations should be referenced in the sequence in which service is available in those locations. A data consumer should assume that travel is possible from one stop or location to any stop or location later in the trip, provided that the `pickup/drop_off_type` of each stop_time and the time constraints of each `start/end_pickup_drop_off_window` do not forbid it.<br><br>**Conditionally Forbidden**:<br>- **Forbidden** if `stop_times.stop_id` or `stop_times.location_group_id` are defined."
+        },
+        "stop_sequence": {
+          "presence": "required",
+          "type": "Non-negative integer",
+          "rule_id": "GTFS_STOP_TIMES_TXT_STOP_SEQUENCE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "stop_headsign": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_STOP_TIMES_TXT_STOP_HEADSIGN_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "start_pickup_drop_off_window": {
+          "presence": "conditionally_required",
+          "type": "Time",
+          "rule_id": "GTFS_STOP_TIMES_TXT_START_PICKUP_DROP_OFF_WINDOW_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Time that on-demand service becomes available in a GeoJSON location, location group, or stop.<br><br>**Conditionally Required**:<br>- **Required** if `stop_times.location_group_id` or `stop_times.location_id` is defined.<br>- **Required** if `end_pickup_drop_off_window` is defined.<br>- **Forbidden** if `arrival_time` or `departure_time` is defined.<br>- Optional otherwise."
+        },
+        "end_pickup_drop_off_window": {
+          "presence": "conditionally_required",
+          "type": "Time",
+          "rule_id": "GTFS_STOP_TIMES_TXT_END_PICKUP_DROP_OFF_WINDOW_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Time that on-demand service ends in a GeoJSON location, location group, or stop.<br><br>**Conditionally Required**:<br>- **Required** if `stop_times.location_group_id` or `stop_times.location_id` is defined.<br>- **Required** if `start_pickup_drop_off_window` is defined.<br>- **Forbidden** if `arrival_time` or `departure_time` is defined.<br>- Optional otherwise."
+        },
+        "pickup_type": {
+          "presence": "conditionally_forbidden",
+          "type": "Enum",
+          "rule_id": "GTFS_STOP_TIMES_TXT_PICKUP_TYPE_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_STOP_TIMES_TXT_PICKUP_TYPE",
+          "condition": "Indicates pickup method. Valid options are:<br><br>`0` or empty - Regularly scheduled pickup. <br>`1` - No pickup available.<br>`2` - Must phone agency to arrange pickup.<br>`3` - Must coordinate with driver to arrange pickup.<br><br> **Conditionally Forbidden**: <br>- `pickup_type=0` **forbidden** if `start_pickup_drop_off_window` or `end_pickup_drop_off_window` are defined.<br> - `pickup_type=3` **forbidden** if `start_pickup_drop_off_window` or `end_pickup_drop_off_window` are defined.<br> - Optional otherwise."
+        },
+        "drop_off_type": {
+          "presence": "conditionally_forbidden",
+          "type": "Enum",
+          "rule_id": "GTFS_STOP_TIMES_TXT_DROP_OFF_TYPE_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_STOP_TIMES_TXT_DROP_OFF_TYPE",
+          "condition": "Indicates drop off method. Valid options are:<br><br>`0` or empty - Regularly scheduled drop off.<br>`1` - No drop off available.<br>`2` - Must phone agency to arrange drop off.<br>`3` - Must coordinate with driver to arrange drop off.<br><br> **Conditionally Forbidden**:<br> - `drop_off_type=0` **forbidden** if `start_pickup_drop_off_window` or `end_pickup_drop_off_window` are defined.<br> - Optional otherwise."
+        },
+        "continuous_pickup": {
+          "presence": "conditionally_forbidden",
+          "type": "Enum",
+          "rule_id": "GTFS_STOP_TIMES_TXT_CONTINUOUS_PICKUP_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_STOP_TIMES_TXT_CONTINUOUS_PICKUP",
+          "condition": "Indicates that the rider can board the transit vehicle at any point along the vehicle’s travel path as described by [shapes.txt](#shapestxt), from this `stop_time` to the next `stop_time` in the trip’s `stop_sequence`. Valid options are: <br><br>`0` - Continuous stopping pickup. <br>`1` or empty - No continuous stopping pickup. <br>`2` - Must phone agency to arrange continuous stopping pickup. <br>`3` - Must coordinate with driver to arrange continuous stopping pickup.  <br><br>If this field is populated, it overrides any continuous pickup behavior defined in [routes.txt](#routestxt). If this field is empty, the `stop_time` inherits any continuous pickup behavior defined in [routes.txt](#routestxt).<br><br>**Conditionally Forbidden**:<br>- Any value other than `1` or empty is **Forbidden** if `start_pickup_drop_off_window` or `end_pickup_drop_off_window` are defined.<br> - Optional otherwise."
+        },
+        "continuous_drop_off": {
+          "presence": "conditionally_forbidden",
+          "type": "Enum",
+          "rule_id": "GTFS_STOP_TIMES_TXT_CONTINUOUS_DROP_OFF_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_STOP_TIMES_TXT_CONTINUOUS_DROP_OFF",
+          "condition": "Indicates that the rider can alight from the transit vehicle at any point along the vehicle’s travel path as described by [shapes.txt](#shapestxt), from this `stop_time` to the next `stop_time` in the trip’s `stop_sequence`. Valid options are: <br><br>`0` - Continuous stopping drop off. <br>`1` or empty - No continuous stopping drop off. <br>`2` - Must phone agency to arrange continuous stopping drop off. <br>`3` - Must coordinate with driver to arrange continuous stopping drop off. <br><br>If this field is populated, it overrides any continuous drop-off behavior defined in [routes.txt](#routestxt). If this field is empty, the `stop_time` inherits any continuous drop-off behavior defined in [routes.txt](#routestxt).<br><br>**Conditionally Forbidden**:<br>- Any value other than `1` or empty is **Forbidden** if `start_pickup_drop_off_window` or `end_pickup_drop_off_window` are defined.<br> - Optional otherwise."
+        },
+        "shape_dist_traveled": {
+          "presence": "optional",
+          "type": "Non-negative float",
+          "rule_id": "GTFS_STOP_TIMES_TXT_SHAPE_DIST_TRAVELED_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "timepoint": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_STOP_TIMES_TXT_TIMEPOINT_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_STOP_TIMES_TXT_TIMEPOINT",
+          "condition": null
+        },
+        "pickup_booking_rule_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `booking_rules.booking_rule_id`",
+          "rule_id": "GTFS_STOP_TIMES_TXT_PICKUP_BOOKING_RULE_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [
+            "booking_rules.booking_rule_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "drop_off_booking_rule_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `booking_rules.booking_rule_id`",
+          "rule_id": "GTFS_STOP_TIMES_TXT_DROP_OFF_BOOKING_RULE_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stoptimestxt",
+          "references": [
+            "booking_rules.booking_rule_id"
+          ],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "calendar.txt": {
+      "presence": "conditionally_required",
+      "rule_id": "GTFS_FILE_CALENDAR_TXT_CONDITIONALLY_REQUIRED",
+      "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+      "condition": "required unless all service dates are in calendar_dates.txt",
+      "fields": {
+        "service_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_CALENDAR_TXT_SERVICE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "monday": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_CALENDAR_TXT_MONDAY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+          "references": [],
+          "enum": "GTFS_ENUM_CALENDAR_TXT_MONDAY",
+          "condition": null
+        },
+        "tuesday": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_CALENDAR_TXT_TUESDAY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+          "references": [],
+          "enum": "GTFS_ENUM_CALENDAR_TXT_TUESDAY",
+          "condition": null
+        },
+        "wednesday": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_CALENDAR_TXT_WEDNESDAY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+          "references": [],
+          "enum": "GTFS_ENUM_CALENDAR_TXT_WEDNESDAY",
+          "condition": null
+        },
+        "thursday": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_CALENDAR_TXT_THURSDAY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+          "references": [],
+          "enum": "GTFS_ENUM_CALENDAR_TXT_THURSDAY",
+          "condition": null
+        },
+        "friday": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_CALENDAR_TXT_FRIDAY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+          "references": [],
+          "enum": "GTFS_ENUM_CALENDAR_TXT_FRIDAY",
+          "condition": null
+        },
+        "saturday": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_CALENDAR_TXT_SATURDAY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+          "references": [],
+          "enum": "GTFS_ENUM_CALENDAR_TXT_SATURDAY",
+          "condition": null
+        },
+        "sunday": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_CALENDAR_TXT_SUNDAY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+          "references": [],
+          "enum": "GTFS_ENUM_CALENDAR_TXT_SUNDAY",
+          "condition": null
+        },
+        "start_date": {
+          "presence": "required",
+          "type": "Date",
+          "rule_id": "GTFS_CALENDAR_TXT_START_DATE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "end_date": {
+          "presence": "required",
+          "type": "Date",
+          "rule_id": "GTFS_CALENDAR_TXT_END_DATE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendartxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "calendar_dates.txt": {
+      "presence": "conditionally_required",
+      "rule_id": "GTFS_FILE_CALENDAR_DATES_TXT_CONDITIONALLY_REQUIRED",
+      "source": "https://gtfs.org/documentation/schedule/reference/#calendardatestxt",
+      "condition": "required when calendar.txt is omitted",
+      "fields": {
+        "service_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `calendar.service_id` or ID",
+          "rule_id": "GTFS_CALENDAR_DATES_TXT_SERVICE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendardatestxt",
+          "references": [
+            "calendar.service_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "date": {
+          "presence": "required",
+          "type": "Date",
+          "rule_id": "GTFS_CALENDAR_DATES_TXT_DATE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendardatestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "exception_type": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_CALENDAR_DATES_TXT_EXCEPTION_TYPE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#calendardatestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_CALENDAR_DATES_TXT_EXCEPTION_TYPE",
+          "condition": null
+        }
+      }
+    },
+    "fare_attributes.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_FARE_ATTRIBUTES_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#fareattributestxt",
+      "condition": null,
+      "fields": {
+        "fare_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_FARE_ATTRIBUTES_TXT_FARE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareattributestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "price": {
+          "presence": "required",
+          "type": "Non-negative float",
+          "rule_id": "GTFS_FARE_ATTRIBUTES_TXT_PRICE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareattributestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "currency_type": {
+          "presence": "required",
+          "type": "Currency code",
+          "rule_id": "GTFS_FARE_ATTRIBUTES_TXT_CURRENCY_TYPE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareattributestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "payment_method": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_FARE_ATTRIBUTES_TXT_PAYMENT_METHOD_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareattributestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_FARE_ATTRIBUTES_TXT_PAYMENT_METHOD",
+          "condition": null
+        },
+        "transfers": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_FARE_ATTRIBUTES_TXT_TRANSFERS_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareattributestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_FARE_ATTRIBUTES_TXT_TRANSFERS",
+          "condition": null
+        },
+        "agency_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `agency.agency_id`",
+          "rule_id": "GTFS_FARE_ATTRIBUTES_TXT_AGENCY_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareattributestxt",
+          "references": [
+            "agency.agency_id"
+          ],
+          "enum": null,
+          "condition": "Identifies the relevant agency for a fare. <br><br>Conditionally Required:<br>- **Required** if multiple agencies are defined in [agency.txt](#agencytxt).<br>- Recommended otherwise."
+        },
+        "transfer_duration": {
+          "presence": "optional",
+          "type": "Non-negative integer",
+          "rule_id": "GTFS_FARE_ATTRIBUTES_TXT_TRANSFER_DURATION_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareattributestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "fare_rules.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_FARE_RULES_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#farerulestxt",
+      "condition": null,
+      "fields": {
+        "fare_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `fare_attributes.fare_id`",
+          "rule_id": "GTFS_FARE_RULES_TXT_FARE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farerulestxt",
+          "references": [
+            "fare_attributes.fare_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "route_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `routes.route_id`",
+          "rule_id": "GTFS_FARE_RULES_TXT_ROUTE_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farerulestxt",
+          "references": [
+            "routes.route_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "origin_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `stops.zone_id`",
+          "rule_id": "GTFS_FARE_RULES_TXT_ORIGIN_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farerulestxt",
+          "references": [
+            "stops.zone_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "destination_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `stops.zone_id`",
+          "rule_id": "GTFS_FARE_RULES_TXT_DESTINATION_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farerulestxt",
+          "references": [
+            "stops.zone_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "contains_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `stops.zone_id`",
+          "rule_id": "GTFS_FARE_RULES_TXT_CONTAINS_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farerulestxt",
+          "references": [
+            "stops.zone_id"
+          ],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "timeframes.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_TIMEFRAMES_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#timeframestxt",
+      "condition": null,
+      "fields": {
+        "timeframe_group_id": {
+          "presence": "required",
+          "type": "ID",
+          "rule_id": "GTFS_TIMEFRAMES_TXT_TIMEFRAME_GROUP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#timeframestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "start_time": {
+          "presence": "conditionally_required",
+          "type": "Local time",
+          "rule_id": "GTFS_TIMEFRAMES_TXT_START_TIME_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#timeframestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Defines the beginning of a timeframe. The interval includes the start time.<br> Values greater than `24:00:00` are forbidden. An empty value in `start_time` is considered `00:00:00`. <br><br> Conditionally Required:<br> - **Required** if `timeframes.end_time` is defined.<br> - **Forbidden** otherwise"
+        },
+        "end_time": {
+          "presence": "conditionally_required",
+          "type": "Local time",
+          "rule_id": "GTFS_TIMEFRAMES_TXT_END_TIME_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#timeframestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Defines the end of a timeframe. The interval does not include the end time.<br> Values greater than `24:00:00` are forbidden. An empty value in `end_time` is considered `24:00:00`. <br><br> Conditionally Required:<br> - **Required** if `timeframes.start_time` is defined.<br> - **Forbidden** otherwise"
+        },
+        "service_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `calendar.service_id` or `calendar_dates.service_id`",
+          "rule_id": "GTFS_TIMEFRAMES_TXT_SERVICE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#timeframestxt",
+          "references": [
+            "calendar.service_id",
+            "calendar_dates.service_id"
+          ],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "rider_categories.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_RIDER_CATEGORIES_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#ridercategoriestxt",
+      "condition": null,
+      "fields": {
+        "rider_category_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_RIDER_CATEGORIES_TXT_RIDER_CATEGORY_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#ridercategoriestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "rider_category_name": {
+          "presence": "required",
+          "type": "Text",
+          "rule_id": "GTFS_RIDER_CATEGORIES_TXT_RIDER_CATEGORY_NAME_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#ridercategoriestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "is_default_fare_category": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_RIDER_CATEGORIES_TXT_IS_DEFAULT_FARE_CATEGORY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#ridercategoriestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_RIDER_CATEGORIES_TXT_IS_DEFAULT_FARE_CATEGORY",
+          "condition": null
+        },
+        "eligibility_url": {
+          "presence": "optional",
+          "type": "URL",
+          "rule_id": "GTFS_RIDER_CATEGORIES_TXT_ELIGIBILITY_URL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#ridercategoriestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "fare_media.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_FARE_MEDIA_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#faremediatxt",
+      "condition": null,
+      "fields": {
+        "fare_media_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_FARE_MEDIA_TXT_FARE_MEDIA_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#faremediatxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "fare_media_name": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_FARE_MEDIA_TXT_FARE_MEDIA_NAME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#faremediatxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "fare_media_type": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_FARE_MEDIA_TXT_FARE_MEDIA_TYPE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#faremediatxt",
+          "references": [],
+          "enum": "GTFS_ENUM_FARE_MEDIA_TXT_FARE_MEDIA_TYPE",
+          "condition": null
+        }
+      }
+    },
+    "fare_products.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_FARE_PRODUCTS_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#fareproductstxt",
+      "condition": null,
+      "fields": {
+        "fare_product_id": {
+          "presence": "required",
+          "type": "ID",
+          "rule_id": "GTFS_FARE_PRODUCTS_TXT_FARE_PRODUCT_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareproductstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "fare_product_name": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_FARE_PRODUCTS_TXT_FARE_PRODUCT_NAME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareproductstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "rider_category_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `rider_categories.rider_category_id`",
+          "rule_id": "GTFS_FARE_PRODUCTS_TXT_RIDER_CATEGORY_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareproductstxt",
+          "references": [
+            "rider_categories.rider_category_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "fare_media_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `fare_media.fare_media_id`",
+          "rule_id": "GTFS_FARE_PRODUCTS_TXT_FARE_MEDIA_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareproductstxt",
+          "references": [
+            "fare_media.fare_media_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "amount": {
+          "presence": "required",
+          "type": "Currency amount",
+          "rule_id": "GTFS_FARE_PRODUCTS_TXT_AMOUNT_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareproductstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "currency": {
+          "presence": "required",
+          "type": "Currency code",
+          "rule_id": "GTFS_FARE_PRODUCTS_TXT_CURRENCY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#fareproductstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "fare_leg_rules.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_FARE_LEG_RULES_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#farelegrulestxt",
+      "condition": null,
+      "fields": {
+        "leg_group_id": {
+          "presence": "optional",
+          "type": "ID",
+          "rule_id": "GTFS_FARE_LEG_RULES_TXT_LEG_GROUP_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "network_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `routes.network_id` or `networks.network_id`",
+          "rule_id": "GTFS_FARE_LEG_RULES_TXT_NETWORK_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegrulestxt",
+          "references": [
+            "routes.network_id",
+            "networks.network_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "from_area_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `areas.area_id`",
+          "rule_id": "GTFS_FARE_LEG_RULES_TXT_FROM_AREA_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegrulestxt",
+          "references": [
+            "areas.area_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "to_area_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `areas.area_id`",
+          "rule_id": "GTFS_FARE_LEG_RULES_TXT_TO_AREA_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegrulestxt",
+          "references": [
+            "areas.area_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "from_timeframe_group_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `timeframes.timeframe_group_id`",
+          "rule_id": "GTFS_FARE_LEG_RULES_TXT_FROM_TIMEFRAME_GROUP_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegrulestxt",
+          "references": [
+            "timeframes.timeframe_group_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "to_timeframe_group_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `timeframes.timeframe_group_id`",
+          "rule_id": "GTFS_FARE_LEG_RULES_TXT_TO_TIMEFRAME_GROUP_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegrulestxt",
+          "references": [
+            "timeframes.timeframe_group_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "fare_product_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `fare_products.fare_product_id`",
+          "rule_id": "GTFS_FARE_LEG_RULES_TXT_FARE_PRODUCT_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegrulestxt",
+          "references": [
+            "fare_products.fare_product_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "rule_priority": {
+          "presence": "optional",
+          "type": "Non-negative integer",
+          "rule_id": "GTFS_FARE_LEG_RULES_TXT_RULE_PRIORITY_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "fare_leg_join_rules.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_FARE_LEG_JOIN_RULES_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#farelegjoinrulestxt",
+      "condition": null,
+      "fields": {
+        "from_network_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `routes.network_id` or `networks.network_id`",
+          "rule_id": "GTFS_FARE_LEG_JOIN_RULES_TXT_FROM_NETWORK_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegjoinrulestxt",
+          "references": [
+            "routes.network_id",
+            "networks.network_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "to_network_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `routes.network_id` or `networks.network_id`",
+          "rule_id": "GTFS_FARE_LEG_JOIN_RULES_TXT_TO_NETWORK_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegjoinrulestxt",
+          "references": [
+            "routes.network_id",
+            "networks.network_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "from_stop_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `stops.stop_id`",
+          "rule_id": "GTFS_FARE_LEG_JOIN_RULES_TXT_FROM_STOP_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegjoinrulestxt",
+          "references": [
+            "stops.stop_id"
+          ],
+          "enum": null,
+          "condition": "Matches a pre-transfer leg that ends at the specified stop (`location_type=0` or empty) or station (`location_type=1`).<br><br>Conditionally Required:<br> - **Required** if `to_stop_id` is defined.<br> - Optional otherwise."
+        },
+        "to_stop_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `stops.stop_id`",
+          "rule_id": "GTFS_FARE_LEG_JOIN_RULES_TXT_TO_STOP_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#farelegjoinrulestxt",
+          "references": [
+            "stops.stop_id"
+          ],
+          "enum": null,
+          "condition": "Matches a post-transfer leg that starts at the specified stop (`location_type=0` or empty) or station (`location_type=1`).<br><br>Conditionally Required:<br> - **Required** if `from_stop_id` is defined.<br> - Optional otherwise."
+        }
+      }
+    },
+    "fare_transfer_rules.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_FARE_TRANSFER_RULES_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#faretransferrulestxt",
+      "condition": null,
+      "fields": {
+        "from_leg_group_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `fare_leg_rules.leg_group_id`",
+          "rule_id": "GTFS_FARE_TRANSFER_RULES_TXT_FROM_LEG_GROUP_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#faretransferrulestxt",
+          "references": [
+            "fare_leg_rules.leg_group_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "to_leg_group_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `fare_leg_rules.leg_group_id`",
+          "rule_id": "GTFS_FARE_TRANSFER_RULES_TXT_TO_LEG_GROUP_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#faretransferrulestxt",
+          "references": [
+            "fare_leg_rules.leg_group_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "transfer_count": {
+          "presence": "conditionally_forbidden",
+          "type": "Non-zero integer",
+          "rule_id": "GTFS_FARE_TRANSFER_RULES_TXT_TRANSFER_COUNT_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#faretransferrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Defines how many consecutive transfers the transfer rule may be applied to.<br><br>Valid options are:<br>`-1` - No limit.<br>`1` or more - Defines how many transfers the transfer rule may span.<br><br>If a sub-journey matches multiple records with different `transfer_count`s, then the rule with the minimum `transfer_count` that is greater than or equal to the current transfer count of the sub-journey is to be selected.<br><br>Conditionally Forbidden:<br>- **Forbidden** if `fare_transfer_rules.from_leg_group_id` does not equal `fare_transfer_rules.to_leg_group_id`.<br>- **Required** if `fare_transfer_rules.from_leg_group_id` equals `fare_transfer_rules.to_leg_group_id`."
+        },
+        "duration_limit": {
+          "presence": "optional",
+          "type": "Positive integer",
+          "rule_id": "GTFS_FARE_TRANSFER_RULES_TXT_DURATION_LIMIT_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#faretransferrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "duration_limit_type": {
+          "presence": "conditionally_required",
+          "type": "Enum",
+          "rule_id": "GTFS_FARE_TRANSFER_RULES_TXT_DURATION_LIMIT_TYPE_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#faretransferrulestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_FARE_TRANSFER_RULES_TXT_DURATION_LIMIT_TYPE",
+          "condition": "Defines the relative start and end of `fare_transfer_rules.duration_limit`.<br><br>Valid options are:<br>`0` - Between the departure fare validation of the first leg in transfer sub-journey and the arrival fare validation of the last leg in transfer sub-journey.<br>`1` - Between the departure fare validation of the first leg in transfer sub-journey and the departure fare validation of the last leg in transfer sub-journey.<br>`2` - Between the arrival fare validation of the first leg in transfer sub-journey and the departure fare validation of the last leg in transfer sub-journey.<br>`3` - Between the arrival fare validation of the first leg in transfer sub-journey and the arrival fare validation of the last leg in transfer sub-journey.<br><br>When a transfer rule with the same `from_leg_group_id` and `to_leg_group_id` is matched multiple times consecutively within a multi-leg journey, the `duration_limit` specified by the rule should be measured starting from the first matched leg.<br><br>Conditionally Required:<br>- **Required** if `fare_transfer_rules.duration_limit` is defined.<br>- **Forbidden** if `fare_transfer_rules.duration_limit` is empty."
+        },
+        "fare_transfer_type": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_FARE_TRANSFER_RULES_TXT_FARE_TRANSFER_TYPE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#faretransferrulestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_FARE_TRANSFER_RULES_TXT_FARE_TRANSFER_TYPE",
+          "condition": null
+        },
+        "fare_product_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `fare_products.fare_product_id`",
+          "rule_id": "GTFS_FARE_TRANSFER_RULES_TXT_FARE_PRODUCT_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#faretransferrulestxt",
+          "references": [
+            "fare_products.fare_product_id"
+          ],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "areas.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_AREAS_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#areastxt",
+      "condition": null,
+      "fields": {
+        "area_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_AREAS_TXT_AREA_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#areastxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "area_name": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_AREAS_TXT_AREA_NAME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#areastxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "stop_areas.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_STOP_AREAS_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#stopareastxt",
+      "condition": null,
+      "fields": {
+        "area_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `areas.area_id`",
+          "rule_id": "GTFS_STOP_AREAS_TXT_AREA_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopareastxt",
+          "references": [
+            "areas.area_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "stop_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `stops.stop_id`",
+          "rule_id": "GTFS_STOP_AREAS_TXT_STOP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#stopareastxt",
+          "references": [
+            "stops.stop_id"
+          ],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "networks.txt": {
+      "presence": "conditionally_forbidden",
+      "rule_id": "GTFS_FILE_NETWORKS_TXT_CONDITIONALLY_FORBIDDEN",
+      "source": "https://gtfs.org/documentation/schedule/reference/#networkstxt",
+      "condition": "forbidden when routes.txt contains network_id",
+      "fields": {
+        "network_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_NETWORKS_TXT_NETWORK_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#networkstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "network_name": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_NETWORKS_TXT_NETWORK_NAME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#networkstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "route_networks.txt": {
+      "presence": "conditionally_forbidden",
+      "rule_id": "GTFS_FILE_ROUTE_NETWORKS_TXT_CONDITIONALLY_FORBIDDEN",
+      "source": "https://gtfs.org/documentation/schedule/reference/#routenetworkstxt",
+      "condition": "forbidden when routes.txt contains network_id",
+      "fields": {
+        "network_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `networks.network_id`",
+          "rule_id": "GTFS_ROUTE_NETWORKS_TXT_NETWORK_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routenetworkstxt",
+          "references": [
+            "networks.network_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "route_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `routes.route_id`",
+          "rule_id": "GTFS_ROUTE_NETWORKS_TXT_ROUTE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#routenetworkstxt",
+          "references": [
+            "routes.route_id"
+          ],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "shapes.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_SHAPES_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#shapestxt",
+      "condition": null,
+      "fields": {
+        "shape_id": {
+          "presence": "required",
+          "type": "ID",
+          "rule_id": "GTFS_SHAPES_TXT_SHAPE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#shapestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "shape_pt_lat": {
+          "presence": "required",
+          "type": "Latitude",
+          "rule_id": "GTFS_SHAPES_TXT_SHAPE_PT_LAT_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#shapestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "shape_pt_lon": {
+          "presence": "required",
+          "type": "Longitude",
+          "rule_id": "GTFS_SHAPES_TXT_SHAPE_PT_LON_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#shapestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "shape_pt_sequence": {
+          "presence": "required",
+          "type": "Non-negative integer",
+          "rule_id": "GTFS_SHAPES_TXT_SHAPE_PT_SEQUENCE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#shapestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "shape_dist_traveled": {
+          "presence": "optional",
+          "type": "Non-negative float",
+          "rule_id": "GTFS_SHAPES_TXT_SHAPE_DIST_TRAVELED_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#shapestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "frequencies.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_FREQUENCIES_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#frequenciestxt",
+      "condition": null,
+      "fields": {
+        "trip_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `trips.trip_id`",
+          "rule_id": "GTFS_FREQUENCIES_TXT_TRIP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#frequenciestxt",
+          "references": [
+            "trips.trip_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "start_time": {
+          "presence": "required",
+          "type": "Time",
+          "rule_id": "GTFS_FREQUENCIES_TXT_START_TIME_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#frequenciestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "end_time": {
+          "presence": "required",
+          "type": "Time",
+          "rule_id": "GTFS_FREQUENCIES_TXT_END_TIME_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#frequenciestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "headway_secs": {
+          "presence": "required",
+          "type": "Positive integer",
+          "rule_id": "GTFS_FREQUENCIES_TXT_HEADWAY_SECS_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#frequenciestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "exact_times": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_FREQUENCIES_TXT_EXACT_TIMES_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#frequenciestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_FREQUENCIES_TXT_EXACT_TIMES",
+          "condition": null
+        }
+      }
+    },
+    "transfers.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_TRANSFERS_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#transferstxt",
+      "condition": null,
+      "fields": {
+        "from_stop_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `stops.stop_id`",
+          "rule_id": "GTFS_TRANSFERS_TXT_FROM_STOP_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#transferstxt",
+          "references": [
+            "stops.stop_id"
+          ],
+          "enum": null,
+          "condition": "Identifies a stop (`location_type=0`) or a station (`location_type=1`) where a connection between routes begins. If this field refers to a station, the transfer rule applies to all its child stops. It must refer to a stop (`location_type=0`) if `transfer_type` is `4` or `5`.<br><br>Conditionally Required:<br>- **Required** if `transfer_type` is empty, `0`, `1`, `2`, or `3`.<br>- Optional if `transfer_type` is `4` or `5`."
+        },
+        "to_stop_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `stops.stop_id`",
+          "rule_id": "GTFS_TRANSFERS_TXT_TO_STOP_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#transferstxt",
+          "references": [
+            "stops.stop_id"
+          ],
+          "enum": null,
+          "condition": "Identifies a stop (`location_type=0`) or a station (`location_type=1`) where a connection between routes ends. If this field refers to a station, the transfer rule applies to all child stops. It must refer to a stop (`location_type=0`) if `transfer_type` is 4 or 5.<br><br>Conditionally Required:<br>- **Required** if `transfer_type` is empty, `0`, `1`, `2`, or `3`.<br>- Optional if `transfer_type` is `4` or `5`."
+        },
+        "from_route_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `routes.route_id`",
+          "rule_id": "GTFS_TRANSFERS_TXT_FROM_ROUTE_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#transferstxt",
+          "references": [
+            "routes.route_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "to_route_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `routes.route_id`",
+          "rule_id": "GTFS_TRANSFERS_TXT_TO_ROUTE_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#transferstxt",
+          "references": [
+            "routes.route_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "from_trip_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `trips.trip_id`",
+          "rule_id": "GTFS_TRANSFERS_TXT_FROM_TRIP_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#transferstxt",
+          "references": [
+            "trips.trip_id"
+          ],
+          "enum": null,
+          "condition": "Identifies a trip where a connection between routes begins.<br><br>If `from_trip_id` is defined, the transfer will apply to the arriving trip for the given `from_stop_id`.<br><br>If both `from_trip_id` and `from_route_id` are defined, the `trip_id` must belong to the `route_id`, and `from_trip_id` will take precedence.<br><br>Conditionally Required:<br>- **Required** if `transfer_type` is `4` or `5`. <br>- Optional otherwise."
+        },
+        "to_trip_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID referencing `trips.trip_id`",
+          "rule_id": "GTFS_TRANSFERS_TXT_TO_TRIP_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#transferstxt",
+          "references": [
+            "trips.trip_id"
+          ],
+          "enum": null,
+          "condition": "Identifies a trip where a connection between routes ends.<br><br>If `to_trip_id` is defined, the transfer will apply to the departing trip for the given `to_stop_id`.<br><br>If both `to_trip_id` and `to_route_id` are defined, the `trip_id` must belong to the `route_id`, and `to_trip_id` will take precedence. <br><br>Conditionally Required:<br>- **Required** if `transfer_type` is `4` or `5`. <br>- Optional otherwise."
+        },
+        "transfer_type": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_TRANSFERS_TXT_TRANSFER_TYPE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#transferstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_TRANSFERS_TXT_TRANSFER_TYPE",
+          "condition": null
+        },
+        "min_transfer_time": {
+          "presence": "optional",
+          "type": "Non-negative integer",
+          "rule_id": "GTFS_TRANSFERS_TXT_MIN_TRANSFER_TIME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#transferstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "pathways.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_PATHWAYS_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+      "condition": null,
+      "fields": {
+        "pathway_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_PATHWAYS_TXT_PATHWAY_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "from_stop_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `stops.stop_id`",
+          "rule_id": "GTFS_PATHWAYS_TXT_FROM_STOP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [
+            "stops.stop_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "to_stop_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `stops.stop_id`",
+          "rule_id": "GTFS_PATHWAYS_TXT_TO_STOP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [
+            "stops.stop_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "pathway_mode": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_PATHWAYS_TXT_PATHWAY_MODE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [],
+          "enum": "GTFS_ENUM_PATHWAYS_TXT_PATHWAY_MODE",
+          "condition": null
+        },
+        "is_bidirectional": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_PATHWAYS_TXT_IS_BIDIRECTIONAL_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [],
+          "enum": "GTFS_ENUM_PATHWAYS_TXT_IS_BIDIRECTIONAL",
+          "condition": null
+        },
+        "length": {
+          "presence": "optional",
+          "type": "Non-negative float",
+          "rule_id": "GTFS_PATHWAYS_TXT_LENGTH_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "traversal_time": {
+          "presence": "optional",
+          "type": "Positive integer",
+          "rule_id": "GTFS_PATHWAYS_TXT_TRAVERSAL_TIME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "stair_count": {
+          "presence": "optional",
+          "type": "Non-null integer",
+          "rule_id": "GTFS_PATHWAYS_TXT_STAIR_COUNT_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "max_slope": {
+          "presence": "optional",
+          "type": "Float",
+          "rule_id": "GTFS_PATHWAYS_TXT_MAX_SLOPE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "min_width": {
+          "presence": "optional",
+          "type": "Positive float",
+          "rule_id": "GTFS_PATHWAYS_TXT_MIN_WIDTH_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "signposted_as": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_PATHWAYS_TXT_SIGNPOSTED_AS_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "reversed_signposted_as": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_PATHWAYS_TXT_REVERSED_SIGNPOSTED_AS_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#pathwaystxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "levels.txt": {
+      "presence": "conditionally_required",
+      "rule_id": "GTFS_FILE_LEVELS_TXT_CONDITIONALLY_REQUIRED",
+      "source": "https://gtfs.org/documentation/schedule/reference/#levelstxt",
+      "condition": "required when pathways.txt contains pathway_mode=5",
+      "fields": {
+        "level_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_LEVELS_TXT_LEVEL_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#levelstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "level_index": {
+          "presence": "required",
+          "type": "Float",
+          "rule_id": "GTFS_LEVELS_TXT_LEVEL_INDEX_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#levelstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "level_name": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_LEVELS_TXT_LEVEL_NAME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#levelstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "location_groups.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_LOCATION_GROUPS_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#locationgroupstxt",
+      "condition": null,
+      "fields": {
+        "location_group_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_LOCATION_GROUPS_TXT_LOCATION_GROUP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationgroupstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "location_group_name": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_LOCATION_GROUPS_TXT_LOCATION_GROUP_NAME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationgroupstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "location_group_stops.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_LOCATION_GROUP_STOPS_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#locationgroupstopstxt",
+      "condition": null,
+      "fields": {
+        "location_group_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `location_groups.location_group_id`",
+          "rule_id": "GTFS_LOCATION_GROUP_STOPS_TXT_LOCATION_GROUP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationgroupstopstxt",
+          "references": [
+            "location_groups.location_group_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "stop_id": {
+          "presence": "required",
+          "type": "Foreign ID referencing `stops.stop_id`",
+          "rule_id": "GTFS_LOCATION_GROUP_STOPS_TXT_STOP_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationgroupstopstxt",
+          "references": [
+            "stops.stop_id"
+          ],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "locations.geojson": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_LOCATIONS_GEOJSON_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#locationsgeojson",
+      "condition": null,
+      "fields": {
+        "type": {
+          "presence": "required",
+          "type": "String",
+          "rule_id": "GTFS_LOCATIONS_GEOJSON_TYPE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationsgeojson",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "features": {
+          "presence": "required",
+          "type": "Array",
+          "rule_id": "GTFS_LOCATIONS_GEOJSON_FEATURES_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationsgeojson",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "id": {
+          "presence": "required",
+          "type": "String",
+          "rule_id": "GTFS_LOCATIONS_GEOJSON_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationsgeojson",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "properties": {
+          "presence": "required",
+          "type": "Object",
+          "rule_id": "GTFS_LOCATIONS_GEOJSON_PROPERTIES_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationsgeojson",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "stop_name": {
+          "presence": "optional",
+          "type": "String",
+          "rule_id": "GTFS_LOCATIONS_GEOJSON_STOP_NAME_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationsgeojson",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "stop_desc": {
+          "presence": "optional",
+          "type": "String",
+          "rule_id": "GTFS_LOCATIONS_GEOJSON_STOP_DESC_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationsgeojson",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "geometry": {
+          "presence": "required",
+          "type": "Object",
+          "rule_id": "GTFS_LOCATIONS_GEOJSON_GEOMETRY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationsgeojson",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "coordinates": {
+          "presence": "required",
+          "type": "Array",
+          "rule_id": "GTFS_LOCATIONS_GEOJSON_COORDINATES_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#locationsgeojson",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "booking_rules.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_BOOKING_RULES_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+      "condition": null,
+      "fields": {
+        "booking_rule_id": {
+          "presence": "required",
+          "type": "Unique ID",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_BOOKING_RULE_ID_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "booking_type": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_BOOKING_TYPE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": "GTFS_ENUM_BOOKING_RULES_TXT_BOOKING_TYPE",
+          "condition": null
+        },
+        "prior_notice_duration_min": {
+          "presence": "conditionally_required",
+          "type": "Integer",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_PRIOR_NOTICE_DURATION_MIN_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Minimum number of minutes before travel to make the request.<br><br>**Conditionally Required**:<br>- **Required** for `booking_type=1`.<br>- **Forbidden** otherwise."
+        },
+        "prior_notice_duration_max": {
+          "presence": "conditionally_forbidden",
+          "type": "Integer",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_PRIOR_NOTICE_DURATION_MAX_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Maximum number of minutes before travel to make the booking request.<br><br>**Conditionally Forbidden**:<br>- **Forbidden** for `booking_type=0` and `booking_type=2`.<br>- Optional for `booking_type=1`."
+        },
+        "prior_notice_last_day": {
+          "presence": "conditionally_required",
+          "type": "Integer",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_PRIOR_NOTICE_LAST_DAY_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Last day before travel to make the booking request. <br><br>Example: “Ride must be booked 1 day in advance before 5PM” will be encoded as `prior_notice_last_day=1`.<br><br>**Conditionally Required**:<br>- **Required** for `booking_type=2`.<br>- **Forbidden** otherwise."
+        },
+        "prior_notice_last_time": {
+          "presence": "conditionally_required",
+          "type": "Time",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_PRIOR_NOTICE_LAST_TIME_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Last time on the last day before travel to make the booking request.<br><br>Example: “Ride must be booked 1 day in advance before 5PM” will be encoded as `prior_notice_last_time=17:00:00`.<br><br>**Conditionally Required**:<br>- **Required** if `prior_notice_last_day` is defined.<br>- **Forbidden** otherwise."
+        },
+        "prior_notice_start_day": {
+          "presence": "conditionally_forbidden",
+          "type": "Integer",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_PRIOR_NOTICE_START_DAY_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Earliest day before travel to make the booking request.<br><br>Example: “Ride can be booked at the earliest one week in advance at midnight” will be encoded as `prior_notice_start_day=7`.<br><br>**Conditionally Forbidden**:<br>- **Forbidden** for `booking_type=0`.<br> - **Forbidden** for `booking_type=1` if `prior_notice_duration_max` is defined.<br> - Optional otherwise."
+        },
+        "prior_notice_start_time": {
+          "presence": "conditionally_required",
+          "type": "Time",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_PRIOR_NOTICE_START_TIME_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": "Earliest time on the earliest day before travel to make the booking request.<br><br>Example: “Ride can be booked at the earliest one week in advance at midnight” will be encoded as `prior_notice_start_time=00:00:00`.<br><br>**Conditionally Required**:<br>- **Required** if `prior_notice_start_day` is defined.<br>- **Forbidden** otherwise."
+        },
+        "prior_notice_service_id": {
+          "presence": "conditionally_forbidden",
+          "type": "Foreign ID referencing `calendar.service_id`",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_PRIOR_NOTICE_SERVICE_ID_CONDITIONALLY_FORBIDDEN",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [
+            "calendar.service_id"
+          ],
+          "enum": null,
+          "condition": "Indicates the service days on which `prior_notice_last_day` or `prior_notice_start_day` are counted. <br><br>Example: If empty, `prior_notice_start_day=2` will be two calendar days in advance. If defined as a `service_id` containing only business days (weekdays without holidays), `prior_notice_start_day=2` will be two business days in advance.<br><br>**Conditionally Forbidden**:<br> - Optional if `booking_type=2`. <br> - **Forbidden** otherwise."
+        },
+        "message": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_MESSAGE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "pickup_message": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_PICKUP_MESSAGE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "drop_off_message": {
+          "presence": "optional",
+          "type": "Text",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_DROP_OFF_MESSAGE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "phone_number": {
+          "presence": "optional",
+          "type": "Phone number",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_PHONE_NUMBER_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "info_url": {
+          "presence": "optional",
+          "type": "URL",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_INFO_URL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "booking_url": {
+          "presence": "optional",
+          "type": "URL",
+          "rule_id": "GTFS_BOOKING_RULES_TXT_BOOKING_URL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#bookingrulestxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "translations.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_TRANSLATIONS_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#translationstxt",
+      "condition": null,
+      "fields": {
+        "table_name": {
+          "presence": "required",
+          "type": "Enum",
+          "rule_id": "GTFS_TRANSLATIONS_TXT_TABLE_NAME_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#translationstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_TRANSLATIONS_TXT_TABLE_NAME",
+          "condition": null
+        },
+        "field_name": {
+          "presence": "required",
+          "type": "Text",
+          "rule_id": "GTFS_TRANSLATIONS_TXT_FIELD_NAME_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#translationstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "language": {
+          "presence": "required",
+          "type": "Language code",
+          "rule_id": "GTFS_TRANSLATIONS_TXT_LANGUAGE_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#translationstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "translation": {
+          "presence": "required",
+          "type": "Text or URL or Email or Phone number",
+          "rule_id": "GTFS_TRANSLATIONS_TXT_TRANSLATION_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#translationstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "record_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID",
+          "rule_id": "GTFS_TRANSLATIONS_TXT_RECORD_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#translationstxt",
+          "references": [],
+          "enum": null,
+          "condition": "Defines the record that corresponds to the field to be translated. The value in `record_id` must be the first or only field of a table's primary key, as defined in the primary key attribute for each table and below:<br><br>- `agency_id` for [agency.txt](#agencytxt)<br>- `stop_id` for [stops.txt](#stopstxt);<br>- `route_id` for [routes.txt](#routestxt);<br>- `trip_id` for [trips.txt](#tripstxt);<br>- `trip_id` for [stop_times.txt](#stop_timestxt);<br>- `pathway_id` for [pathways.txt](#pathwaystxt);<br>- `level_id` for [levels.txt](#levelstxt);<br>- `attribution_id` for [attributions.txt](#attributionstxt).<br><br>Fields in tables not defined above should not be translated. However producers sometimes add extra fields that are outside the official specification and these unofficial fields may be translated. Below is the recommended way to use `record_id` for those tables:<br><br>- `service_id` for [calendar.txt](#calendartxt);<br>- `service_id` for [calendar_dates.txt](#calendar_datestxt);<br>- `fare_id` for [fare_attributes.txt](#fare_attributestxt);<br>- `fare_id` for [fare_rules.txt](#fare_rulestxt);<br>- `shape_id` for [shapes.txt](#shapestxt);<br>- `trip_id` for [frequencies.txt](#frequenciestxt);<br>- `from_stop_id` for `transfers.txt`.<br><br>Conditionally Required:<br>- **Forbidden** if `table_name` is `feed_info`.<br>- **Forbidden** if `field_value` is defined.<br>- **Required** if `field_value` is empty."
+        },
+        "record_sub_id": {
+          "presence": "conditionally_required",
+          "type": "Foreign ID",
+          "rule_id": "GTFS_TRANSLATIONS_TXT_RECORD_SUB_ID_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#translationstxt",
+          "references": [],
+          "enum": null,
+          "condition": "Helps the record that contains the field to be translated when the table doesn’t have a unique ID. Therefore, the value in `record_sub_id` is the secondary ID of the table, as defined by the table below:<br><br>- None for [agency.txt](#agencytxt);<br>- None for [stops.txt](#stopstxt);<br>- None for [routes.txt](#routestxt);<br>- None for [trips.txt](#tripstxt);<br>- `stop_sequence` for [stop_times.txt](#stop_timestxt);<br>- None for [pathways.txt](#pathwaystxt);<br>- None for [levels.txt](#levelstxt);<br>- None for [attributions.txt](#attributionstxt).<br><br>Fields in tables not defined above should not be translated. However producers sometimes add extra fields that are outside the official specification and these unofficial fields may be translated. Below is the recommended way to use `record_sub_id` for those tables:<br><br>- None for [calendar.txt](#calendartxt);<br>- `date` for [calendar_dates.txt](#calendar_datestxt);<br>- None for [fare_attributes.txt](#fare_attributestxt);<br>- `route_id` for [fare_rules.txt](#fare_rulestxt);<br>- None for [shapes.txt](#shapestxt);<br>- `start_time` for [frequencies.txt](#frequenciestxt);<br>- `to_stop_id` for [transfers.txt](#transferstxt).<br><br>Conditionally Required:<br>- **Forbidden** if `table_name` is `feed_info`.<br>- **Forbidden** if `field_value` is defined.<br>- **Required** if `table_name=stop_times` and `record_id` is defined."
+        },
+        "field_value": {
+          "presence": "conditionally_required",
+          "type": "Text or URL or Email or Phone number",
+          "rule_id": "GTFS_TRANSLATIONS_TXT_FIELD_VALUE_CONDITIONALLY_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#translationstxt",
+          "references": [],
+          "enum": null,
+          "condition": "Instead of defining which record should be translated by using `record_id` and `record_sub_id`, this field can be used to define the value which should be translated. When used, the translation will be applied when the fields identified by `table_name` and `field_name` contains the exact same value defined in field_value.<br><br>The field must have **exactly** the value defined in `field_value`. If only a subset of the value matches `field_value`, the translation won’t be applied.<br><br>If two translation rules match the same record (one with `field_value`, and the other one with `record_id`), the rule with `record_id` takes precedence.<br><br>Conditionally Required:<br>- **Forbidden** if `table_name` is `feed_info`.<br>- **Forbidden** if `record_id` is defined.<br>- **Required** if `record_id` is empty."
+        }
+      }
+    },
+    "feed_info.txt": {
+      "presence": "conditionally_required",
+      "rule_id": "GTFS_FILE_FEED_INFO_TXT_CONDITIONALLY_REQUIRED",
+      "source": "https://gtfs.org/documentation/schedule/reference/#feedinfotxt",
+      "condition": "required when translations.txt is provided",
+      "fields": {
+        "feed_publisher_name": {
+          "presence": "required",
+          "type": "Text",
+          "rule_id": "GTFS_FEED_INFO_TXT_FEED_PUBLISHER_NAME_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#feedinfotxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "feed_publisher_url": {
+          "presence": "required",
+          "type": "URL",
+          "rule_id": "GTFS_FEED_INFO_TXT_FEED_PUBLISHER_URL_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#feedinfotxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "feed_lang": {
+          "presence": "required",
+          "type": "Language code",
+          "rule_id": "GTFS_FEED_INFO_TXT_FEED_LANG_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#feedinfotxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "default_lang": {
+          "presence": "optional",
+          "type": "Language code",
+          "rule_id": "GTFS_FEED_INFO_TXT_DEFAULT_LANG_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#feedinfotxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "feed_start_date": {
+          "presence": "recommended",
+          "type": "Date",
+          "rule_id": "GTFS_FEED_INFO_TXT_FEED_START_DATE_RECOMMENDED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#feedinfotxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "feed_end_date": {
+          "presence": "recommended",
+          "type": "Date",
+          "rule_id": "GTFS_FEED_INFO_TXT_FEED_END_DATE_RECOMMENDED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#feedinfotxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "feed_version": {
+          "presence": "recommended",
+          "type": "Text",
+          "rule_id": "GTFS_FEED_INFO_TXT_FEED_VERSION_RECOMMENDED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#feedinfotxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "feed_contact_email": {
+          "presence": "optional",
+          "type": "Email",
+          "rule_id": "GTFS_FEED_INFO_TXT_FEED_CONTACT_EMAIL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#feedinfotxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "feed_contact_url": {
+          "presence": "optional",
+          "type": "URL",
+          "rule_id": "GTFS_FEED_INFO_TXT_FEED_CONTACT_URL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#feedinfotxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    },
+    "attributions.txt": {
+      "presence": "optional",
+      "rule_id": "GTFS_FILE_ATTRIBUTIONS_TXT_OPTIONAL",
+      "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+      "condition": null,
+      "fields": {
+        "attribution_id": {
+          "presence": "optional",
+          "type": "Unique ID",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_ATTRIBUTION_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "agency_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `agency.agency_id`",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_AGENCY_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [
+            "agency.agency_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "route_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `routes.route_id`",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_ROUTE_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [
+            "routes.route_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "trip_id": {
+          "presence": "optional",
+          "type": "Foreign ID referencing `trips.trip_id`",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_TRIP_ID_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [
+            "trips.trip_id"
+          ],
+          "enum": null,
+          "condition": null
+        },
+        "organization_name": {
+          "presence": "required",
+          "type": "Text",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_ORGANIZATION_NAME_REQUIRED",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "is_producer": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_IS_PRODUCER_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_ATTRIBUTIONS_TXT_IS_PRODUCER",
+          "condition": null
+        },
+        "is_operator": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_IS_OPERATOR_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_ATTRIBUTIONS_TXT_IS_OPERATOR",
+          "condition": null
+        },
+        "is_authority": {
+          "presence": "optional",
+          "type": "Enum",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_IS_AUTHORITY_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [],
+          "enum": "GTFS_ENUM_ATTRIBUTIONS_TXT_IS_AUTHORITY",
+          "condition": null
+        },
+        "attribution_url": {
+          "presence": "optional",
+          "type": "URL",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_ATTRIBUTION_URL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "attribution_email": {
+          "presence": "optional",
+          "type": "Email",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_ATTRIBUTION_EMAIL_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        },
+        "attribution_phone": {
+          "presence": "optional",
+          "type": "Phone number",
+          "rule_id": "GTFS_ATTRIBUTIONS_TXT_ATTRIBUTION_PHONE_OPTIONAL",
+          "source": "https://gtfs.org/documentation/schedule/reference/#attributionstxt",
+          "references": [],
+          "enum": null,
+          "condition": null
+        }
+      }
+    }
+  },
+  "enums": {
+    "GTFS_ENUM_AGENCY_TXT_CEMV_SUPPORT": [
+      "1",
+      "2"
+    ],
+    "GTFS_ENUM_STOPS_TXT_LOCATION_TYPE": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "GTFS_ENUM_STOPS_TXT_WHEELCHAIR_BOARDING": [
+      "1",
+      "2",
+      "1",
+      "2",
+      "1",
+      "2"
+    ],
+    "GTFS_ENUM_STOPS_TXT_STOP_ACCESS": [
+      "0",
+      "1"
+    ],
+    "GTFS_ENUM_ROUTES_TXT_ROUTE_TYPE": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "11",
+      "12"
+    ],
+    "GTFS_ENUM_ROUTES_TXT_CONTINUOUS_PICKUP": [
+      "0",
+      "2",
+      "3"
+    ],
+    "GTFS_ENUM_ROUTES_TXT_CONTINUOUS_DROP_OFF": [
+      "0",
+      "2",
+      "3"
+    ],
+    "GTFS_ENUM_ROUTES_TXT_CEMV_SUPPORT": [
+      "1",
+      "2"
+    ],
+    "GTFS_ENUM_TRIPS_TXT_DIRECTION_ID": [
+      "0",
+      "1"
+    ],
+    "GTFS_ENUM_TRIPS_TXT_WHEELCHAIR_ACCESSIBLE": [
+      "1",
+      "2"
+    ],
+    "GTFS_ENUM_TRIPS_TXT_BIKES_ALLOWED": [
+      "1",
+      "2"
+    ],
+    "GTFS_ENUM_TRIPS_TXT_CARS_ALLOWED": [
+      "1",
+      "2"
+    ],
+    "GTFS_ENUM_STOP_TIMES_TXT_PICKUP_TYPE": [
+      "1",
+      "2",
+      "3"
+    ],
+    "GTFS_ENUM_STOP_TIMES_TXT_DROP_OFF_TYPE": [
+      "1",
+      "2",
+      "3"
+    ],
+    "GTFS_ENUM_STOP_TIMES_TXT_CONTINUOUS_PICKUP": [
+      "0",
+      "2",
+      "3"
+    ],
+    "GTFS_ENUM_STOP_TIMES_TXT_CONTINUOUS_DROP_OFF": [
+      "0",
+      "2",
+      "3"
+    ],
+    "GTFS_ENUM_STOP_TIMES_TXT_TIMEPOINT": [
+      "0",
+      "1"
+    ],
+    "GTFS_ENUM_CALENDAR_TXT_MONDAY": [
+      "1",
+      "0"
+    ],
+    "GTFS_ENUM_CALENDAR_TXT_TUESDAY": [],
+    "GTFS_ENUM_CALENDAR_TXT_WEDNESDAY": [],
+    "GTFS_ENUM_CALENDAR_TXT_THURSDAY": [],
+    "GTFS_ENUM_CALENDAR_TXT_FRIDAY": [],
+    "GTFS_ENUM_CALENDAR_TXT_SATURDAY": [],
+    "GTFS_ENUM_CALENDAR_TXT_SUNDAY": [],
+    "GTFS_ENUM_CALENDAR_DATES_TXT_EXCEPTION_TYPE": [
+      "1",
+      "2"
+    ],
+    "GTFS_ENUM_FARE_ATTRIBUTES_TXT_PAYMENT_METHOD": [
+      "0",
+      "1"
+    ],
+    "GTFS_ENUM_FARE_ATTRIBUTES_TXT_TRANSFERS": [
+      "0",
+      "1",
+      "2"
+    ],
+    "GTFS_ENUM_RIDER_CATEGORIES_TXT_IS_DEFAULT_FARE_CATEGORY": [
+      "1"
+    ],
+    "GTFS_ENUM_FARE_MEDIA_TXT_FARE_MEDIA_TYPE": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "GTFS_ENUM_FARE_TRANSFER_RULES_TXT_DURATION_LIMIT_TYPE": [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    "GTFS_ENUM_FARE_TRANSFER_RULES_TXT_FARE_TRANSFER_TYPE": [
+      "0",
+      "1",
+      "2"
+    ],
+    "GTFS_ENUM_FREQUENCIES_TXT_EXACT_TIMES": [
+      "1"
+    ],
+    "GTFS_ENUM_TRANSFERS_TXT_TRANSFER_TYPE": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "GTFS_ENUM_PATHWAYS_TXT_PATHWAY_MODE": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7"
+    ],
+    "GTFS_ENUM_PATHWAYS_TXT_IS_BIDIRECTIONAL": [
+      "0",
+      "1"
+    ],
+    "GTFS_ENUM_BOOKING_RULES_TXT_BOOKING_TYPE": [
+      "0",
+      "1",
+      "2"
+    ],
+    "GTFS_ENUM_TRANSLATIONS_TXT_TABLE_NAME": [],
+    "GTFS_ENUM_ATTRIBUTIONS_TXT_IS_PRODUCER": [
+      "1"
+    ],
+    "GTFS_ENUM_ATTRIBUTIONS_TXT_IS_OPERATOR": [],
+    "GTFS_ENUM_ATTRIBUTIONS_TXT_IS_AUTHORITY": []
+  }
+}

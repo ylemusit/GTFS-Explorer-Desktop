@@ -1,0 +1,18 @@
+{
+  "fixture_id": "invalid_missing_stop_times",
+  "description": "Feed GTFS Schedule ficticio con viaje sin stop_times.txt para pruebas de validación.",
+  "tables": {
+    "agency.txt": {
+      "headers": ["agency_name", "agency_url", "agency_timezone"],
+      "rows": [{"agency_name": "Operador Ficticio", "agency_url": "https://example.invalid", "agency_timezone": "Europe/Madrid"}]
+    },
+    "routes.txt": {
+      "headers": ["route_id", "route_short_name", "route_type"],
+      "rows": [{"route_id": "R1", "route_short_name": "1", "route_type": "3"}]
+    },
+    "trips.txt": {
+      "headers": ["route_id", "service_id", "trip_id"],
+      "rows": [{"route_id": "R1", "service_id": "weekday", "trip_id": "T1"}]
+    }
+  }
+}

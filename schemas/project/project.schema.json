@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GTFS Explorer Desktop project descriptor v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "project_id", "name", "status", "feed", "references"],
+  "properties": {
+    "version": {"const": 1},
+    "project_id": {"type": "string", "minLength": 1},
+    "name": {"type": "string", "minLength": 1},
+    "status": {"type": "string", "minLength": 1},
+    "feed": {"type": ["object", "null"]},
+    "references": {"type": "object"}
+  }
+}

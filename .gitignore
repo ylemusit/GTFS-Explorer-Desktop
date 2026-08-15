@@ -1,0 +1,19 @@
+.codex-runs/
+.task-*/
+.venv/
+.pytest_cache/
+.t004-temp/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.tmp/
+.pip-build-tracker/
+.pip-cache/
+tests/.runtime/
+tests/fixtures/generated/
+node_modules/
+dist/
+examples/golines-asturias/generated/
+packaging/portable/deployment/
+packaging/portable/GTFS Explorer.dist/
+nuitka-crash-report.xml

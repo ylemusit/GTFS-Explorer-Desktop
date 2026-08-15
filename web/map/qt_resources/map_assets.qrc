@@ -1,0 +1,10 @@
+<!DOCTYPE RCC><RCC version="1.0">
+  <qresource prefix="/gtfs-explorer/map">
+    <file alias="map_bundle.js">map_bundle.js</file>
+    <file alias="map_worker.mjs">map_worker.mjs</file>
+    <file alias="maplibre-gl-shared.mjs">maplibre-gl-shared.mjs</file>
+    <file alias="maplibre-gl.css">maplibre-gl.css</file>
+    <file alias="map_bridge.js">map_bridge.js</file>
+    <file alias="map_layers.js">map_layers.js</file>
+  </qresource>
+</RCC>

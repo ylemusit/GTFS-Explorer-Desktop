@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GTFS Explorer Desktop settings v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "recent_project_paths"],
+  "properties": {
+    "version": {"const": 1},
+    "recent_project_paths": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).*$"}
+    }
+  }
+}

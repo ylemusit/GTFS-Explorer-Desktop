@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "generator": {"name": "GTFS Explorer Desktop", "version": "0.1.0"},
+  "source": {"sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "spec_revision": "2026-04-27"},
+  "selection": {"route_ids": ["D1"], "trip_ids": [], "service_ids": ["WD"]},
+  "agencies": [{"agency_id": "A", "name": "Demo", "timezone": "Europe/Madrid"}],
+  "routes": [{"route_id": "D1", "agency_id": "A", "short_name": "D1", "long_name": "Demo 1", "route_type": 3}],
+  "services": [{"service_id": "WD", "calendar": {"monday": true, "tuesday": true, "wednesday": true, "thursday": true, "friday": true, "saturday": false, "sunday": false, "start_date": "2026-01-01", "end_date": "2026-12-31"}, "calendar_dates": []}],
+  "stops": [{"stop_id": "S1", "name": "Parada", "latitude": 43.36, "longitude": -5.84, "location_type": 0, "parent_station": null}],
+  "shapes": [{"shape_id": "D1_OUT", "points": [{"sequence": 1, "latitude": 43.36, "longitude": -5.84, "distance_traveled": 0}]}],
+  "trips": [{"trip_id": "D1_WD_2500", "route_id": "D1", "service_id": "WD", "direction_id": 0, "shape_id": "D1_OUT", "stop_times": [{"stop_id": "S1", "stop_sequence": 1, "arrival": "25:00:00", "arrival_service_seconds": 90000, "departure": "25:00:00", "departure_service_seconds": 90000}]}],
+  "transfers": [], "metadata": {"license": "synthetic"}, "warnings": [{"code": "DEMO_WARNING", "message": "Ejemplo sintético."}]
+}

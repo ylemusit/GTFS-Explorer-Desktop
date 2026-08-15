@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' qrc:; connect-src 'self'; style-src 'self';">
+  <title>GTFS Explorer map spike</title>
+  <style>body { margin: 0; } svg { background: #f5f5f5; }</style>
+</head>
+<body>
+  <svg width="320" height="180" aria-label="Línea y parada locales">
+    <path d="M20,140 L160,40 L300,100" stroke="#155eef" stroke-width="5" fill="none"></path>
+    <circle cx="160" cy="40" r="8" fill="#d92d20"></circle>
+  </svg>
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <script>
+    new QWebChannel(qt.webChannelTransport, function (channel) {
+      const bridge = channel.objects.spikeBridge;
+      bridge.report(JSON.stringify({kind: "feature-clicked", feature: "stop:fixture"}));
+      fetch("/tiles/sample.pmtiles", {headers: {Range: "bytes=0-7"}}).then(function (response) {
+        bridge.report(JSON.stringify({kind: "range-result", status: response.status, contentRange: response.headers.get("Content-Range")}));
+      });
+    });
+  </script>
+</body>
+</html>

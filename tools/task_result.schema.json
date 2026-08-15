@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Resultado de una tarea del plan maestro",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "status",
+    "summary",
+    "files_changed",
+    "tests",
+    "criteria",
+    "pending_or_risk",
+    "out_of_scope",
+    "blocker",
+    "gate_decision"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^T[0-9]{3}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DONE", "BLOCKED"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "files_changed": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "tests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "status", "result"],
+        "properties": {
+          "command": { "type": "string", "minLength": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["PASSED", "FAILED", "NOT_RUN"]
+          },
+          "result": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion", "demonstrated", "evidence"],
+        "properties": {
+          "criterion": { "type": "string", "minLength": 1 },
+          "demonstrated": { "type": "boolean" },
+          "evidence": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "pending_or_risk": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "out_of_scope": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "type", "description", "required_action"],
+      "properties": {
+        "present": { "type": "boolean" },
+        "type": {
+          "type": "string",
+          "enum": ["NONE", "TECHNICAL", "EXTERNAL_DECISION", "PERMISSION", "COST", "SECURITY"]
+        },
+        "description": { "type": "string" },
+        "required_action": { "type": "string" }
+      }
+    },
+    "gate_decision": {
+      "type": "string",
+      "enum": ["NOT_APPLICABLE", "GO", "NO_GO"]
+    }
+  }
+}

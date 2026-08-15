@@ -1,0 +1,11 @@
+{
+  "assets": {
+    "map_bundle.js": "f1c9a9f2dc5cacf3e685f3b681866294e0f3a68d5a826b206fd519229a0cc1e1",
+    "map_worker.mjs": "1c427feab7d74c34102faa70ecdc6f1916e5fd71d70dd33c01e71cb01163a05c",
+    "maplibre-gl-shared.mjs": "c919fed81cb2fe1bc424567a50c54c8a8609d6d3f457a672c2e59e4dbbc78c35",
+    "maplibre-gl.css": "8e2dbbab312dc57656fbb76e9fa5308c75c9d7c7ba5808a7d55bcdb64cc813fa"
+  },
+  "lock_sha256": "af37b2368bdd8149981ecbfe5d082f9d06f761726e2287836cda4af395fff961",
+  "node": "v24.11.0",
+  "npm": "11.6.1"
+}

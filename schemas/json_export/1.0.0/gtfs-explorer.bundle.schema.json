@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gtfs-explorer.local/schemas/json-export/1.0.0/gtfs-explorer.bundle.schema.json",
+  "title": "GTFS Explorer bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generator", "source", "selection", "agencies", "routes", "services", "stops", "shapes", "trips", "transfers", "metadata", "warnings"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "generator": {"$ref": "#/$defs/generator"},
+    "source": {"$ref": "#/$defs/source"},
+    "selection": {"$ref": "#/$defs/selection"},
+    "agencies": {"type": "array", "items": {"$ref": "#/$defs/agency"}},
+    "routes": {"type": "array", "items": {"$ref": "#/$defs/route"}},
+    "services": {"type": "array", "items": {"$ref": "#/$defs/service"}},
+    "stops": {"type": "array", "items": {"$ref": "#/$defs/stop"}},
+    "shapes": {"type": "array", "items": {"$ref": "#/$defs/shape"}},
+    "trips": {"type": "array", "items": {"$ref": "#/$defs/trip"}},
+    "transfers": {"type": "array", "items": {"$ref": "#/$defs/transfer"}},
+    "metadata": {"type": "object"},
+    "warnings": {"type": "array", "items": {"$ref": "#/$defs/warning"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1},
+    "maybe_string": {"type": ["string", "null"]},
+    "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "time": {"type": ["string", "null"], "pattern": "^([0-9]{1,}):[0-5][0-9]:[0-5][0-9]$"},
+    "generator": {"type": "object", "additionalProperties": false, "required": ["name", "version"], "properties": {"name": {"const": "GTFS Explorer Desktop"}, "version": {"$ref": "#/$defs/id"}}},
+    "source": {"type": "object", "additionalProperties": false, "required": ["sha256", "spec_revision"], "properties": {"sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "spec_revision": {"$ref": "#/$defs/date"}}},
+    "selection": {"type": "object", "additionalProperties": false, "required": ["route_ids", "trip_ids", "service_ids"], "properties": {"route_ids": {"$ref": "#/$defs/id_list"}, "trip_ids": {"$ref": "#/$defs/id_list"}, "service_ids": {"$ref": "#/$defs/id_list"}}},
+    "id_list": {"type": "array", "items": {"$ref": "#/$defs/id"}, "uniqueItems": true},
+    "agency": {"type": "object", "additionalProperties": false, "required": ["agency_id", "name", "timezone"], "properties": {"agency_id": {"$ref": "#/$defs/maybe_string"}, "name": {"$ref": "#/$defs/id"}, "timezone": {"$ref": "#/$defs/id"}, "url": {"$ref": "#/$defs/maybe_string"}, "lang": {"$ref": "#/$defs/maybe_string"}, "phone": {"$ref": "#/$defs/maybe_string"}, "email": {"$ref": "#/$defs/maybe_string"}, "fare_url": {"$ref": "#/$defs/maybe_string"}}},
+    "route": {"type": "object", "additionalProperties": false, "required": ["route_id", "agency_id", "short_name", "long_name", "route_type"], "properties": {"route_id": {"$ref": "#/$defs/id"}, "agency_id": {"$ref": "#/$defs/maybe_string"}, "short_name": {"$ref": "#/$defs/maybe_string"}, "long_name": {"$ref": "#/$defs/maybe_string"}, "route_type": {"type": "integer"}, "description": {"$ref": "#/$defs/maybe_string"}, "url": {"$ref": "#/$defs/maybe_string"}, "color": {"$ref": "#/$defs/maybe_string"}, "text_color": {"$ref": "#/$defs/maybe_string"}}},
+    "calendar": {"type": "object", "additionalProperties": false, "required": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "start_date", "end_date"], "properties": {"monday": {"type": "boolean"}, "tuesday": {"type": "boolean"}, "wednesday": {"type": "boolean"}, "thursday": {"type": "boolean"}, "friday": {"type": "boolean"}, "saturday": {"type": "boolean"}, "sunday": {"type": "boolean"}, "start_date": {"$ref": "#/$defs/date"}, "end_date": {"$ref": "#/$defs/date"}}},
+    "service": {"type": "object", "additionalProperties": false, "required": ["service_id", "calendar", "calendar_dates"], "properties": {"service_id": {"$ref": "#/$defs/id"}, "calendar": {"anyOf": [{"$ref": "#/$defs/calendar"}, {"type": "null"}]}, "calendar_dates": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["date", "exception_type"], "properties": {"date": {"$ref": "#/$defs/date"}, "exception_type": {"enum": [1, 2]}}}}}},
+    "stop": {"type": "object", "additionalProperties": false, "required": ["stop_id", "name", "latitude", "longitude", "location_type", "parent_station"], "properties": {"stop_id": {"$ref": "#/$defs/id"}, "name": {"$ref": "#/$defs/maybe_string"}, "latitude": {"type": ["number", "null"], "minimum": -90, "maximum": 90}, "longitude": {"type": ["number", "null"], "minimum": -180, "maximum": 180}, "location_type": {"type": ["integer", "null"], "minimum": 0, "maximum": 4}, "parent_station": {"$ref": "#/$defs/maybe_string"}, "code": {"$ref": "#/$defs/maybe_string"}, "description": {"$ref": "#/$defs/maybe_string"}, "timezone": {"$ref": "#/$defs/maybe_string"}, "wheelchair_boarding": {"type": ["integer", "null"], "minimum": 0, "maximum": 2}}},
+    "shape": {"type": "object", "additionalProperties": false, "required": ["shape_id", "points"], "properties": {"shape_id": {"$ref": "#/$defs/id"}, "points": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["sequence", "latitude", "longitude", "distance_traveled"], "properties": {"sequence": {"type": "integer", "minimum": 0}, "latitude": {"type": "number", "minimum": -90, "maximum": 90}, "longitude": {"type": "number", "minimum": -180, "maximum": 180}, "distance_traveled": {"type": ["number", "null"], "minimum": 0}}}}}},
+    "stop_time": {"type": "object", "additionalProperties": false, "required": ["stop_id", "stop_sequence", "arrival", "arrival_service_seconds", "departure", "departure_service_seconds"], "properties": {"stop_id": {"$ref": "#/$defs/id"}, "stop_sequence": {"type": "integer", "minimum": 0}, "arrival": {"$ref": "#/$defs/time"}, "arrival_service_seconds": {"type": ["integer", "null"], "minimum": 0}, "departure": {"$ref": "#/$defs/time"}, "departure_service_seconds": {"type": ["integer", "null"], "minimum": 0}, "headsign": {"$ref": "#/$defs/maybe_string"}, "pickup_type": {"type": ["integer", "null"], "minimum": 0, "maximum": 3}, "drop_off_type": {"type": ["integer", "null"], "minimum": 0, "maximum": 3}, "timepoint": {"enum": [0, 1, null]}}},
+    "trip": {"type": "object", "additionalProperties": false, "required": ["trip_id", "route_id", "service_id", "direction_id", "shape_id", "stop_times"], "properties": {"trip_id": {"$ref": "#/$defs/id"}, "route_id": {"$ref": "#/$defs/id"}, "service_id": {"$ref": "#/$defs/id"}, "direction_id": {"enum": [0, 1, null]}, "shape_id": {"$ref": "#/$defs/maybe_string"}, "headsign": {"$ref": "#/$defs/maybe_string"}, "short_name": {"$ref": "#/$defs/maybe_string"}, "wheelchair_accessible": {"type": ["integer", "null"], "minimum": 0, "maximum": 2}, "bikes_allowed": {"type": ["integer", "null"], "minimum": 0, "maximum": 2}, "stop_times": {"type": "array", "items": {"$ref": "#/$defs/stop_time"}}}},
+    "transfer": {"type": "object", "additionalProperties": false, "required": ["from_stop_id", "to_stop_id", "transfer_type", "min_transfer_time"], "properties": {"from_stop_id": {"$ref": "#/$defs/id"}, "to_stop_id": {"$ref": "#/$defs/id"}, "transfer_type": {"type": ["integer", "null"], "minimum": 0, "maximum": 5}, "min_transfer_time": {"type": ["integer", "null"], "minimum": 0}}},
+    "warning": {"type": "object", "additionalProperties": false, "required": ["code", "message"], "properties": {"code": {"$ref": "#/$defs/id"}, "message": {"$ref": "#/$defs/id"}, "entity_type": {"$ref": "#/$defs/maybe_string"}, "entity_id": {"$ref": "#/$defs/maybe_string"}}}
+  }
+}

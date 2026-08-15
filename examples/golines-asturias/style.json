@@ -1,0 +1,77 @@
+{
+  "version": 8,
+  "name": "Asturias offline — ejemplo GoLines",
+  "sources": {
+    "basemap": {
+      "type": "vector",
+      "url": "pmtiles://basemap.pmtiles",
+      "attribution": "© OpenStreetMap contributors"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {"background-color": "#eaf0f3"}
+    },
+    {
+      "id": "earth",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "earth",
+      "paint": {"fill-color": "#eef1e7"}
+    },
+    {
+      "id": "landcover",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "landcover",
+      "paint": {"fill-color": "#dce8d4", "fill-opacity": 0.7}
+    },
+    {
+      "id": "landuse",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "landuse",
+      "paint": {"fill-color": "#e3eadc", "fill-opacity": 0.65}
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "water",
+      "paint": {"fill-color": "#a9d8e8"}
+    },
+    {
+      "id": "buildings",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "buildings",
+      "minzoom": 11,
+      "paint": {"fill-color": "#d7ccbe", "fill-opacity": 0.8}
+    },
+    {
+      "id": "boundaries",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "boundaries",
+      "paint": {"line-color": "#9aa5ad", "line-width": 1, "line-dasharray": [3, 2]}
+    },
+    {
+      "id": "roads-casing",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "roads",
+      "minzoom": 5,
+      "paint": {"line-color": "#c4c9cd", "line-width": 3.4, "line-opacity": 0.85}
+    },
+    {
+      "id": "roads",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "roads",
+      "minzoom": 5,
+      "paint": {"line-color": "#ffffff", "line-width": 2.2, "line-opacity": 0.95}
+    }
+  ]
+}

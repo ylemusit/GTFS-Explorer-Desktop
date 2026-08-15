@@ -1,0 +1,1 @@
+"""Inspector de paradas GTFS."""

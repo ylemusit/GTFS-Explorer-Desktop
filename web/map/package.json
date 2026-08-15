@@ -1,0 +1,14 @@
+{
+  "name": "gtfs-explorer-map-spike",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "maplibre-gl": "6.3.0",
+    "pmtiles": "4.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0.0",
+  "generator": {"name": "GTFS Explorer Desktop", "version": "0.1.0"},
+  "source": {"sha256": "0000000000000000000000000000000000000000000000000000000000000000", "spec_revision": "2026-04-27"},
+  "selection": {"route_ids": [], "trip_ids": [], "service_ids": []},
+  "agencies": [], "routes": [], "services": [], "stops": [], "shapes": [], "trips": [], "transfers": [], "metadata": {}, "warnings": []
+}
