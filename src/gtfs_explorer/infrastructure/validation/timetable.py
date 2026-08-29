@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import TypeGuard
 
 from gtfs_explorer.domain.validation import (
     LocalizedMessage,
@@ -69,8 +70,8 @@ class _StopTime:
     location_group_id: str | None
     location_id: str | None
     sequence: int | None
-    window_start: int | None
-    window_end: int | None
+    window_start: int | str | None
+    window_end: int | str | None
     pickup_type: int | None
     drop_off_type: int | None
     continuous_pickup: int | None
@@ -79,7 +80,7 @@ class _StopTime:
 
     @property
     def has_window(self) -> bool:
-        return self.window_start is not None or self.window_end is not None
+        return _is_informed(self.window_start) or _is_informed(self.window_end)
 
     @property
     def entity_id(self) -> str:
@@ -102,11 +103,9 @@ def _stop_time_conditions(rows: tuple[_StopTime, ...]) -> Iterable[ValidationIss
                 "stop_id",
                 row.entity_id,
             )
-        if (
-            row.window_start is None
-            and row.window_end is not None
-            or (row.window_start is not None and row.window_end is None)
-        ):
+        start_informed = _is_informed(row.window_start)
+        end_informed = _is_informed(row.window_end)
+        if start_informed != end_informed:
             yield _issue(
                 "GTFS_STOP_TIME_WINDOW_PAIR_REQUIRED",
                 "validation.stop_time_window_pair_required",
@@ -115,11 +114,7 @@ def _stop_time_conditions(rows: tuple[_StopTime, ...]) -> Iterable[ValidationIss
                 "start_pickup_drop_off_window",
                 row.entity_id,
             )
-        if (
-            row.window_start is not None
-            and row.window_end is not None
-            and row.window_start > row.window_end
-        ):
+        if _window_order_invalid(row.window_start, row.window_end):
             yield _issue(
                 "GTFS_STOP_TIME_WINDOW_ORDER_INVALID",
                 "validation.stop_time_window_order_invalid",
@@ -138,7 +133,7 @@ def _stop_time_conditions(rows: tuple[_StopTime, ...]) -> Iterable[ValidationIss
                     "arrival_time",
                     row.entity_id,
                 )
-            if row.pickup_type in (None, 0, 3):
+            if row.pickup_type in (0, 3):
                 yield _issue(
                     "GTFS_STOP_TIME_WINDOW_PICKUP_FORBIDDEN",
                     "validation.stop_time_window_pickup_forbidden",
@@ -147,7 +142,7 @@ def _stop_time_conditions(rows: tuple[_StopTime, ...]) -> Iterable[ValidationIss
                     "pickup_type",
                     row.entity_id,
                 )
-            if row.drop_off_type in (None, 0):
+            if row.drop_off_type == 0:
                 yield _issue(
                     "GTFS_STOP_TIME_WINDOW_DROP_OFF_FORBIDDEN",
                     "validation.stop_time_window_drop_off_forbidden",
@@ -194,6 +189,21 @@ def _stop_time_conditions(rows: tuple[_StopTime, ...]) -> Iterable[ValidationIss
                     "arrival_time",
                     row.entity_id,
                 )
+
+
+def _is_informed(value: int | str | None) -> TypeGuard[int | str]:
+    """Trata lexemas vacíos como ausencia, incluso antes de tipar el campo."""
+    return value is not None and (not isinstance(value, str) or bool(value.strip()))
+
+
+def _window_order_invalid(start: int | str | None, end: int | str | None) -> bool:
+    if not (_is_informed(start) and _is_informed(end)):
+        return False
+    if isinstance(start, int) and isinstance(end, int):
+        return start > end
+    if isinstance(start, str) and isinstance(end, str):
+        return start > end
+    return False
 
 
 def _sequence_and_time_issues(rows: tuple[_StopTime, ...]) -> Iterable[ValidationIssue]:

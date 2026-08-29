@@ -2477,11 +2477,13 @@
       "2"
     ],
     "GTFS_ENUM_STOP_TIMES_TXT_PICKUP_TYPE": [
+      "0",
       "1",
       "2",
       "3"
     ],
     "GTFS_ENUM_STOP_TIMES_TXT_DROP_OFF_TYPE": [
+      "0",
       "1",
       "2",
       "3"

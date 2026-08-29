@@ -13,6 +13,7 @@ from gtfs_explorer.application.jobs.import_job import CancelToken, ImportProgres
 class _ImportWorker(QObject):
     """Construye y ejecuta el comando exclusivamente en el thread de trabajo."""
 
+    started = Signal()
     progress = Signal(object)
     finished = Signal(object)
     failed = Signal(str)
@@ -30,6 +31,7 @@ class _ImportWorker(QObject):
 
     @Slot()
     def run(self) -> None:
+        self.started.emit()
         try:
             command = self._command_factory(self.progress.emit)
             self.finished.emit(command.execute(self._token))
@@ -40,6 +42,7 @@ class _ImportWorker(QObject):
 class ImportJobAdapter(QObject):
     """Propiedad de la UI para un único trabajo de importación activo."""
 
+    started = Signal()
     progress = Signal(object)
     finished = Signal(object)
     failed = Signal(str)
@@ -48,6 +51,8 @@ class ImportJobAdapter(QObject):
         super().__init__(parent)
         self._thread: QThread | None = None
         self._worker: _ImportWorker | None = None
+        self._pending_result: ImportFeedResult | None = None
+        self._pending_error: str | None = None
 
     @property
     def is_running(self) -> bool:
@@ -62,6 +67,7 @@ class ImportJobAdapter(QObject):
         worker = _ImportWorker(command_factory)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
+        worker.started.connect(self.started)
         worker.progress.connect(self.progress)
         worker.finished.connect(self._complete)
         worker.failed.connect(self._fail)
@@ -79,12 +85,19 @@ class ImportJobAdapter(QObject):
             self._worker.cancel()
 
     def _complete(self, result: ImportFeedResult) -> None:
-        self.finished.emit(result)
+        self._pending_result = result
 
     def _fail(self, message: str) -> None:
-        self.failed.emit(message)
+        self._pending_error = message
 
     @Slot()
     def _clear_finished_thread(self) -> None:
         self._worker = None
         self._thread = None
+        result, error = self._pending_result, self._pending_error
+        self._pending_result = None
+        self._pending_error = None
+        if result is not None:
+            self.finished.emit(result)
+        elif error is not None:
+            self.failed.emit(error)

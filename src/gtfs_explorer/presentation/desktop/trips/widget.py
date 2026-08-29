@@ -26,7 +26,15 @@ class TripTimelineWidget(QWidget):
         layout = QVBoxLayout(self)
         self._table = QTableWidget(0, 5)
         self._table.setObjectName("tripTimeline")
-        self._table.setHorizontalHeaderLabels(("Secuencia", "Parada", "ID", "Llegada", "Salida"))
+        self._table.setHorizontalHeaderLabels(
+            (
+                "Secuencia",
+                "Parada",
+                "ID",
+                "Llegada GTFS (arrival_time)",
+                "Salida GTFS (departure_time)",
+            )
+        )
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.setAccessibleName("Timeline programado del viaje")
         self._table.itemSelectionChanged.connect(self._select_stop)

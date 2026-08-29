@@ -23,7 +23,15 @@ class StopInspectorWidget(QWidget):
         layout.addWidget(self._headline)
         self._events = QTableWidget(0, 5)
         self._events.setObjectName("stopScheduledEvents")
-        self._events.setHorizontalHeaderLabels(("Ruta", "ID ruta", "Viaje", "Llegada", "Salida"))
+        self._events.setHorizontalHeaderLabels(
+            (
+                "Ruta",
+                "ID ruta",
+                "Viaje",
+                "Llegada GTFS (arrival_time)",
+                "Salida GTFS (departure_time)",
+            )
+        )
         self._events.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._events.setAccessibleName("Eventos programados de la parada")
         layout.addWidget(self._events)
@@ -39,7 +47,9 @@ class StopInspectorWidget(QWidget):
             self._events.setRowCount(0)
             return
         name = inspection.stop.name or "Sin nombre"
-        self._headline.setText(f"Parada: {name} ({inspection.stop.stop_id}) — horarios programados")
+        self._headline.setText(
+            f"Parada: {name} ({inspection.stop.stop_id}) — horarios GTFS del feed"
+        )
         events = inspection.scheduled_events.items
         self._events.setRowCount(len(events))
         for row, event in enumerate(events):

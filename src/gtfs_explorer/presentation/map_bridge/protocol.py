@@ -139,7 +139,7 @@ class MapBridge(QObject):
         self._pending.append(command)
         return DispatchStatus.QUEUED
 
-    @Slot(str)  # type: ignore[arg-type]
+    @Slot(str)
     def receive(self, serialized: str) -> None:
         """Punto de entrada WebChannel: rechaza entradas inválidas sin propagar errores."""
         try:

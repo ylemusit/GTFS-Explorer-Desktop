@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 from gtfs_explorer.domain.errors import ImportCancelled
@@ -50,6 +50,7 @@ class ValidationEngine:
         feed_id: str,
         batch_id: str,
         is_cancelled: CancellationCheck | None = None,
+        on_progress: Callable[[str], None] | None = None,
     ) -> ValidationRunResult:
         if not feed_id or not batch_id:
             raise ValueError("feed_id y batch_id son obligatorios.")
@@ -60,6 +61,8 @@ class ValidationEngine:
         try:
             for rule in self._registry.ordered_rules():
                 _raise_if_cancelled(check_cancelled)
+                if on_progress is not None:
+                    on_progress(rule.code)
                 try:
                     for issue in rule.evaluate(context):
                         _raise_if_cancelled(check_cancelled)

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from gtfs_explorer.domain.project import FeedMetadata, ProjectMetadata
+from gtfs_explorer.domain.project import FeedMetadata, ProjectMetadata, ProjectStatus
 from gtfs_explorer.infrastructure.duckdb.repositories import DuckDbUnitOfWork
 
 PROJECT_DESCRIPTOR_VERSION = 1
@@ -19,6 +22,18 @@ class ProjectDescriptorError(ValueError):
 
 class ProjectDescriptorMismatchError(ProjectDescriptorError):
     """El descriptor no representa los metadatos autoritativos de DuckDB."""
+
+
+class ProjectDescriptorUnrecoverableMismatchError(ProjectDescriptorMismatchError):
+    """La divergencia no es el patrón legado que se puede reparar sin riesgo."""
+
+
+class ProjectDescriptorReconciliation(StrEnum):
+    """Resultado verificable de comparar descriptor y metadatos persistidos."""
+
+    MATCH = "MATCH"
+    RECOVERABLE_LEGACY_MISMATCH = "RECOVERABLE_LEGACY_MISMATCH"
+    UNRECOVERABLE_MISMATCH = "UNRECOVERABLE_MISMATCH"
 
 
 @dataclass(frozen=True)
@@ -63,7 +78,7 @@ class ProjectDescriptor:
 def reconcile_project_descriptor(
     project_directory: Path, unit_of_work: DuckDbUnitOfWork
 ) -> ProjectDescriptor:
-    """Regenera un descriptor ausente o rechaza uno inválido/divergente al reabrir."""
+    """Regenera un descriptor ausente y repara solo el patrón legado conocido."""
     project = unit_of_work.projects.metadata()
     if project is None:
         raise ProjectDescriptorError("DuckDB no contiene metadatos de proyecto.")
@@ -75,14 +90,70 @@ def reconcile_project_descriptor(
         save_project_descriptor(descriptor_path, expected)
         return expected
     actual = load_project_descriptor(descriptor_path)
-    if actual.to_dict() != expected.to_dict():
-        raise ProjectDescriptorMismatchError("project.json no coincide con los metadatos DuckDB.")
-    return actual
+    reconciliation = classify_project_descriptor(actual, expected)
+    if reconciliation is ProjectDescriptorReconciliation.MATCH:
+        return actual
+    if reconciliation is ProjectDescriptorReconciliation.UNRECOVERABLE_MISMATCH:
+        raise ProjectDescriptorUnrecoverableMismatchError(
+            "project.json no coincide de forma segura con los metadatos DuckDB."
+        )
+
+    # El bug pre-fix solo dejó atrás los campos operativos derivados del feed.
+    # La identidad, el nombre y las referencias ya se han comprobado arriba.
+    save_project_descriptor(descriptor_path, expected)
+    repaired = load_project_descriptor(descriptor_path)
+    if repaired.to_dict() != expected.to_dict():
+        raise ProjectDescriptorError("project.json no se pudo verificar tras la reparación.")
+    return repaired
+
+
+def classify_project_descriptor(
+    actual: ProjectDescriptor, expected: ProjectDescriptor
+) -> ProjectDescriptorReconciliation:
+    """Distingue coherencia, bug histórico y divergencias que requieren intervención.
+
+    El nombre no se deriva de un feed y el bug conocido nunca modificó identidad
+    ni referencias locales. Por ello solo se acepta la divergencia de ``status``
+    y de los metadatos de feed, después de exigir igualdad en esos campos.
+    """
+    if actual.to_dict() == expected.to_dict():
+        return ProjectDescriptorReconciliation.MATCH
+    if (
+        actual.project_id != expected.project_id
+        or actual.name != expected.name
+        or actual.references != expected.references
+    ):
+        return ProjectDescriptorReconciliation.UNRECOVERABLE_MISMATCH
+    try:
+        ProjectStatus(actual.status)
+    except ValueError:
+        return ProjectDescriptorReconciliation.UNRECOVERABLE_MISMATCH
+    if (
+        actual.feed_id is not None
+        and actual.feed_id == expected.feed_id
+        and actual.feed_sha256 != expected.feed_sha256
+    ):
+        return ProjectDescriptorReconciliation.UNRECOVERABLE_MISMATCH
+    return ProjectDescriptorReconciliation.RECOVERABLE_LEGACY_MISMATCH
 
 
 def save_project_descriptor(path: Path, descriptor: ProjectDescriptor) -> None:
+    """Publica un descriptor completo mediante reemplazo atómico en su directorio."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(descriptor.to_dict(), indent=2) + "\n", encoding="utf-8")
+    descriptor_bytes = (json.dumps(descriptor.to_dict(), indent=2) + "\n").encode("utf-8")
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(file_descriptor, "wb") as output:
+            output.write(descriptor_bytes)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary_path, path)
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
 
 
 def load_project_descriptor(path: Path) -> ProjectDescriptor:

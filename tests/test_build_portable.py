@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from gtfs_explorer.presentation.desktop.map.widget import _map_assets_directory
+from gtfs_explorer.product import IDENTITY
 
 
 def _load_builder() -> object:
@@ -66,6 +67,27 @@ def test_portable_zip_contains_the_offline_runtime_contract(tmp_path: Path) -> N
     assert "GTFS Explorer Portable/SBOM.cdx.json" in names
 
 
+def test_distribution_includes_manifested_user_guide(tmp_path: Path, monkeypatch) -> None:
+    builder = _load_builder()
+    monkeypatch.setattr(builder, "ROOT", tmp_path)
+    deployment = tmp_path / "packaging" / "portable" / "deployment" / "entrypoint.dist"
+    deployment.mkdir(parents=True)
+    (deployment / "entrypoint.exe").write_bytes(b"exe")
+    map_assets = tmp_path / "web" / "map" / "qt_resources"
+    map_assets.mkdir(parents=True)
+    (map_assets / "map_bundle.js").write_text("map", encoding="utf-8")
+    guide = tmp_path / "docs" / "USER_GUIDE.md"
+    guide.parent.mkdir()
+    guide.write_text("manual", encoding="utf-8")
+    monkeypatch.setattr(builder, "MAP_ASSETS", map_assets)
+    monkeypatch.setattr(builder, "USER_GUIDE", guide)
+
+    destination = tmp_path / "payload"
+    builder._copy_distribution(destination)
+
+    assert (destination / "docs" / "USER_GUIDE.md").read_text(encoding="utf-8") == "manual"
+
+
 def test_external_duckdb_copy_keeps_source_and_extension_without_caches(tmp_path: Path) -> None:
     builder = _load_builder()
     source = tmp_path / "source" / "duckdb"
@@ -100,6 +122,20 @@ def test_deploy_excludes_duckdb_from_nuitka_compilation() -> None:
     assert "--nofollow-import-to=duckdb" in specification
     assert "--include-data-dir=src/gtfs_explorer/infrastructure/duckdb/migrations=" in specification
     assert "--include-data-dir=schemas=schemas" in specification
+
+
+def test_deploy_spec_receives_canonical_windows_metadata(monkeypatch) -> None:
+    builder = _load_builder()
+    monkeypatch.setattr(builder, "SPEC", Path("packaging/portable/pysidedeploy.spec"))
+
+    rendered = builder._render_deploy_spec()
+
+    assert f"--product-name={IDENTITY.name}" in rendered
+    assert f"--company-name={IDENTITY.author}" in rendered
+    assert f"--file-version={IDENTITY.windows_file_version}" in rendered
+    assert f"--product-version={IDENTITY.windows_product_version}" in rendered
+    assert f"--file-description={IDENTITY.file_description}" in rendered
+    assert f"--copyright={IDENTITY.copyright_text}" in rendered
 
 
 def test_previous_deployment_is_removed_before_build(tmp_path: Path, monkeypatch) -> None:

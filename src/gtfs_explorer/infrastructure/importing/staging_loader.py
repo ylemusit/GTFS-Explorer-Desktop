@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -39,11 +40,13 @@ class StagingLoader:
         schedule_spec: ScheduleSpec,
         *,
         is_cancelled: Callable[[], bool] = lambda: False,
+        on_progress: Callable[[str, int], None] | None = None,
     ) -> StagingLoadResult:
         """Sustituye el staging en una sola transacción o lo revierte íntegramente."""
         source_root = source_directory.resolve()
         row_counts: dict[str, int] = {}
         unknown_files: list[str] = []
+        progress = _ProgressThrottle(on_progress)
         with database.connection() as connection:
             connection.execute("BEGIN TRANSACTION")
             try:
@@ -80,7 +83,9 @@ class StagingLoader:
                         tuple(file_spec.fields),
                         table_name,
                         is_cancelled,
+                        progress.emit,
                     )
+                    progress.flush(filename, count)
                     connection.execute(
                         "UPDATE stg_source_inventory SET loaded_row_count = ? "
                         "WHERE original_name = ?",
@@ -121,17 +126,22 @@ class StagingLoader:
         expected_columns: tuple[str, ...],
         table_name: str,
         is_cancelled: Callable[[], bool],
+        on_progress: Callable[[str, int], None] | None,
     ) -> int:
         self._create_staging_table(connection, table_name, expected_columns)
         count = 0
         for batch in self._reader.iter_gtfs_batches(source_path, self._batch_size):
             self._raise_if_cancelled(is_cancelled)
             positions = _column_positions(batch.header, expected_columns)
+            # El lector ya ha consumido las líneas vacías y conserva su número
+            # físico. No son filas GTFS lógicas: no se materializan ni cuentan,
+            # mientras que una línea `,,` sí conserva su semántica de fila vacía.
             values = [
                 _staging_row(
                     row.number, filename, batch.header, row.values, positions, expected_columns
                 )
                 for row in batch.rows
+                if row.values
             ]
             self._raise_if_cancelled(is_cancelled)
             if values:
@@ -140,6 +150,8 @@ class StagingLoader:
                     f"INSERT INTO {_quote_identifier(table_name)} VALUES ({placeholders})", values
                 )
                 count += len(values)
+            if on_progress is not None:
+                on_progress(filename, count)
         return count
 
     @staticmethod
@@ -175,6 +187,33 @@ def _staging_table_name(filename: str) -> str:
 
 def _quote_identifier(value: str) -> str:
     return '"' + value.replace('"', '""') + '"'
+
+
+class _ProgressThrottle:
+    """Agrupa avisos de lotes para que la señal no compita con la carga."""
+
+    def __init__(self, callback: Callable[[str, int], None] | None) -> None:
+        self._callback = callback
+        self._last_at = 0.0
+        self._pending: tuple[str, int] | None = None
+
+    def emit(self, filename: str, count: int) -> None:
+        if self._callback is None:
+            return
+        self._pending = (filename, count)
+        now = time.monotonic()
+        if now - self._last_at >= 0.25:
+            self._callback(filename, count)
+            self._last_at = now
+            self._pending = None
+
+    def flush(self, filename: str, count: int) -> None:
+        if self._callback is None:
+            return
+        if self._pending is not None:
+            self._callback(filename, count)
+            self._last_at = time.monotonic()
+            self._pending = None
 
 
 def _column_positions(

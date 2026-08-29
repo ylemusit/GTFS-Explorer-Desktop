@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import hypot
+from math import hypot, isfinite
 
 from gtfs_explorer.domain.geometry import TripShapeGeometry
 
@@ -76,6 +76,43 @@ def map_layers_for_trip(geometry: TripShapeGeometry) -> MapLayerPayload:
         for stop in geometry.stops
     ]
     return MapLayerPayload(_collection(shape_features), _collection(stop_features))
+
+
+def map_layer_bounds(payload: MapLayerPayload) -> tuple[float, float, float, float] | None:
+    """Calcula la envolvente del overlay sin tocar su geometría ni el feed.
+
+    La envolvente se usa únicamente para decidir si un paquete PMTiles puede
+    cubrir el viaje completo. No se inspeccionan teselas ni se envía el overlay
+    a ningún proveedor remoto.
+    """
+    coordinates: list[tuple[float, float]] = []
+    for collection in (payload.shapes, payload.stops):
+        for feature in _features(collection):
+            geometry = feature.get("geometry")
+            if not isinstance(geometry, dict):
+                continue
+            geometry_type = geometry.get("type")
+            values = geometry.get("coordinates")
+            points = values if geometry_type == "LineString" else [values]
+            if not isinstance(points, list):
+                continue
+            for point in points:
+                if not isinstance(point, list) or len(point) < 2:
+                    continue
+                longitude, latitude = point[0], point[1]
+                if (
+                    isinstance(longitude, (int, float))
+                    and not isinstance(longitude, bool)
+                    and isinstance(latitude, (int, float))
+                    and not isinstance(latitude, bool)
+                    and isfinite(float(longitude))
+                    and isfinite(float(latitude))
+                ):
+                    coordinates.append((float(longitude), float(latitude)))
+    if not coordinates:
+        return None
+    longitudes, latitudes = zip(*coordinates)
+    return min(longitudes), min(latitudes), max(longitudes), max(latitudes)
 
 
 def simplify_for_viewport(payload: MapLayerPayload, viewport: MapViewport) -> MapLayerPayload:

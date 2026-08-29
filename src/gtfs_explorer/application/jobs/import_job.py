@@ -16,15 +16,31 @@ class ImportPhase(StrEnum):
     CLEANUP = "CLEANUP"
 
 
+class ProgressMode(StrEnum):
+    """Indica si el total mostrado procede de una medida real."""
+
+    DETERMINATE = "DETERMINATE"
+    INDETERMINATE = "INDETERMINATE"
+
+
 @dataclass(frozen=True)
 class ImportProgress:
     phase: ImportPhase
     completed_steps: int
     total_steps: int
+    detail: str | None = None
+    completed: int | None = None
+    total: int | None = None
+    unit: str | None = None
+    mode: ProgressMode = ProgressMode.DETERMINATE
 
     @property
     def fraction(self) -> float:
         return self.completed_steps / self.total_steps
+
+    @property
+    def has_measurement(self) -> bool:
+        return self.completed is not None
 
 
 class CancelToken:

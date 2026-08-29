@@ -120,6 +120,20 @@ class ProjectDatabase:
         """Copia de seguridad más reciente tomada antes de una migración."""
         return self.database_path.with_suffix(self.database_path.suffix + ".pre-migration.bak")
 
+    def validate_compatible(self) -> int:
+        """Comprueba una base existente sin migrarla ni crear directorios de trabajo."""
+        migrations = _load_migrations(self._migrations_directory)
+        connection = self._open_connection()
+        try:
+            current_version = _current_schema_version(connection)
+        finally:
+            connection.close()
+        if current_version != migrations[-1].version:
+            raise DatabaseSchemaError(
+                "La versión del esquema DuckDB no es compatible con esta apertura."
+            )
+        return current_version
+
     def initialize(self) -> int:
         """Aplica las migraciones pendientes de forma transaccional y devuelve la versión."""
         self.database_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,4 @@
-"""Escritura y revalidación previa de un Mini-GTFS oficial."""
+"""Escritura y revalidación previa de un subconjunto GTFS Schedule."""
 
 from __future__ import annotations
 
@@ -179,10 +179,18 @@ def _validate_tables(
         raise ValueError("Mini-GTFS contiene un archivo que no figura en el registro GTFS.")
     by_name = {table.filename: table for table in tables}
     required = {"agency.txt", "routes.txt", "trips.txt", "stops.txt", "stop_times.txt"}
-    required.add("calendar.txt" if expected.calendar_service_ids else "calendar_dates.txt")
+    if expected.calendar_service_ids:
+        required.add("calendar.txt")
+    if expected.calendar_date_service_ids:
+        required.add("calendar_dates.txt")
     if missing := required - by_name.keys():
         raise ValueError(
             f"Mini-GTFS no contiene las tablas core requeridas: {', '.join(sorted(missing))}."
+        )
+    empty = {name for name in required if not by_name[name].rows}
+    if empty:
+        raise ValueError(
+            f"Mini-GTFS no puede publicar tablas core vacías: {', '.join(sorted(empty))}."
         )
     for table in tables:
         unknown_headers = set(table.headers) - specification.files[table.filename].fields.keys()
@@ -209,12 +217,97 @@ def _csv_bytes(table: MiniGtfsTable, is_cancelled: CancellationCheck) -> bytes:
     output = io.StringIO(newline="")
     writer = csv.writer(output, lineterminator="\r\n")
     writer.writerow(table.headers)
-    for row in sorted(
-        table.rows, key=lambda value: tuple("" if item is None else item for item in value)
-    ):
+    for row in _ordered_rows(table):
         _raise_if_cancelled(is_cancelled)
         writer.writerow("" if value is None else value for value in row)
     return output.getvalue().encode("utf-8")
+
+
+def _ordered_rows(table: MiniGtfsTable) -> tuple[tuple[str | None, ...], ...]:
+    """Ordena determinísticamente sin perder la secuencia de entidades GTFS."""
+    indexed = tuple(enumerate(table.rows))
+    positions = {header: index for index, header in enumerate(table.headers)}
+
+    if table.filename == "stop_times.txt":
+        return tuple(
+            row
+            for _, row in sorted(
+                indexed,
+                key=lambda item: (
+                    _field_text(item[1], positions, "trip_id"),
+                    _numeric_key(_field_text(item[1], positions, "stop_sequence")),
+                    item[0],
+                ),
+            )
+        )
+    if table.filename == "shapes.txt":
+        return tuple(
+            row
+            for _, row in sorted(
+                indexed,
+                key=lambda item: (
+                    _field_text(item[1], positions, "shape_id"),
+                    _numeric_key(_field_text(item[1], positions, "shape_pt_sequence")),
+                    item[0],
+                ),
+            )
+        )
+    if table.filename == "frequencies.txt":
+        return tuple(
+            row
+            for _, row in sorted(
+                indexed,
+                key=lambda item: (
+                    _field_text(item[1], positions, "trip_id"),
+                    _time_key(_field_text(item[1], positions, "start_time")),
+                    item[0],
+                ),
+            )
+        )
+    if table.filename == "calendar_dates.txt":
+        return tuple(
+            row
+            for _, row in sorted(
+                indexed,
+                key=lambda item: (
+                    _field_text(item[1], positions, "service_id"),
+                    _field_text(item[1], positions, "date"),
+                    _numeric_key(_field_text(item[1], positions, "exception_type")),
+                    item[0],
+                ),
+            )
+        )
+    return tuple(
+        row
+        for _, row in sorted(
+            indexed,
+            key=lambda item: (tuple(_text(value) for value in item[1]), item[0]),
+        )
+    )
+
+
+def _field_text(row: tuple[str | None, ...], positions: dict[str, int], field_name: str) -> str:
+    index = positions.get(field_name)
+    return "" if index is None else _text(row[index])
+
+
+def _text(value: str | None) -> str:
+    return "" if value is None else value
+
+
+def _numeric_key(value: str) -> tuple[int, int | str]:
+    try:
+        return (0, int(value))
+    except ValueError:
+        return (1, value)
+
+
+def _time_key(value: str) -> tuple[int, int | str]:
+    parts = value.split(":")
+    if len(parts) == 3 and all(part.isdigit() for part in parts):
+        hours, minutes, seconds = (int(part) for part in parts)
+        return (0, hours * 3600 + minutes * 60 + seconds)
+    return (1, value)
 
 
 def _assert_selection_matches(source: CoreSubsetSource, expected: CoreSubset) -> None:
@@ -222,7 +315,8 @@ def _assert_selection_matches(source: CoreSubsetSource, expected: CoreSubset) ->
         {route_id for route_id, _ in source.route_agencies} == expected.route_ids
         and {trip.trip_id for trip in source.trips} == expected.trip_ids
         and {stop.stop_id for stop in source.stops} == expected.stop_ids
-        and (source.calendar_service_ids | source.calendar_date_service_ids) == expected.service_ids
+        and source.calendar_service_ids == expected.calendar_service_ids
+        and source.calendar_date_service_ids == expected.calendar_date_service_ids
         and source.agency_ids == expected.agency_ids
     ):
         raise ExportError("La reimportación Mini-GTFS no coincide con el cierre seleccionado.")

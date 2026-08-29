@@ -25,7 +25,11 @@ def _module():
 
 def _arguments(tmp_path: Path, source: str) -> list[str]:
     style = tmp_path / "source-style.json"
-    style.write_text('{"version": 8, "sources": {}, "layers": []}', encoding="utf-8")
+    style.write_text(
+        '{"version": 8, "sources": {"basemap": {"type": "vector", '
+        '"url": "pmtiles://basemap.pmtiles"}}, "layers": []}',
+        encoding="utf-8",
+    )
     return [
         str(SCRIPT),
         "--source",

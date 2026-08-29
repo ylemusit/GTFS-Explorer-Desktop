@@ -7,10 +7,13 @@ from pathlib import Path
 
 import pytest
 
+from gtfs_explorer.application.queries.raw import RawInspectorQueries
 from gtfs_explorer.domain.errors import ImportCancelled, TabularReadError
+from gtfs_explorer.domain.raw import RawQuery
 from gtfs_explorer.domain.source import InputSource, InputSourceKind
 from gtfs_explorer.domain.spec import FieldSpec, FileSpec, ScheduleSpec
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseSettings, ProjectDatabase
+from gtfs_explorer.infrastructure.duckdb.repositories.base import DuckDbRawInspectorRepository
 from gtfs_explorer.infrastructure.importing.directory_source import DirectorySource
 from gtfs_explorer.infrastructure.importing.staging_loader import StagingLoader
 
@@ -71,6 +74,47 @@ def test_staging_loads_known_files_in_batches_and_inventories_unknown_files(tmp_
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_staging_preserves_physical_source_rows_with_bom_blanks_and_quoted_values(
+    tmp_path: Path, newline: str
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "stops.txt").write_bytes(
+        (
+            "\ufeffstop_id,stop_name"
+            + newline
+            + newline
+            + '001,"North, central"'
+            + newline
+            + newline
+            + newline
+            + '002,"South"'
+            + newline
+        ).encode()
+    )
+    database = _database(tmp_path)
+
+    StagingLoader(batch_size=1).load(database, source, _manifest(source), _spec())
+
+    with database.connection() as connection:
+        assert connection.execute(
+            "SELECT source_row, stop_id, stop_name FROM stg_stops ORDER BY source_row"
+        ).fetchall() == [
+            (3, "001", "North, central"),
+            (6, "002", "South"),
+        ]
+        assert connection.execute("SELECT count(*) FROM stg_stops").fetchone() == (2,)
+        raw = RawInspectorQueries(DuckDbRawInspectorRepository(connection, _spec())).query(
+            RawQuery("stops.txt", ("stop_id", "stop_name"))
+        )
+        assert [(row.source_row, row.values) for row in raw.rows] == [
+            (3, ("001", "North, central")),
+            (6, ("002", "South")),
+        ]
+
+
+@pytest.mark.integration
 def test_staging_rolls_back_rows_when_a_later_batch_has_a_tabular_error(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -114,3 +158,25 @@ def test_staging_cancellation_reverts_every_insert_of_the_current_load(tmp_path:
         assert connection.execute(
             "SELECT count(*) FROM information_schema.tables WHERE table_name = 'stg_stops'"
         ).fetchone() == (0,)
+
+
+@pytest.mark.integration
+def test_staging_progress_reports_safe_file_and_coalesces_batches(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "stops.txt").write_text(
+        "stop_id,stop_name\n001,North\n002,South\n003,East\n", encoding="utf-8"
+    )
+    events: list[tuple[str, int]] = []
+
+    StagingLoader(batch_size=1).load(
+        _database(tmp_path),
+        source,
+        _manifest(source),
+        _spec(),
+        on_progress=lambda filename, count: events.append((filename, count)),
+    )
+
+    assert events
+    assert events[-1] == ("stops.txt", 3)
+    assert len(events) <= 2

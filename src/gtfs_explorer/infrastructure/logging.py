@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import sys
+import traceback as traceback_module
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -12,8 +13,31 @@ from tempfile import NamedTemporaryFile
 from typing import Mapping
 from zipfile import ZIP_DEFLATED, ZipFile
 
-_ALLOWED_CONTEXT = frozenset({"event", "job_id", "project_id", "feed_id", "error_code"})
+from gtfs_explorer.product import IDENTITY, runtime_architecture, runtime_build_id
+
+_ALLOWED_CONTEXT = frozenset(
+    {
+        "event",
+        "operation",
+        "job_id",
+        "project_id",
+        "project_name",
+        "feed_id",
+        "error_code",
+        "app_state",
+        "product",
+        "version",
+        "build_id",
+        "gtfs_spec_revision",
+        "architecture",
+    }
+)
 _SENSITIVE = re.compile(r"(?i)(token|password|secret|api[_-]?key)\s*[=:]\s*[^\s,]+")
+_TOKEN_LIKE = re.compile(r"(?i)\b[A-Za-z0-9_-]*(?:token|secret)[A-Za-z0-9_-]*\b")
+_ABSOLUTE_PATH = re.compile(
+    r"(?i)(?<![A-Za-z0-9])(?:[a-z]:[\\/][^\s,;]+|/Users/[^\s,;]+|/home/[^\s,;]+)"
+)
+_TRACEBACK_FILE = re.compile(r'(?m)^(\s*File ")([^"\r\n]+)("\s*, line \d+, in .*)$')
 
 
 @dataclass(frozen=True)
@@ -32,13 +56,66 @@ class DiagnosticPreview:
 
 
 def safe_context(context: Mapping[str, object]) -> dict[str, str]:
-    """Conserva solo IDs operativos; descarta filas, rutas y payloads del feed."""
-    return {key: str(value) for key, value in context.items() if key in _ALLOWED_CONTEXT}
+    """Conserva contexto operativo y elimina rutas/payloads del feed."""
+    return {
+        key: sanitize_text(str(value)) for key, value in context.items() if key in _ALLOWED_CONTEXT
+    }
 
 
 def redact(value: str) -> str:
     """Evita que secretos triviales alcancen el diagnóstico local."""
-    return _SENSITIVE.sub("[REDACTED]", value)
+    redacted = _SENSITIVE.sub("[REDACTED]", value)
+    return _TOKEN_LIKE.sub("[REDACTED]", redacted)
+
+
+def sanitize_text(value: str) -> str:
+    """Redacta secretos y rutas absolutas sin volcar datos del workspace."""
+    return _ABSOLUTE_PATH.sub("[PATH]", redact(value))
+
+
+def sanitize_traceback(value: str) -> str:
+    """Conserva el archivo de cada frame, pero nunca sus directorios."""
+
+    def replace_frame(match: re.Match[str]) -> str:
+        path = match.group(2)
+        basename = re.split(r"[\\/]", path)[-1]
+        return f"{match.group(1)}{basename}{match.group(3)}"
+
+    return sanitize_text(_TRACEBACK_FILE.sub(replace_frame, value))
+
+
+def diagnostic_identity_context() -> dict[str, str]:
+    """Identidad segura que acompaña a cualquier error de aplicación."""
+    return {
+        "product": IDENTITY.name,
+        "version": IDENTITY.version,
+        "build_id": runtime_build_id(),
+        "gtfs_spec_revision": IDENTITY.gtfs_spec_revision,
+        "architecture": runtime_architecture(),
+    }
+
+
+def capture_application_error(
+    logger: logging.Logger,
+    *,
+    error_code: str,
+    operation: str,
+    exception: BaseException,
+    context: Mapping[str, object] | None = None,
+) -> None:
+    """Registra una excepción UI completa mientras su traceback sigue disponible."""
+    payload: dict[str, object] = {key: str(value) for key, value in (context or {}).items()}
+    payload.update(diagnostic_identity_context())
+    payload.update({"error_code": error_code, "operation": operation})
+    formatted_traceback = "".join(traceback_module.format_exception(exception))
+    logger.error(
+        "APPLICATION_ERROR code=%s context=%s exception_type=%s exception_message=%s\ntraceback=%s",
+        error_code,
+        safe_context(payload),
+        type(exception).__name__,
+        sanitize_text(str(exception) or type(exception).__name__),
+        sanitize_traceback(formatted_traceback),
+    )
 
 
 def configure_logging(directory: Path, *, debug: bool = False) -> logging.Logger:

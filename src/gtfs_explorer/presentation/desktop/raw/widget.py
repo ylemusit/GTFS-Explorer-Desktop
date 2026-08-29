@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtGui import QGuiApplication
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -27,15 +29,31 @@ from gtfs_explorer.infrastructure.exporting.csv_exporter import (
 from gtfs_explorer.presentation.desktop.i18n import t
 from gtfs_explorer.presentation.models.paged_table import PagedTableModel, RawQueryExecutor
 
+RAW_SIZING_SAMPLE_ROWS = 24
+RAW_SIZING_MIN_WIDTH = 72
+RAW_SIZING_MAX_WIDTH = 320
+RAW_SIZING_HORIZONTAL_PADDING = 24
+
 
 class RawInspectorWidget(QWidget):
     """Permite explorar staging sin formular SQL ni cargar más de una página bajo demanda."""
 
-    def __init__(self, execute: RawQueryExecutor, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        execute: RawQueryExecutor,
+        parent: QWidget | None = None,
+        *,
+        export_directory_resolver: Callable[[], Path] | None = None,
+        prepare_export_directory: Callable[[], Path] | None = None,
+        on_export_directory_used: Callable[[Path], None] | None = None,
+    ) -> None:
         super().__init__(parent)
         self._model = PagedTableModel(execute, self)
         self._model.load_failed.connect(self._show_error)
         self._fields: dict[str, tuple[str, ...]] = {}
+        self._export_directory_resolver = export_directory_resolver
+        self._prepare_export_directory = prepare_export_directory
+        self._on_export_directory_used = on_export_directory_used
         self._build_layout()
 
     def configure(self, files: dict[str, tuple[str, ...]]) -> None:
@@ -51,7 +69,14 @@ class RawInspectorWidget(QWidget):
             self._model.clear()
 
     def clear(self) -> None:
-        self.configure({})
+        self._fields = {}
+        self._files.blockSignals(True)
+        self._files.clear()
+        self._files.blockSignals(False)
+        self._field.clear()
+        self._filter.clear()
+        self._table.clearSelection()
+        self._model.clear()
 
     def inspect_location(
         self, filename: str, field_name: str | None, entity_id: str | None
@@ -69,7 +94,7 @@ class RawInspectorWidget(QWidget):
 
     def _build_layout(self) -> None:
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Inspector raw: datos fieles del staging, sin edición."))
+        layout.addWidget(QLabel(t("raw.description")))
         controls = QHBoxLayout()
         self._files = QComboBox()
         self._files.setAccessibleName(t("raw.file"))
@@ -80,10 +105,16 @@ class RawInspectorWidget(QWidget):
         self._filter.setAccessibleName(t("raw.filter"))
         self._filter.setPlaceholderText(t("raw.filter_placeholder"))
         apply_filter = QPushButton(t("raw.apply"))
+        apply_filter.setAccessibleName(t("raw.apply"))
+        apply_filter.setToolTip(t("raw.apply"))
         apply_filter.clicked.connect(self._apply_filter)
         copy = QPushButton(t("raw.copy"))
+        copy.setAccessibleName(t("raw.copy"))
+        copy.setToolTip(t("raw.copy"))
         copy.clicked.connect(self._copy_selection)
         export = QPushButton(t("raw.export"))
+        export.setAccessibleName(t("raw.export"))
+        export.setToolTip(t("raw.export"))
         export.clicked.connect(self._export_loaded)
         for widget in (self._files, self._field, self._filter, apply_filter, copy, export):
             controls.addWidget(widget)
@@ -94,6 +125,8 @@ class RawInspectorWidget(QWidget):
         self._table.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)
         self._table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         self._table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
+        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self._model.modelReset.connect(self._apply_smart_column_sizing)
         self._table.setAccessibleName(t("raw.table"))
         layout.addWidget(self._table)
         self.setTabOrder(self._files, self._field)
@@ -129,8 +162,21 @@ class RawInspectorWidget(QWidget):
     def _export_loaded(self) -> None:
         if not self._model.rowCount():
             return
+        directory = (
+            self._prepare_export_directory()
+            if self._prepare_export_directory is not None
+            else self._export_directory()
+        )
+        initial = (
+            str(directory / "vista-raw-faithful.csv")
+            if directory is not None
+            else "vista-raw-faithful.csv"
+        )
         destination, _ = QFileDialog.getSaveFileName(
-            self, "Exportar vista cargada", "vista-raw-faithful.csv", "CSV (*.csv)"
+            self,
+            t("dialog.raw_export_title"),
+            initial,
+            t("dialog.raw_csv_filter"),
         )
         if not destination:
             return
@@ -140,13 +186,44 @@ class RawInspectorWidget(QWidget):
         try:
             CsvExporter().write(
                 path,
-                headers=self._model.headers(),
-                rows=self._model.loaded_rows(),
+                # ``Fila fuente`` es metadata de la vista, no una columna GTFS.
+                headers=self._model.headers()[1:],
+                rows=tuple(row[1:] for row in self._model.loaded_rows()),
                 options=CsvExportOptions(mode=CsvExportMode.FAITHFUL),
                 overwrite=path.exists(),
             )
-        except Exception as error:
-            self._show_error(str(error) or type(error).__name__)
+            if self._on_export_directory_used is not None:
+                self._on_export_directory_used(path.parent)
+        except Exception:
+            self._show_error()
 
-    def _show_error(self, message: str) -> None:
-        QMessageBox.warning(self, "Inspector raw", message)
+    def _export_directory(self) -> Path | None:
+        if self._export_directory_resolver is None:
+            return None
+        return self._export_directory_resolver()
+
+    def _show_error(self, _message: str = "") -> None:
+        QMessageBox.warning(
+            self,
+            t("dialog.raw_export_error_title"),
+            t("dialog.raw_export_error_message"),
+            QMessageBox.StandardButton.Ok,
+        )
+
+    def _apply_smart_column_sizing(self) -> None:
+        """Ajusta solo la página cargada, sin consultar el total del staging."""
+        headers = self._model.headers()
+        if not headers:
+            return
+        rows = self._model.loaded_rows()[:RAW_SIZING_SAMPLE_ROWS]
+        metrics = self._table.fontMetrics()
+        header = self._table.horizontalHeader()
+        for column, name in enumerate(headers):
+            candidates = [name]
+            candidates.extend(row[column] for row in rows if column < len(row))
+            measured = max(metrics.horizontalAdvance(value[:80]) for value in candidates if value)
+            width = max(
+                RAW_SIZING_MIN_WIDTH,
+                min(RAW_SIZING_MAX_WIDTH, measured + RAW_SIZING_HORIZONTAL_PADDING),
+            )
+            header.resizeSection(column, width)

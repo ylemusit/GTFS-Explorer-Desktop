@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 from PySide6.QtWidgets import QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
-from gtfs_explorer.application.queries.timetable import TimetableMatrix
+from gtfs_explorer.application.queries.timetable import TimetableCell, TimetableMatrix
 
 
 class TimetableWidget(QWidget):
@@ -63,8 +63,15 @@ class TimetableWidget(QWidget):
             )
             for column, trip in enumerate(pattern.columns, start=1):
                 cell = trip.cells[row]
-                value = " / ".join(
-                    time for time in (cell.arrival_time, cell.departure_time) if time
-                )
-                self._table.setItem(row, column, QTableWidgetItem(value or "—"))
+                self._table.setItem(row, column, QTableWidgetItem(_format_cell(cell)))
         self._table.resizeColumnsToContents()
+
+
+def _format_cell(cell: TimetableCell) -> str:
+    """Distingue los dos campos GTFS aunque solo uno esté informado."""
+    values = []
+    if cell.arrival_time:
+        values.append(f"arrival_time: {cell.arrival_time}")
+    if cell.departure_time:
+        values.append(f"departure_time: {cell.departure_time}")
+    return " · ".join(values) or "—"

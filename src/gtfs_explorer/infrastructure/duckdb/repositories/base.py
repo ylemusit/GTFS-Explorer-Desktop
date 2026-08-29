@@ -12,6 +12,14 @@ import duckdb
 
 from gtfs_explorer.domain.errors import RepositoryError
 from gtfs_explorer.domain.geometry import GeometryIssue, TripShapeGeometry
+from gtfs_explorer.domain.operations import (
+    Operation,
+    OperationStatus,
+    OperationType,
+    validate_artifact,
+    validate_error_code,
+    validate_utc_naive,
+)
 from gtfs_explorer.domain.overview import (
     FeedOverview,
     OverviewFile,
@@ -51,6 +59,7 @@ from gtfs_explorer.infrastructure.duckdb.database import (
     ProjectDatabase,
 )
 from gtfs_explorer.infrastructure.geometry import build_trip_shape_geometry
+from gtfs_explorer.product import IDENTITY
 
 
 class DuckDbProjectRepository:
@@ -131,7 +140,8 @@ class DuckDbFeedRepository:
         row = self._connection.execute(
             "SELECT feed_id, project_id, source_name, source_sha256, import_mode, "
             "spec_revision, status "
-            "FROM feeds ORDER BY imported_at DESC LIMIT 1"
+            "FROM feeds ORDER BY CASE WHEN status = 'IMPORTED' THEN 0 ELSE 1 END, "
+            "imported_at DESC LIMIT 1"
         ).fetchone()
         return (
             None
@@ -160,7 +170,7 @@ class DuckDbFeedRepository:
                 metadata.manifest_sha256,
                 metadata.import_mode,
                 metadata.spec_revision,
-                "0.1.0",
+                IDENTITY.version,
                 datetime.now(timezone.utc),
                 metadata.status,
             ],
@@ -228,19 +238,21 @@ class DuckDbValidationRepository:
     ) -> PagedResult[ValidationIssueSummary]:
         conditions: list[str] = []
         parameters: list[object] = []
-        _validation_in_condition("severity", report_filter.severities, conditions, parameters)
-        _validation_in_condition("category", report_filter.categories, conditions, parameters)
+        _validation_conditions(report_filter, conditions, parameters)
         where = " WHERE " + " AND ".join(conditions) if conditions else ""
         try:
             total_row = self._connection.execute(
-                "SELECT count(*) FROM validation_issues" + where, parameters
+                "SELECT count(*) FROM validation_issues i "
+                "JOIN validation_runs r ON r.batch_id = i.batch_id" + where,
+                parameters,
             ).fetchone()
             rows = self._connection.execute(
-                "SELECT batch_id, position, rule_code, validator, severity, category, file_name, "
-                "row_number, field_name, entity_type, entity_id, message_key, message_parameters, "
-                "help_id, occurrence_count FROM validation_issues"
+                "SELECT i.batch_id, i.position, i.rule_code, i.validator, i.severity, i.category, "
+                "i.file_name, i.row_number, i.field_name, i.entity_type, i.entity_id, "
+                "i.message_key, i.message_parameters, i.help_id, i.occurrence_count "
+                "FROM validation_issues i JOIN validation_runs r ON r.batch_id = i.batch_id"
                 + where
-                + " ORDER BY batch_id DESC, position LIMIT ? OFFSET ?",
+                + " ORDER BY i.batch_id DESC, i.position LIMIT ? OFFSET ?",
                 [*parameters, page.limit, page.offset],
             ).fetchall()
         except (DatabaseError, duckdb.Error, ValueError) as error:
@@ -252,6 +264,25 @@ class DuckDbValidationRepository:
         return PagedResult(
             tuple(_validation_issue_summary(row) for row in rows), total_row[0], page
         )
+
+    def files(self, report_filter: ValidationIssueFilter) -> tuple[str, ...]:
+        """Consulta el catálogo de archivos sin materializar las incidencias."""
+        conditions = ["i.file_name IS NOT NULL", "i.file_name <> ''"]
+        parameters: list[object] = []
+        if report_filter.feed_id is not None:
+            conditions.append("r.feed_id = ?")
+            parameters.append(report_filter.feed_id)
+        try:
+            rows = self._connection.execute(
+                "SELECT DISTINCT i.file_name FROM validation_issues i "
+                "JOIN validation_runs r ON r.batch_id = i.batch_id WHERE "
+                + " AND ".join(conditions)
+                + " ORDER BY lower(i.file_name), i.file_name",
+                parameters,
+            ).fetchall()
+        except (DatabaseError, duckdb.Error, ValueError) as error:
+            raise RepositoryError("No se han podido consultar los archivos validados.") from error
+        return tuple(str(row[0]) for row in rows if row[0] is not None)
 
 
 class DuckDbImportJobRepository:
@@ -289,6 +320,244 @@ class DuckDbImportJobRepository:
                 "WHERE state IN ('PENDING', 'RUNNING', 'CANCELLING')"
             )
         return job_ids
+
+
+class DuckDbOperationRepository:
+    """Ledger canónico de operaciones, aislado de los pipelines productivos."""
+
+    def __init__(self, connection: DatabaseConnection) -> None:
+        self._connection = connection
+
+    def start(
+        self,
+        operation_id: str,
+        project_id: str,
+        operation_type: OperationType,
+        started_at: datetime,
+    ) -> None:
+        validate_utc_naive(started_at)
+        self._connection.execute(
+            "INSERT INTO operations (operation_id, project_id, operation_type, status, started_at) "
+            "VALUES (?, ?, ?, 'RUNNING', ?)",
+            [operation_id, project_id, operation_type, started_at],
+        )
+
+    def finish(
+        self,
+        operation_id: str,
+        status: OperationStatus,
+        finished_at: datetime,
+        error_code: str | None = None,
+    ) -> None:
+        if status is OperationStatus.RUNNING:
+            raise ValueError("Una operación no puede finalizar en RUNNING.")
+        validate_utc_naive(finished_at)
+        validate_error_code(status, error_code)
+        row = self._connection.execute(
+            "SELECT status, started_at FROM operations WHERE operation_id = ?", [operation_id]
+        ).fetchone()
+        if row is None:
+            raise ValueError("La operación no existe.")
+        if str(row[0]) != OperationStatus.RUNNING:
+            raise ValueError("Una operación terminal no puede volver a finalizarse.")
+        if not isinstance(row[1], datetime) or finished_at < row[1]:
+            raise ValueError("La finalización no puede preceder al inicio.")
+        self._connection.execute(
+            "UPDATE operations SET status = ?, finished_at = ?, error_code = ? "
+            "WHERE operation_id = ? AND status = 'RUNNING'",
+            [status, finished_at, error_code, operation_id],
+        )
+
+    def attach_import_detail(self, operation_id: str, feed_id: str, job_id: str) -> None:
+        self._attach(
+            operation_id,
+            OperationType.IMPORT,
+            "operation_import_details",
+            ["operation_id", "feed_id", "job_id"],
+            [operation_id, feed_id, job_id],
+        )
+
+    def attach_validation_detail(
+        self, operation_id: str, feed_id: str, validation_batch_id: str | None = None
+    ) -> None:
+        self._attach(
+            operation_id,
+            OperationType.VALIDATION,
+            "operation_validation_details",
+            ["operation_id", "feed_id", "validation_batch_id"],
+            [operation_id, feed_id, validation_batch_id],
+        )
+
+    def attach_export_detail(
+        self,
+        operation_id: str,
+        feed_id: str,
+        export_format: str,
+        artifact_name: str | None = None,
+        artifact_sha256: str | None = None,
+        artifact_size_bytes: int | None = None,
+    ) -> None:
+        normalized_name, normalized_hash = validate_artifact(
+            artifact_name, artifact_sha256, artifact_size_bytes
+        )
+        self._attach(
+            operation_id,
+            OperationType.EXPORT,
+            "operation_export_details",
+            [
+                "operation_id",
+                "feed_id",
+                "export_format",
+                "artifact_name",
+                "artifact_sha256",
+                "artifact_size_bytes",
+            ],
+            [
+                operation_id,
+                feed_id,
+                export_format,
+                normalized_name,
+                normalized_hash,
+                artifact_size_bytes,
+            ],
+        )
+
+    def update_export_detail(
+        self,
+        operation_id: str,
+        artifact_name: str,
+        artifact_sha256: str,
+        artifact_size_bytes: int,
+    ) -> None:
+        normalized_name, normalized_hash = validate_artifact(
+            artifact_name, artifact_sha256, artifact_size_bytes
+        )
+        assert normalized_name is not None and normalized_hash is not None
+        row = self._connection.execute(
+            "SELECT operation_type FROM operations WHERE operation_id = ?", [operation_id]
+        ).fetchone()
+        if row is None:
+            raise ValueError("La operación no existe.")
+        if str(row[0]) != OperationType.EXPORT:
+            raise ValueError("El detalle no es compatible con el tipo de operación.")
+        existing = self._connection.execute(
+            "SELECT count(*) FROM operation_export_details WHERE operation_id = ?", [operation_id]
+        ).fetchone()
+        if existing is None or existing[0] != 1:
+            raise ValueError("La operación no tiene un detalle de exportación.")
+        self._connection.execute(
+            "UPDATE operation_export_details SET artifact_name = ?, "
+            "artifact_sha256 = ?, artifact_size_bytes = ? WHERE operation_id = ?",
+            [normalized_name, normalized_hash, artifact_size_bytes, operation_id],
+        )
+
+    def list_operations(
+        self,
+        project_id: str,
+        page: PageRequest,
+        operation_type: OperationType | None = None,
+        status: OperationStatus | None = None,
+    ) -> PagedResult[Operation]:
+        conditions = ["o.project_id = ?"]
+        parameters: list[object] = [project_id]
+        if operation_type is not None:
+            conditions.append("o.operation_type = ?")
+            parameters.append(operation_type)
+        if status is not None:
+            conditions.append("o.status = ?")
+            parameters.append(status)
+        where = " WHERE " + " AND ".join(conditions)
+        total = self._connection.execute(
+            "SELECT count(*) FROM operations o" + where, parameters
+        ).fetchone()
+        rows = self._connection.execute(
+            "SELECT o.operation_id, o.project_id, o.operation_type, o.status, o.started_at, "
+            "o.finished_at, o.error_code, coalesce(i.feed_id, v.feed_id, e.feed_id), "
+            "coalesce(fi.source_name, fv.source_name, fe.source_name), i.job_id, "
+            "coalesce(v.validation_batch_id, ivr.batch_id), "
+            "CASE WHEN coalesce(vr.status, ivr.status) IN ('VALID', 'INVALID', 'CANCELLED') "
+            "THEN coalesce(vr.status, ivr.status) END, "
+            "CASE WHEN coalesce(vr.status, ivr.status) IN ('VALID', 'INVALID', 'CANCELLED') "
+            "THEN coalesce(vr.total_issue_count, ivr.total_issue_count) END, e.export_format, "
+            "e.artifact_name, e.artifact_sha256, e.artifact_size_bytes FROM operations o "
+            "LEFT JOIN operation_import_details i ON i.operation_id = o.operation_id "
+            "LEFT JOIN feeds fi ON fi.feed_id = i.feed_id "
+            "LEFT JOIN operation_validation_details v ON v.operation_id = o.operation_id "
+            "LEFT JOIN feeds fv ON fv.feed_id = v.feed_id "
+            "LEFT JOIN validation_runs vr ON vr.batch_id = v.validation_batch_id "
+            "LEFT JOIN validation_runs ivr ON ivr.batch_id = i.job_id || ':structure' "
+            "AND ivr.feed_id = i.feed_id "
+            "LEFT JOIN operation_export_details e ON e.operation_id = o.operation_id "
+            "LEFT JOIN feeds fe ON fe.feed_id = e.feed_id"
+            + where
+            + " ORDER BY o.started_at DESC, o.operation_id DESC LIMIT ? OFFSET ?",
+            [*parameters, page.limit, page.offset],
+        ).fetchall()
+        if total is None or not isinstance(total[0], int):
+            raise RepositoryError("El recuento de operaciones no es válido.")
+        return PagedResult(tuple(self._operation(row) for row in rows), total[0], page)
+
+    def _attach(
+        self,
+        operation_id: str,
+        expected_type: OperationType,
+        table: str,
+        columns: list[str],
+        values: list[object],
+    ) -> None:
+        row = self._connection.execute(
+            "SELECT operation_type FROM operations WHERE operation_id = ?", [operation_id]
+        ).fetchone()
+        if row is None:
+            raise ValueError("La operación no existe.")
+        if str(row[0]) != expected_type:
+            raise ValueError("El detalle no es compatible con el tipo de operación.")
+        existing = self._connection.execute(
+            f"SELECT count(*) FROM {table} WHERE operation_id = ?", [operation_id]
+        ).fetchone()
+        if existing is None or existing[0] != 0:
+            raise ValueError("Una operación ya tiene un detalle de ese tipo.")
+        unique_column = {
+            "operation_import_details": "job_id",
+            "operation_validation_details": "validation_batch_id",
+        }.get(table)
+        if unique_column is not None and values[-1] is not None:
+            linked = self._connection.execute(
+                f"SELECT count(*) FROM {table} WHERE {unique_column} = ?", [values[-1]]
+            ).fetchone()
+            if linked is None or linked[0] != 0:
+                raise ValueError("La referencia ya está asociada a otra operación.")
+        statement = (
+            f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})"
+        )
+        self._connection.execute(statement, values)
+
+    @staticmethod
+    def _operation(row: tuple[object, ...]) -> Operation:
+        started_at, finished_at = row[4], row[5]
+        if not isinstance(started_at, datetime) or (
+            finished_at is not None and not isinstance(finished_at, datetime)
+        ):
+            raise RepositoryError("Los timestamps de operaciones no son válidos.")
+        return Operation(
+            str(row[0]),
+            str(row[1]),
+            OperationType(str(row[2])),
+            OperationStatus(str(row[3])),
+            started_at,
+            finished_at,
+            None if row[6] is None else str(row[6]),
+            None if row[7] is None else str(row[7]),
+            None if row[9] is None else str(row[9]),
+            None if row[10] is None else str(row[10]),
+            None if row[11] is None else str(row[11]),
+            None if row[12] is None else _int_value(row[12]),
+            None if row[13] is None else str(row[13]),
+            None if row[14] is None else str(row[14]),
+            None if row[15] is None else str(row[15]),
+            None if row[16] is None else _int_value(row[16]),
+            None if row[8] is None else str(row[8]),
+        )
 
 
 class DuckDbServiceCalendarRepository:
@@ -1056,6 +1325,31 @@ def _validation_in_condition(
     parameters.extend(ordered)
 
 
+def _validation_conditions(
+    report_filter: ValidationIssueFilter,
+    conditions: list[str],
+    parameters: list[object],
+) -> None:
+    """Construye predicados de validación con parámetros, nunca SQL de la UI."""
+    _validation_in_condition("i.severity", report_filter.severities, conditions, parameters)
+    _validation_in_condition("i.category", report_filter.categories, conditions, parameters)
+    if report_filter.file_name is not None:
+        conditions.append("i.file_name = ?")
+        parameters.append(report_filter.file_name)
+    if report_filter.feed_id is not None:
+        conditions.append("r.feed_id = ?")
+        parameters.append(report_filter.feed_id)
+    search_text = (report_filter.search_text or "").strip().lower()
+    if search_text:
+        conditions.append(
+            "(contains(lower(coalesce(i.rule_code, '')), ?) "
+            "OR contains(lower(coalesce(i.message_key, '')), ?) "
+            "OR contains(lower(coalesce(i.field_name, '')), ?) "
+            "OR contains(lower(coalesce(i.file_name, '')), ?))"
+        )
+        parameters.extend([search_text] * 4)
+
+
 def _validation_issue_summary(row: tuple[object, ...]) -> ValidationIssueSummary:
     parameters = json.loads(str(row[12]))
     if not isinstance(parameters, dict):
@@ -1112,6 +1406,7 @@ class DuckDbUnitOfWork:
         self.overview = DuckDbFeedOverviewRepository(self._connection)
         self.validation = DuckDbValidationRepository(self._connection)
         self.import_jobs = DuckDbImportJobRepository(self._connection)
+        self.operations = DuckDbOperationRepository(self._connection)
         self.service_calendar = DuckDbServiceCalendarRepository(self._connection)
         self.route_explorer = DuckDbRouteExplorerRepository(self._connection)
         self.stop_inspector = DuckDbStopInspectorRepository(self._connection)

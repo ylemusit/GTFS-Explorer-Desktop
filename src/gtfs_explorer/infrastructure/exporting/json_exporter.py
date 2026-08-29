@@ -15,6 +15,10 @@ from gtfs_explorer.infrastructure.exporting.atomic_output import (
     AtomicOutputWriter,
     CancellationCheck,
 )
+from gtfs_explorer.product import IDENTITY
+
+# Compatibilidad para consumidores que ya importaban esta variable del módulo.
+__version__ = IDENTITY.version
 
 _BATCH_SIZE = 1_000
 _SCHEMA_VERSION = "1.0.0"
@@ -87,7 +91,7 @@ class JsonBundleExporter:
         trip_where, parameters = _trip_predicate(selection)
         scalar_fields: tuple[tuple[str, object], ...] = (
             ("schema_version", _SCHEMA_VERSION),
-            ("generator", {"name": "GTFS Explorer Desktop", "version": "0.1.0"}),
+            ("generator", {"name": IDENTITY.name, "version": IDENTITY.version}),
             ("source", source),
             ("selection", _selection_payload(selection)),
         )

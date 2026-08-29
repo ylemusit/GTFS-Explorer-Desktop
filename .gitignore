@@ -16,4 +16,5 @@ dist/
 examples/golines-asturias/generated/
 packaging/portable/deployment/
 packaging/portable/GTFS Explorer.dist/
+packaging/portable/GTFS Explorer Desktop.dist/
 nuitka-crash-report.xml

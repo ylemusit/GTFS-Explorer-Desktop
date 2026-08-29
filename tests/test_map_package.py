@@ -15,7 +15,14 @@ def _write_package(root: Path) -> Path:
     root.mkdir(parents=True)
     (root / "basemap.pmtiles").write_bytes(b"PMTiles\x03" + bytes(256))
     (root / "style.json").write_text(
-        json.dumps({"version": 8, "sources": {}, "layers": []}), encoding="utf-8"
+        json.dumps(
+            {
+                "version": 8,
+                "sources": {"basemap": {"type": "vector", "url": "pmtiles://basemap.pmtiles"}},
+                "layers": [],
+            }
+        ),
+        encoding="utf-8",
     )
     hashes = {
         name: hashlib.sha256((root / name).read_bytes()).hexdigest()
@@ -97,4 +104,19 @@ def test_corrupt_pmtiles_fails_before_the_loopback_server_starts(tmp_path: Path)
     ).hexdigest()
     (root / "package.json").write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(MapPackageError, match="PMTiles"):
+        load_map_package(root)
+
+
+@pytest.mark.parametrize("field", ("glyphs", "sprite"))
+def test_style_remote_assets_are_rejected(field: str, tmp_path: Path) -> None:
+    root = _write_package(tmp_path / "map-package")
+    style = json.loads((root / "style.json").read_text(encoding="utf-8"))
+    style[field] = "https://cdn.example/asset"
+    (root / "style.json").write_text(json.dumps(style), encoding="utf-8")
+    manifest = json.loads((root / "package.json").read_text(encoding="utf-8"))
+    manifest["sha256"]["style.json"] = hashlib.sha256(
+        (root / "style.json").read_bytes()
+    ).hexdigest()
+    (root / "package.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(MapPackageError, match="remota"):
         load_map_package(root)

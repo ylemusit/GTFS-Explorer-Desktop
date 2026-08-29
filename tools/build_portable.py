@@ -7,20 +7,33 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
+import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from gtfs_explorer.product import (  # noqa: E402
+    IDENTITY,
+    windows_file_version,
+    windows_product_version,
+)
+
 SPEC = ROOT / "packaging" / "portable" / "pysidedeploy.spec"
 ENTRYPOINT = ROOT / "packaging" / "portable" / "entrypoint.py"
 MAP_ASSETS = ROOT / "web" / "map" / "qt_resources"
+USER_GUIDE = ROOT / "docs" / "USER_GUIDE.md"
 DIST_ROOT = ROOT / "dist"
-PRODUCT_DIRECTORY = "GTFS Explorer Portable"
+PRODUCT_DIRECTORY = IDENTITY.portable_directory_name
 LICENSE_CHECK = ROOT / "tools" / "check_licenses.py"
+LABEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 def _sha256(path: Path) -> str:
@@ -32,20 +45,63 @@ def _sha256(path: Path) -> str:
 
 
 def _read_version() -> str:
-    for line in (ROOT / "src" / "gtfs_explorer" / "__init__.py").read_text("utf-8").splitlines():
-        if line.startswith("__version__"):
-            return line.split("=", 1)[1].strip().strip('"')
-    raise RuntimeError("No se encontró __version__ en gtfs_explorer.")
+    return IDENTITY.version
+
+
+def _windows_metadata_args() -> tuple[str, ...]:
+    """Argumentos PE generados desde la identidad canónica del producto."""
+    return (
+        f"--product-name={IDENTITY.name}",
+        f"--company-name={IDENTITY.author}",
+        f"--file-version={IDENTITY.windows_file_version}",
+        f"--product-version={IDENTITY.windows_product_version}",
+        f"--file-description={IDENTITY.file_description}",
+        f"--copyright={IDENTITY.copyright_text}",
+        f"--output-filename={IDENTITY.executable_name}",
+    )
+
+
+def _render_deploy_spec() -> str:
+    """Añade metadata Windows a una copia efímera del spec versionado."""
+    rendered: list[str] = []
+    found_extra_args = False
+    metadata = shlex.join(_windows_metadata_args())
+    for line in SPEC.read_text(encoding="utf-8").splitlines(keepends=True):
+        if line.startswith("title ="):
+            ending = "\n" if line.endswith("\n") else ""
+            rendered.append(f"title = {IDENTITY.name}{ending}")
+        elif line.startswith("extra_args ="):
+            ending = "\n" if line.endswith("\n") else ""
+            rendered.append(f"{line.rstrip('\r\n')} {metadata}{ending}")
+            found_extra_args = True
+        else:
+            rendered.append(line)
+    if not found_extra_args:
+        raise RuntimeError("El spec portable no contiene la opción nuitka.extra_args.")
+    return "".join(rendered)
+
+
+def _validate_label(label: str | None) -> str | None:
+    if label is not None and not LABEL_PATTERN.fullmatch(label):
+        raise ValueError("La etiqueta solo puede contener letras, números, '.', '_' o '-'.")
+    return label
+
+
+def _artifact_name(prefix: str, version: str, label: str | None, suffix: str) -> str:
+    label_part = f"-{label}" if label else ""
+    return f"{prefix}-{version}{label_part}-win-x64{suffix}"
 
 
 def _deployment_directory() -> Path:
-    return ROOT / "packaging" / "portable" / "GTFS Explorer.dist"
+    # pyside6-deploy keeps Nuitka's standalone output under the executable
+    # stem, independently of the human-readable application title.
+    return ROOT / "packaging" / "portable" / "deployment" / "entrypoint.dist"
 
 
 def _clean_previous_deployment() -> None:
     for path in (
         ROOT / "packaging" / "portable" / "deployment",
-        _deployment_directory(),
+        ROOT / "packaging" / "portable" / "GTFS Explorer.dist",
     ):
         if path.exists():
             shutil.rmtree(path)
@@ -55,7 +111,7 @@ def _run_deploy(*, dry_run: bool) -> None:
     # pyside6-deploy reescribe su spec con rutas absolutas. Usamos una copia
     # efímera para conservar el spec versionado como contrato reproducible.
     with tempfile.NamedTemporaryFile("w", suffix=".spec", delete=False, encoding="utf-8") as file:
-        file.write(SPEC.read_text(encoding="utf-8"))
+        file.write(_render_deploy_spec())
         temporary_spec = Path(file.name)
     try:
         command = [
@@ -79,6 +135,9 @@ def _copy_distribution(destination: Path) -> None:
         raise RuntimeError(f"pyside6-deploy no generó el standalone esperado: {source}")
     shutil.copytree(source, destination)
     shutil.copytree(MAP_ASSETS, destination / "web" / "map" / "qt_resources")
+    help_document = destination / "docs" / "USER_GUIDE.md"
+    help_document.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(USER_GUIDE, help_document)
     (destination / "portable.flag").touch()
 
 
@@ -110,8 +169,8 @@ def _copy_external_duckdb(destination: Path, *, source: Path | None = None) -> N
 
 def _executable(directory: Path) -> Path:
     source = directory / "entrypoint.exe"
-    executable = directory / "GTFS Explorer.exe"
-    if source.is_file():
+    executable = directory / IDENTITY.executable_name
+    if source.is_file() and not executable.is_file():
         source.replace(executable)
     if not executable.is_file():
         raise RuntimeError(f"El portable no contiene el ejecutable esperado: {executable}")
@@ -180,8 +239,10 @@ def _smoke_map_runtime(directory: Path) -> dict[str, object]:
 def _write_manifest(directory: Path, version: str) -> Path:
     files = [path for path in sorted(directory.rglob("*")) if path.is_file()]
     payload = {
-        "product": "GTFS Explorer Desktop",
+        "product": IDENTITY.name,
         "version": version,
+        "file_version": windows_file_version(version),
+        "product_version": windows_product_version(version),
         "format": "portable-standalone-v1",
         "files": {
             path.relative_to(directory).as_posix(): {
@@ -210,7 +271,9 @@ def _write_zip(source: Path, destination: Path) -> None:
             archive.writestr(info, path.read_bytes())
 
 
-def build(*, dry_run: bool = False) -> Path | None:
+def build(
+    *, dry_run: bool = False, output_dir: Path | None = None, label: str | None = None
+) -> Path | None:
     if not ENTRYPOINT.is_file() or not SPEC.is_file() or not MAP_ASSETS.is_dir():
         raise RuntimeError("Faltan los recursos necesarios para el portable.")
     if dry_run:
@@ -218,8 +281,10 @@ def build(*, dry_run: bool = False) -> Path | None:
         return None
 
     version = _read_version()
-    DIST_ROOT.mkdir(exist_ok=True)
-    zip_path = DIST_ROOT / f"GTFS-Explorer-Portable-{version}-win-x64.zip"
+    label = _validate_label(label)
+    destination_root = (output_dir or DIST_ROOT).resolve()
+    destination_root.mkdir(parents=True, exist_ok=True)
+    zip_path = destination_root / _artifact_name("GTFS-Explorer-Portable", version, label, ".zip")
     deployment = _deployment_directory()
     _clean_previous_deployment()
     with tempfile.TemporaryDirectory(
@@ -246,15 +311,42 @@ def build(*, dry_run: bool = False) -> Path | None:
         _write_manifest(package_root, version)
         _write_zip(package_root, zip_path)
     hash_path = zip_path.with_suffix(".zip.sha256")
-    hash_path.write_text(f"{_sha256(zip_path)}  {zip_path.name}\n", encoding="ascii")
+    archive_hash = _sha256(zip_path)
+    hash_path.write_text(f"{archive_hash}  {zip_path.name}\n", encoding="ascii")
+    manifest_path = zip_path.with_suffix(".manifest.json")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "product": IDENTITY.name,
+                "version": version,
+                "file_version": windows_file_version(version),
+                "product_version": windows_product_version(version),
+                "build_label": label,
+                "artifact": {
+                    "file": zip_path.name,
+                    "sha256": archive_hash,
+                    "bytes": zip_path.stat().st_size,
+                },
+                "format": "portable-build-v1",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return zip_path
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Muestra el build sin publicar ZIP.")
+    parser.add_argument("--output-dir", type=Path, help="Directorio de salida; por defecto, dist/.")
+    parser.add_argument("--label", help="Etiqueta aislada añadida al nombre del artefacto.")
     arguments = parser.parse_args()
-    result = build(dry_run=arguments.dry_run)
+    result = build(
+        dry_run=arguments.dry_run, output_dir=arguments.output_dir, label=arguments.label
+    )
     if result is not None:
         print(result)
     return 0

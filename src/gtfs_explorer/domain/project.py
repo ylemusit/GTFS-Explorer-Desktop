@@ -16,6 +16,7 @@ class ProjectStatus(StrEnum):
 
 class FeedStatus(StrEnum):
     IMPORTED = "IMPORTED"
+    CANCELLED = "CANCELLED"
     FAILED = "FAILED"
 
 

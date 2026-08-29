@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
 from gtfs_explorer.domain.exporting import ExportManifest
 from gtfs_explorer.presentation.desktop.i18n import t
 
+from .naming import normalize_export_destination, sanitize_export_component, suggest_export_filename
+
 
 class ExportFormat(StrEnum):
     JSON = "json"
@@ -79,11 +81,19 @@ class ExportAssistantWidget(QWidget):
         previewer: Previewer | None = None,
         executor: Executor | None = None,
         parent: QWidget | None = None,
+        *,
+        default_directory_resolver: Callable[[], Path] | None = None,
+        prepare_default_directory: Callable[[], Path] | None = None,
+        on_destination_directory_used: Callable[[Path], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self._previewer = previewer or _default_preview
         self._executor = executor
+        self._default_directory_resolver = default_directory_resolver
+        self._prepare_default_directory = prepare_default_directory
+        self._on_destination_directory_used = on_destination_directory_used
         self._cancelled = False
+        self._suggested_destination_text = ""
         self._build()
         self._refresh()
 
@@ -91,10 +101,28 @@ class ExportAssistantWidget(QWidget):
         self._executor = executor
         self._refresh()
 
+    def clear(self) -> None:
+        """Elimina toda selección y destino dependientes del proyecto actual."""
+        self._cancelled = False
+        self._suggested_destination_text = ""
+        self._format.blockSignals(True)
+        self._format.setCurrentIndex(0)
+        self._format.blockSignals(False)
+        for editor in (self._routes, self._trips, self._services):
+            editor.clear()
+        self._destination.clear()
+        self._bbox.setChecked(False)
+        self._spreadsheet_safe.setChecked(False)
+        self._cancel.setEnabled(False)
+        self._refresh()
+
     def request(self) -> ExportRequest:
         format_ = ExportFormat(self._format.currentData())
         destination = _effective_destination(
-            format_, Path(self._destination.text()), self._spreadsheet_safe.isChecked()
+            format_,
+            Path(self._destination.text()),
+            self._spreadsheet_safe.isChecked(),
+            default_directory=self._default_directory(),
         )
         return ExportRequest(
             format_,
@@ -109,44 +137,51 @@ class ExportAssistantWidget(QWidget):
 
     def _build(self) -> None:
         layout = QVBoxLayout(self)
-        description = QLabel(
-            "Seleccione rutas y, si procede, viajes o servicios. El cierre de dependencias "
-            "se previsualiza antes de escribir en el equipo."
-        )
+        description = QLabel(t("export.introduction"))
         description.setWordWrap(True)
         layout.addWidget(description)
         form = QFormLayout()
         self._format = QComboBox()
         self._format.setObjectName("exportFormat")
         self._format.setAccessibleName(t("export.format"))
-        self._format.addItem("JSON bundle (derivada)", ExportFormat.JSON.value)
-        self._format.addItem("GeoJSON (compatible)", ExportFormat.GEOJSON.value)
-        self._format.addItem("CSV (compatible)", ExportFormat.CSV.value)
-        self._format.addItem(
-            "Mini-GTFS (oficial si supera validación)", ExportFormat.MINI_GTFS.value
-        )
-        form.addRow("Formato:", self._format)
+        self._format.addItem(t("export.format_json"), ExportFormat.JSON.value)
+        self._format.addItem(t("export.format_geojson"), ExportFormat.GEOJSON.value)
+        self._format.addItem(t("export.format_csv"), ExportFormat.CSV.value)
+        self._format.addItem(t("export.format_mini_gtfs"), ExportFormat.MINI_GTFS.value)
+        format_label = QLabel(t("export.format_label"))
+        format_label.setBuddy(self._format)
+        form.addRow(format_label, self._format)
         self._routes = _identifiers_editor("exportRoutes")
         self._trips = _identifiers_editor("exportTrips")
         self._services = _identifiers_editor("exportServices")
         self._routes.setAccessibleName(t("export.routes"))
         self._trips.setAccessibleName(t("export.trips"))
         self._services.setAccessibleName(t("export.services"))
-        form.addRow("Rutas (una por línea):", self._routes)
-        form.addRow("Viajes opcionales:", self._trips)
-        form.addRow("Servicios opcionales:", self._services)
+        for label_text, editor in (
+            (t("export.routes_label"), self._routes),
+            (t("export.trips_label"), self._trips),
+            (t("export.services_label"), self._services),
+        ):
+            label = QLabel(label_text)
+            label.setBuddy(editor)
+            form.addRow(label, editor)
         destination_row = QHBoxLayout()
         self._destination = QLineEdit()
         self._destination.setObjectName("exportDestination")
         self._destination.setAccessibleName(t("export.destination"))
         browse = QPushButton(t("export.browse"))
+        browse.setAccessibleName(t("export.browse"))
+        browse.setAccessibleDescription(t("export.browse_description"))
+        browse.setToolTip(t("export.browse"))
         browse.clicked.connect(self._choose_destination)
         destination_row.addWidget(self._destination)
         destination_row.addWidget(browse)
-        form.addRow("Destino:", destination_row)
-        self._bbox = QCheckBox("Incluir bbox GeoJSON")
+        destination_label = QLabel(t("export.destination_label"))
+        destination_label.setBuddy(self._destination)
+        form.addRow(destination_label, destination_row)
+        self._bbox = QCheckBox(t("export.include_bbox"))
         self._bbox.setObjectName("exportBbox")
-        self._spreadsheet_safe = QCheckBox("Neutralizar fórmulas para hoja de cálculo")
+        self._spreadsheet_safe = QCheckBox(t("export.spreadsheet_safe"))
         self._spreadsheet_safe.setObjectName("exportSpreadsheetSafe")
         form.addRow(self._bbox)
         form.addRow(self._spreadsheet_safe)
@@ -163,8 +198,12 @@ class ExportAssistantWidget(QWidget):
         buttons = QHBoxLayout()
         self._export = QPushButton(t("export.start"))
         self._export.setObjectName("exportStart")
+        self._export.setAccessibleName(t("export.start"))
+        self._export.setToolTip(t("export.start"))
         self._cancel = QPushButton(t("export.cancel"))
         self._cancel.setObjectName("exportCancel")
+        self._cancel.setAccessibleName(t("export.cancel"))
+        self._cancel.setToolTip(t("export.cancel"))
         self._cancel.setEnabled(False)
         self._export.clicked.connect(self._execute)
         self._cancel.clicked.connect(self._request_cancel)
@@ -196,6 +235,9 @@ class ExportAssistantWidget(QWidget):
 
     def _refresh(self) -> None:
         format_ = ExportFormat(self._format.currentData())
+        route_ids = _identifiers(self._routes.toPlainText())
+        trip_ids = _identifiers(self._trips.toPlainText())
+        service_ids = _identifiers(self._services.toPlainText())
         # Todas las salidas se acotan por rutas; incluso el CSV es una vista
         # compatible de las rutas seleccionadas, no una exportación implícita
         # de todo el feed.
@@ -209,28 +251,80 @@ class ExportAssistantWidget(QWidget):
             self._bbox.setChecked(False)
         if format_ is not ExportFormat.CSV:
             self._spreadsheet_safe.setChecked(False)
-        self._format_help.setText(_format_help(format_))
+        proposed_name = suggest_export_filename(
+            format_,
+            route_ids=route_ids,
+            trip_ids=trip_ids,
+            service_ids=service_ids,
+            spreadsheet_safe=self._spreadsheet_safe.isChecked(),
+        )
+        self._sync_proposed_destination(proposed_name if route_ids else "")
+        self._format_help.setText(
+            _format_help(
+                format_,
+                route_ids=route_ids,
+                trip_ids=trip_ids,
+                service_ids=service_ids,
+                spreadsheet_safe=self._spreadsheet_safe.isChecked(),
+            )
+        )
         request = self.request()
         if needs_routes and not request.route_ids:
-            self._preview.setText("Seleccione al menos una ruta: el cierre no puede calcularse.")
+            self._preview.setText(t("export.preview_missing_routes"))
             self._export.setEnabled(False)
             return
         if not request.destination.name:
-            self._preview.setText("Seleccione un archivo de destino local.")
+            self._preview.setText(t("export.preview_missing_destination"))
             self._export.setEnabled(False)
             return
         preview = self._previewer(request)
-        lines = ["Dependencias: " + (", ".join(preview.dependencies) or "ninguna.")]
-        lines.extend(f"Aviso: {warning}" for warning in preview.warnings)
+        lines = [
+            t(
+                "export.preview_dependencies",
+                dependencies=", ".join(preview.dependencies) or t("export.preview_no_dependencies"),
+            )
+        ]
+        lines.extend(t("export.preview_warning", warning=warning) for warning in preview.warnings)
         if request.destination.exists():
-            lines.append("El destino ya existe: se pedirá confirmación antes de sobrescribirlo.")
+            lines.append(t("export.preview_existing_destination"))
         self._preview.setText("\n".join(lines))
         self._export.setEnabled(self._executor is not None)
 
+    def _sync_proposed_destination(self, proposed_name: str) -> None:
+        current = self._destination.text()
+        if not proposed_name:
+            if current == self._suggested_destination_text:
+                self._destination.clear()
+            self._suggested_destination_text = ""
+            return
+        if current and current != self._suggested_destination_text:
+            # Un nombre escrito manualmente no se sustituye al cambiar el
+            # formato o la selección; la ayuda sigue mostrando la propuesta.
+            self._suggested_destination_text = ""
+            return
+        self._suggested_destination_text = proposed_name
+        if current != proposed_name:
+            self._destination.setText(proposed_name)
+
     def _choose_destination(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Exportar GTFS")
+        directory = (
+            self._prepare_default_directory()
+            if self._prepare_default_directory is not None
+            else self._default_directory()
+        )
+        current_name = Path(self._destination.text()).name or "gtfs-export.json"
+        initial = str(directory / current_name) if directory is not None else current_name
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            t("dialog.export_title"),
+            initial,
+            _format_filter(ExportFormat(self._format.currentData())),
+        )
         if path:
-            self._destination.setText(path)
+            selected = Path(path)
+            self._destination.setText(str(selected))
+            if self._on_destination_directory_used is not None:
+                self._on_destination_directory_used(selected.parent)
 
     def _execute(self) -> None:
         if self._executor is None:
@@ -240,8 +334,10 @@ class ExportAssistantWidget(QWidget):
             request.destination.exists()
             and QMessageBox.question(
                 self,
-                "Sobrescribir exportación",
-                f"Ya existe '{request.destination.name}'. ¿Sobrescribir?",
+                t("dialog.overwrite_export_title"),
+                t("dialog.overwrite_export_message", filename=request.destination.name),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
             is not QMessageBox.StandardButton.Yes
         ):
@@ -251,23 +347,49 @@ class ExportAssistantWidget(QWidget):
         self._cancel.setEnabled(True)
         try:
             result = self._executor(request, lambda: self._cancelled)
-        except Exception as error:
-            QMessageBox.critical(self, "No se pudo exportar", str(error) or type(error).__name__)
+        except Exception:
+            QMessageBox.critical(
+                self,
+                t("dialog.export_error_title"),
+                t("dialog.export_error_message"),
+                QMessageBox.StandardButton.Ok,
+            )
             return
         finally:
             self._cancel.setEnabled(False)
             self._refresh()
-        warnings = "\n".join(f"Aviso: {item}" for item in result.warnings) or "Sin avisos."
+        warnings = "\n".join(
+            t("export.preview_warning", warning=item) for item in result.warnings
+        ) or t("export.no_warnings")
         QMessageBox.information(
             self,
-            "Exportación completada",
-            f"Salida {result.classification}.\nSHA-256: {result.manifest.sha256}\n{warnings}",
+            t("dialog.export_completed_title"),
+            t(
+                "dialog.export_completed_message",
+                classification=result.classification,
+                sha256=result.manifest.sha256,
+                warnings=warnings,
+            ),
             QMessageBox.StandardButton.Ok,
         )
 
     def _request_cancel(self) -> None:
         self._cancelled = True
         self._cancel.setEnabled(False)
+
+    def _default_directory(self) -> Path | None:
+        if self._default_directory_resolver is None:
+            return None
+        return self._default_directory_resolver()
+
+
+def _format_filter(format_: ExportFormat) -> str:
+    return {
+        ExportFormat.JSON: t("dialog.filter_json"),
+        ExportFormat.GEOJSON: t("dialog.filter_geojson"),
+        ExportFormat.CSV: t("dialog.filter_csv"),
+        ExportFormat.MINI_GTFS: t("dialog.filter_gtfs"),
+    }[format_]
 
 
 def _identifiers(value: str) -> frozenset[str]:
@@ -281,32 +403,76 @@ def _identifiers_editor(name: str) -> QPlainTextEdit:
     return editor
 
 
-def _format_help(format_: ExportFormat) -> str:
-    return {
-        ExportFormat.JSON: "Salida derivada: bundle propio de GTFS Explorer, no GTFS oficial.",
-        ExportFormat.GEOJSON: (
-            "Salida compatible RFC 7946; contiene geometría, no un feed GTFS oficial."
+def _format_help(
+    format_: ExportFormat,
+    *,
+    route_ids: frozenset[str] = frozenset(),
+    trip_ids: frozenset[str] = frozenset(),
+    service_ids: frozenset[str] = frozenset(),
+    spreadsheet_safe: bool = False,
+) -> str:
+    descriptions = {
+        ExportFormat.JSON: t("export.help_json"),
+        ExportFormat.GEOJSON: t("export.help_geojson"),
+        ExportFormat.CSV: t(
+            "export.help_csv",
+            mode=t("export.mode_spreadsheet_safe" if spreadsheet_safe else "export.mode_faithful"),
         ),
-        ExportFormat.CSV: "Salida compatible CSV; no es un feed GTFS oficial.",
-        ExportFormat.MINI_GTFS: (
-            "Salida oficial solo si supera la reimportación y validación Mini-GTFS."
-        ),
-    }[format_]
+        ExportFormat.MINI_GTFS: t("export.help_mini_gtfs"),
+    }
+    selection = _selection_context(route_ids, trip_ids, service_ids)
+    proposed_name = suggest_export_filename(
+        format_,
+        route_ids=route_ids,
+        trip_ids=trip_ids,
+        service_ids=service_ids,
+        spreadsheet_safe=spreadsheet_safe,
+    )
+    return t(
+        "export.help_summary",
+        description=descriptions[format_],
+        selection=selection,
+        proposed_name=proposed_name,
+    )
+
+
+def _selection_context(
+    route_ids: frozenset[str], trip_ids: frozenset[str], service_ids: frozenset[str]
+) -> str:
+    parts: list[str] = []
+    for key, values in (
+        ("export.selection_routes", route_ids),
+        ("export.selection_trips", trip_ids),
+        ("export.selection_services", service_ids),
+    ):
+        if values:
+            safe_values = sorted(
+                (sanitize_export_component(value, fallback="id") for value in values),
+                key=lambda value: (value.casefold(), value),
+            )
+            visible = ", ".join(safe_values[:4])
+            parts.append(t(key, values=visible))
+            if len(safe_values) > 4:
+                parts[-1] += t("export.selection_more", count=len(safe_values) - 4)
+    return " · ".join(parts) if parts else t("export.selection_empty")
 
 
 def _effective_destination(
-    format_: ExportFormat, destination: Path, spreadsheet_safe: bool
+    format_: ExportFormat,
+    destination: Path,
+    spreadsheet_safe: bool,
+    *,
+    default_directory: Path | None = None,
 ) -> Path:
-    """Devuelve el artefacto real antes de comprobar overwrite.
-
-    CSV obliga a hacer visible su modo en el nombre. La confirmación de
-    sobrescritura debe referirse a ese archivo final, no al texto intermedio
-    escrito por la persona usuaria.
-    """
-    if format_ is not ExportFormat.CSV:
-        return destination
-    mode = "spreadsheet-safe" if spreadsheet_safe else "faithful"
-    return destination.with_name(destination.stem + f"-{mode}.csv")
+    """Devuelve el artefacto real antes de comprobar overwrite."""
+    normalized = normalize_export_destination(format_, destination, spreadsheet_safe)
+    if (
+        default_directory is not None
+        and normalized.name not in {"", ".", ".."}
+        and not normalized.is_absolute()
+    ):
+        normalized = default_directory / normalized
+    return normalized
 
 
 def _default_preview(request: ExportRequest) -> ExportPreview:

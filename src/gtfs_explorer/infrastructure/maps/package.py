@@ -32,6 +32,10 @@ class MapPackage:
     min_zoom: int
     max_zoom: int
     files: tuple[PurePosixPath, ...]
+    package_id: str
+    package_version: str
+    name: str
+    style_id: str
 
 
 def load_map_package(root: Path) -> MapPackage:
@@ -42,8 +46,8 @@ def load_map_package(root: Path) -> MapPackage:
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise MapPackageError("No se puede leer package.json del mapa.") from error
-    if not isinstance(payload, dict) or payload.get("version") != 1:
-        raise MapPackageError("El paquete de mapa no usa el contrato v1.")
+    if not isinstance(payload, dict) or payload.get("version") not in {1, 2}:
+        raise MapPackageError("El paquete de mapa no usa un contrato compatible.")
     required = (
         "basemap",
         "style",
@@ -81,7 +85,8 @@ def load_map_package(root: Path) -> MapPackage:
     if style.relative_to(root).as_posix() not in {item.as_posix() for item in files}:
         raise MapPackageError("El estilo no está protegido por un hash.")
     _validate_pmtiles(basemap)
-    _validate_style(style)
+    profile = _style_profile(payload, root, files)
+    _validate_style(style, basemap, profile[2])
     return MapPackage(
         root,
         basemap,
@@ -95,6 +100,10 @@ def load_map_package(root: Path) -> MapPackage:
         min_zoom,
         max_zoom,
         files,
+        _package_identifier(payload.get("package_id"), root.name),
+        _package_identifier(payload.get("package_version"), "legacy"),
+        _text(payload.get("name")) or root.name,
+        profile[0],
     )
 
 
@@ -162,22 +171,67 @@ def _validate_pmtiles(path: Path) -> None:
         raise MapPackageError("basemap.pmtiles no es un PMTiles v3 válido.")
 
 
-def _validate_style(path: Path) -> None:
+def _validate_style(path: Path, basemap: Path, tileset_profile: str) -> None:
     try:
         style = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise MapPackageError("style.json no es JSON válido.") from error
     if not isinstance(style, dict) or style.get("version") != 8:
         raise MapPackageError("style.json no es un estilo MapLibre v8.")
-    if _contains_remote_url(style):
+    if _contains_forbidden_url(style):
         raise MapPackageError("style.json contiene una URL remota no permitida.")
+    sources = style.get("sources")
+    if not isinstance(sources, dict) or set(sources) != {"basemap"}:
+        raise MapPackageError("style.json debe declarar únicamente la fuente basemap esperada.")
+    source = sources["basemap"]
+    if not isinstance(source, dict) or source.get("url") != f"pmtiles://{basemap.name}":
+        raise MapPackageError("style.json no apunta al PMTiles declarado.")
+    expected_type = "raster" if tileset_profile == "raster" else "vector"
+    if source.get("type") != expected_type:
+        raise MapPackageError("El tipo de fuente del estilo no coincide con el perfil.")
 
 
-def _contains_remote_url(value: Any) -> bool:
+def _contains_forbidden_url(value: Any) -> bool:
     if isinstance(value, str):
-        return value.casefold().startswith(("http://", "https://", "//"))
+        return value.casefold().startswith(("http://", "https://", "//", "file://"))
     if isinstance(value, dict):
-        return any(_contains_remote_url(item) for item in value.values())
+        return any(_contains_forbidden_url(item) for item in value.values())
     if isinstance(value, list):
-        return any(_contains_remote_url(item) for item in value)
+        return any(_contains_forbidden_url(item) for item in value)
     return False
+
+
+def _style_profile(
+    payload: dict[str, Any], root: Path, files: tuple[PurePosixPath, ...]
+) -> tuple[str, str, str]:
+    value = payload.get("style_profile")
+    if value is None and payload.get("version") == 1:
+        return "legacy-local-v1", "1", "vector"
+    if not isinstance(value, dict):
+        raise MapPackageError("El paquete no declara un perfil de estilo.")
+    required = ("style_id", "style_version", "tileset_profile", "maplibre_style", "required_assets")
+    if any(not isinstance(value.get(key), str) or not value[key].strip() for key in required[:4]):
+        raise MapPackageError("El perfil de estilo no es válido.")
+    if value["tileset_profile"] not in {"vector", "raster"}:
+        raise MapPackageError("El perfil de teselas no está soportado.")
+    if value["maplibre_style"] != payload.get("style") or not isinstance(
+        value["required_assets"], list
+    ):
+        raise MapPackageError("El perfil de estilo no coincide con el paquete.")
+    declared = {item.as_posix() for item in files}
+    for item in value["required_assets"]:
+        asset = _safe_file(root, item)
+        if asset.relative_to(root).as_posix() not in declared:
+            raise MapPackageError("Un asset requerido no está protegido por hash.")
+    return value["style_id"].strip(), value["style_version"].strip(), value["tileset_profile"]
+
+
+def _package_identifier(value: Any, fallback: str) -> str:
+    text = _text(value) or fallback
+    if any(char in text for char in "/\\"):
+        raise MapPackageError("El identificador del paquete no es válido.")
+    return text
+
+
+def _text(value: Any) -> str | None:
+    return value.strip() if isinstance(value, str) and value.strip() else None

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 
+from gtfs_explorer.domain.errors import ImportCancelled
 from gtfs_explorer.domain.spec import FieldSpec, ScheduleSpec
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseConnection, ProjectDatabase
 from gtfs_explorer.infrastructure.importing.normalizers.core import _convert
@@ -25,7 +27,11 @@ class GeometryNormalizer:
     """Convierte `shapes.txt` preservando la secuencia y los valores fuente."""
 
     def normalize(
-        self, database: ProjectDatabase, specification: ScheduleSpec
+        self,
+        database: ProjectDatabase,
+        specification: ScheduleSpec,
+        *,
+        is_cancelled: Callable[[], bool] = lambda: False,
     ) -> GeometryNormalizationResult:
         """Sustituye los shapes y sus problemas de conversión en una transacción."""
         issues: list[tuple[object, ...]] = []
@@ -38,7 +44,9 @@ class GeometryNormalizer:
                 )
                 row_count = 0
                 if _FILENAME in _present_files(connection):
-                    row_count = self._normalize_file(connection, specification, issues)
+                    row_count = self._normalize_file(
+                        connection, specification, issues, is_cancelled
+                    )
                 if issues:
                     connection.executemany(
                         "INSERT INTO normalization_issues VALUES (?, ?, ?, ?, ?, ?, ?)", issues
@@ -54,11 +62,14 @@ class GeometryNormalizer:
         connection: DatabaseConnection,
         specification: ScheduleSpec,
         issues: list[tuple[object, ...]],
+        is_cancelled: Callable[[], bool],
     ) -> int:
         fields = specification.files[_FILENAME].fields
         columns = _staging_columns(connection, _FILENAME)
         rows = connection.execute("SELECT * FROM stg_shapes").fetchall()
-        for row in rows:
+        for index, row in enumerate(rows):
+            if index % 128 == 0 and is_cancelled():
+                raise ImportCancelled("La normalización se ha cancelado.")
             raw = dict(zip(columns, row, strict=True))
             source_row = int(raw.pop("source_row"))
             source_filename = str(raw.pop("source_filename"))

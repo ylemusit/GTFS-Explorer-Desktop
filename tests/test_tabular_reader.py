@@ -25,8 +25,38 @@ def test_strict_gtfs_preserves_textual_rfc_csv_values(tmp_path: Path) -> None:
     parsed = TabularReader().read_gtfs(path)
     assert parsed.header == ("trip_id", "arrival_time", "stop_headsign")
     assert parsed.rows[0].values == ("001", "25:10:00", "Parada, Norte")
-    assert parsed.rows[1].number == 4
+    assert parsed.rows[1].number == 3
     assert parsed.rows[1].values == ("002", "26:00:00", "Dos\r\nLíneas", "columna-extra")
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_source_row_is_physical_record_start_and_preserves_blank_lines(
+    newline: str, tmp_path: Path
+) -> None:
+    path = tmp_path / "stops.txt"
+    path.write_bytes(
+        (
+            "\ufeffid,name"
+            + newline
+            + newline
+            + "A,Alpha"
+            + newline
+            + newline
+            + newline
+            + "B,Beta"
+            + newline
+        ).encode()
+    )
+
+    parsed = TabularReader().read_gtfs(path)
+
+    assert [(row.number, row.values) for row in parsed.rows] == [
+        (2, ()),
+        (3, ("A", "Alpha")),
+        (4, ()),
+        (5, ()),
+        (6, ("B", "Beta")),
+    ]
 
 
 def test_strict_rejects_invalid_encoding_and_compatible_requires_confirmation(

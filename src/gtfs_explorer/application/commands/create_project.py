@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from uuid import uuid4
 
@@ -27,7 +28,7 @@ class CreateProject:
         self._name = name
 
     def execute(self) -> OpenedProject:
-        directory = self._project_directory
+        directory = self._project_directory.resolve()
         if not directory.is_dir():
             raise ProjectCreateError("Seleccione una carpeta existente para el proyecto.")
         if any(directory.iterdir()):
@@ -51,6 +52,15 @@ class CreateProject:
             )
             return OpenProject(directory).execute()
         except Exception as error:
-            for path in (directory / "project.json", directory / "data.duckdb"):
+            # El directorio elegido por el usuario se conserva; solo se retiran
+            # artefactos creados por esta tentativa fallida.
+            for path in (
+                directory / "project.json",
+                directory / "data.duckdb",
+                directory / "data.duckdb.pre-migration.bak",
+            ):
                 path.unlink(missing_ok=True)
+            for transient in (directory / "temp", directory / "cache"):
+                if transient.is_dir():
+                    shutil.rmtree(transient)
             raise ProjectCreateError("No se ha podido crear el proyecto local.") from error

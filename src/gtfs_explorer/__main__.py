@@ -10,14 +10,14 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from . import __version__
 from .infrastructure.filesystem.paths import application_resource_path, resolve_application_paths
 from .infrastructure.logging import configure_logging, install_exception_handler
+from .product import IDENTITY
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gtfs-explorer")
-    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument("--version", action="version", version=IDENTITY.version)
     parser.add_argument("--runtime-smoke", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--map-runtime-smoke", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
@@ -61,7 +61,9 @@ def _runtime_smoke() -> int:
         )
         if database.initialize() < 1:
             raise RuntimeError("No se pudieron aplicar las migraciones DuckDB.")
-    load_schedule_spec(application_resource_path("schemas/gtfs_schedule/2026-04-27/spec.json"))
+    load_schedule_spec(
+        application_resource_path(f"schemas/gtfs_schedule/{IDENTITY.gtfs_spec_revision}/spec.json")
+    )
     return 0
 
 
@@ -106,7 +108,13 @@ def _map_runtime_smoke(report_path: Path | None, map_package: Path | None = None
         "errors": [],
     }
     application = QApplication.instance() or QApplication(sys.argv)
-    widget = MapWidget(lambda _trip_id: MapLayerPayload(shapes, stops), lambda _stop_id: None)
+    # El smoke gráfico debe ser reproducible y no puede convertir una prueba
+    # local del overlay en una petición real al proveedor online.
+    widget = MapWidget(
+        lambda _trip_id: MapLayerPayload(shapes, stops),
+        lambda _stop_id: None,
+        provider=None,
+    )
     errors: list[str] = []
     widget._bridge.protocol_error.connect(errors.append)  # noqa: SLF001 - smoke del binario
 
@@ -205,7 +213,12 @@ def main() -> int:
 
     from .presentation.desktop.main_window import run_window
 
-    return run_window(logger=logger, logs_directory=paths.logs_directory, debug=debug)
+    return run_window(
+        application_paths=paths,
+        logger=logger,
+        logs_directory=paths.logs_directory,
+        debug=debug,
+    )
 
 
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
 """GTFS Explorer Desktop."""
 
-__version__ = "0.1.0"
+from .product import PRODUCT_VERSION
+
+__version__ = PRODUCT_VERSION

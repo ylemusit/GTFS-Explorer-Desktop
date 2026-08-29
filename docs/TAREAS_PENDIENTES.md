@@ -1,8 +1,21 @@
 # Tareas pendientes y bloqueos
 
-Este documento registra únicamente tareas del plan maestro que no han podido completarse o que requieren una decisión antes de continuar.
+Este documento conserva el historial de incidencias del plan maestro. Las entradas
+que aparecen debajo son bloqueos históricos o intentos anteriores; no representan
+por sí solas el estado vigente de una tarea. La fuente actual de estados es
+`docs/TASK_STATUS.json` y, para la actualización `0.1.0-rc2`,
+`docs/PLAN_ACTUALIZACION_HERRAMIENTA.md` y
+`docs/CONTEXTO_Y_LINEA_DE_TRABAJO_GPT.md`.
 
-Cada entrada debe incluir la tarea, la parte completada, el criterio pendiente, la evidencia del problema, los intentos realizados y la acción necesaria. El orquestador añade las incidencias automáticamente y se detiene; nunca omite una dependencia bloqueada.
+Actualmente no hay un bloqueo activo del orquestador: las tareas Txxx cerradas
+constan como `DONE` en `docs/TASK_STATUS.json`. El orquestador puede añadir aquí
+nuevas incidencias cuando una ejecución quede bloqueada.
+
+## Historial de bloqueos e incidencias resueltas
+
+Cada entrada histórica incluye la tarea, la parte completada, el criterio
+pendiente, la evidencia del problema, los intentos realizados y la acción
+necesaria registrada en su momento.
 
 
 ## T001 — Fijar plataforma y versiones

@@ -1,14 +1,14 @@
 [project]
 name = "gtfs-explorer-desktop"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Aplicación Windows portable y offline-first para explorar GTFS Schedule"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "duckdb==1.1.3",
     "nuitka==2.6.9",
-    "PySide6==6.8.2.1",
-    "shapely==2.0.7",
+    "PySide6==6.8.3",
+    "shapely==2.1.2",
 ]
 
 [project.scripts]
@@ -20,6 +20,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "gtfs_explorer.product.PRODUCT_VERSION"}
 
 [tool.setuptools.package-data]
 "gtfs_explorer.resources.help" = ["*.json"]
@@ -53,4 +56,5 @@ addopts = ["--strict-markers"]
 markers = [
     "unit: prueba aislada sin servicios ni interfaz gráfica",
     "integration: prueba que integra más de un componente local",
+    "e2e: journey de usuario sobre la arquitectura productiva y recursos locales aislados",
 ]

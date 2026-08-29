@@ -35,8 +35,9 @@ from gtfs_explorer.infrastructure.exporting.json_exporter import (
     JsonBundleExporter,
     JsonExportSelection,
 )
+from gtfs_explorer.product import IDENTITY, runtime_build_id
 
-_SPEC_PATH = Path("schemas/gtfs_schedule/2026-04-27/spec.json")
+_SPEC_PATH = Path(f"schemas/gtfs_schedule/{IDENTITY.gtfs_spec_revision}/spec.json")
 
 
 @dataclass(frozen=True)
@@ -257,6 +258,10 @@ def run(profile: Profile, output: Path | None) -> dict[str, object]:
         cancel_seconds = time.perf_counter() - cancel_started
         disk_bytes = sum(item.stat().st_size for item in workspace.rglob("*") if item.is_file())
         report = {
+            "product": IDENTITY.name,
+            "app_version": IDENTITY.version,
+            "build_id": runtime_build_id(),
+            "gtfs_spec_revision": IDENTITY.gtfs_spec_revision,
             "profile": profile.name,
             "dataset": {
                 "trips": profile.trips,

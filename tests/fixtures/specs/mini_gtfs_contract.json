@@ -1,0 +1,101 @@
+{
+  "fixture_id": "mini_gtfs_contract",
+  "description": "Fixture GTFS ficticio para el contrato Mini-GTFS P1-12.",
+  "tables": {
+    "agency.txt": {
+      "headers": ["agency_id", "agency_name", "agency_url", "agency_timezone"],
+      "rows": [
+        {"agency_id": "A1", "agency_name": "Operador Á", "agency_url": "https://example.invalid/a1", "agency_timezone": "Europe/Madrid"},
+        {"agency_id": "A2", "agency_name": "Operador B", "agency_url": "https://example.invalid/a2", "agency_timezone": "Europe/Madrid"}
+      ]
+    },
+    "calendar.txt": {
+      "headers": ["service_id", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "start_date", "end_date"],
+      "rows": [
+        {"service_id": "S_A", "monday": "1", "tuesday": "1", "wednesday": "1", "thursday": "1", "friday": "1", "saturday": "0", "sunday": "0", "start_date": "20260101", "end_date": "20261231"},
+        {"service_id": "S_B", "monday": "1", "tuesday": "1", "wednesday": "1", "thursday": "1", "friday": "1", "saturday": "0", "sunday": "0", "start_date": "20260101", "end_date": "20261231"}
+      ]
+    },
+    "calendar_dates.txt": {
+      "headers": ["service_id", "date", "exception_type"],
+      "rows": [
+        {"service_id": "S_SPECIAL", "date": "20260826", "exception_type": "1"},
+        {"service_id": "S_B", "date": "20260827", "exception_type": "2"}
+      ]
+    },
+    "routes.txt": {
+      "headers": ["route_id", "agency_id", "route_short_name", "route_long_name", "route_type"],
+      "rows": [
+        {"route_id": "A", "agency_id": "A1", "route_short_name": "Línea Á", "route_long_name": "Ruta A UTF-8", "route_type": "715"},
+        {"route_id": "B", "agency_id": "A2", "route_short_name": "B", "route_long_name": "Ruta B exclusiva", "route_type": "3"}
+      ]
+    },
+    "stops.txt": {
+      "headers": ["stop_id", "stop_name", "stop_lat", "stop_lon", "location_type", "parent_station"],
+      "rows": [
+        {"stop_id": "STA", "stop_name": "Estación Ñ", "stop_lat": "43.1000", "stop_lon": "-5.8000", "location_type": "1", "parent_station": ""},
+        {"stop_id": "SHARED", "stop_name": "Parada compartida", "stop_lat": "43.1010", "stop_lon": "-5.8010", "location_type": "0", "parent_station": "STA"},
+        {"stop_id": "A1", "stop_name": "Parada A uno", "stop_lat": "43.1020", "stop_lon": "-5.8020", "location_type": "0", "parent_station": ""},
+        {"stop_id": "A2", "stop_name": "Parada A dos", "stop_lat": "43.1030", "stop_lon": "-5.8030", "location_type": "0", "parent_station": ""},
+        {"stop_id": "B_ONLY", "stop_name": "Solo B", "stop_lat": "43.2000", "stop_lon": "-5.9000", "location_type": "0", "parent_station": ""}
+      ]
+    },
+    "trips.txt": {
+      "headers": ["route_id", "service_id", "trip_id", "shape_id"],
+      "rows": [
+        {"route_id": "A", "service_id": "S_A", "trip_id": "A_TRIP_1", "shape_id": "SH_A"},
+        {"route_id": "A", "service_id": "S_SPECIAL", "trip_id": "A_TRIP_2", "shape_id": "SH_A"},
+        {"route_id": "B", "service_id": "S_B", "trip_id": "B_TRIP", "shape_id": "SH_B"}
+      ]
+    },
+    "stop_times.txt": {
+      "headers": ["trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence"],
+      "rows": [
+        {"trip_id": "A_TRIP_1", "arrival_time": "23:55:00", "departure_time": "23:56:00", "stop_id": "SHARED", "stop_sequence": "1"},
+        {"trip_id": "A_TRIP_1", "arrival_time": "24:10:00", "departure_time": "24:11:00", "stop_id": "A1", "stop_sequence": "2"},
+        {"trip_id": "A_TRIP_1", "arrival_time": "24:20:00", "departure_time": "24:21:00", "stop_id": "SHARED", "stop_sequence": "3"},
+        {"trip_id": "A_TRIP_2", "arrival_time": "08:00:00", "departure_time": "08:01:00", "stop_id": "SHARED", "stop_sequence": "1"},
+        {"trip_id": "A_TRIP_2", "arrival_time": "08:10:00", "departure_time": "08:11:00", "stop_id": "A2", "stop_sequence": "2"},
+        {"trip_id": "B_TRIP", "arrival_time": "09:00:00", "departure_time": "09:01:00", "stop_id": "SHARED", "stop_sequence": "1"},
+        {"trip_id": "B_TRIP", "arrival_time": "09:10:00", "departure_time": "09:11:00", "stop_id": "B_ONLY", "stop_sequence": "2"}
+      ]
+    },
+    "shapes.txt": {
+      "headers": ["shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"],
+      "rows": [
+        {"shape_id": "SH_A", "shape_pt_lat": "43.1030", "shape_pt_lon": "-5.8030", "shape_pt_sequence": "2"},
+        {"shape_id": "SH_A", "shape_pt_lat": "43.1010", "shape_pt_lon": "-5.8010", "shape_pt_sequence": "1"},
+        {"shape_id": "SH_B", "shape_pt_lat": "43.2000", "shape_pt_lon": "-5.9000", "shape_pt_sequence": "1"},
+        {"shape_id": "SH_B", "shape_pt_lat": "43.2010", "shape_pt_lon": "-5.9010", "shape_pt_sequence": "2"}
+      ]
+    },
+    "frequencies.txt": {
+      "headers": ["trip_id", "start_time", "end_time", "headway_secs", "exact_times"],
+      "rows": [
+        {"trip_id": "A_TRIP_1", "start_time": "25:00:00", "end_time": "26:00:00", "headway_secs": "600", "exact_times": "1"},
+        {"trip_id": "B_TRIP", "start_time": "10:00:00", "end_time": "11:00:00", "headway_secs": "600", "exact_times": "1"}
+      ]
+    },
+    "transfers.txt": {
+      "headers": ["from_stop_id", "to_stop_id", "from_route_id", "to_route_id", "from_trip_id", "to_trip_id", "transfer_type", "min_transfer_time"],
+      "rows": [
+        {"from_stop_id": "SHARED", "to_stop_id": "A1", "from_route_id": "A", "to_route_id": "A", "from_trip_id": "A_TRIP_1", "to_trip_id": "A_TRIP_2", "transfer_type": "2", "min_transfer_time": "60"},
+        {"from_stop_id": "SHARED", "to_stop_id": "B_ONLY", "from_route_id": "A", "to_route_id": "B", "from_trip_id": "A_TRIP_1", "to_trip_id": "B_TRIP", "transfer_type": "2", "min_transfer_time": "120"}
+      ]
+    },
+    "feed_info.txt": {
+      "headers": ["feed_publisher_name", "feed_publisher_url", "feed_lang", "feed_start_date", "feed_end_date", "feed_version"],
+      "rows": [
+        {"feed_publisher_name": "Operador Á", "feed_publisher_url": "https://example.invalid/feed", "feed_lang": "es", "feed_start_date": "20260101", "feed_end_date": "20261231", "feed_version": "contract-1"}
+      ]
+    },
+    "attributions.txt": {
+      "headers": ["attribution_id", "agency_id", "route_id", "trip_id", "organization_name", "is_producer", "is_operator", "is_authority", "attribution_url"],
+      "rows": [
+        {"attribution_id": "GLOBAL", "agency_id": "", "route_id": "", "trip_id": "", "organization_name": "Autoridad Ñ", "is_producer": "1", "is_operator": "0", "is_authority": "1", "attribution_url": "https://example.invalid/global"},
+        {"attribution_id": "A_ATTR", "agency_id": "A1", "route_id": "A", "trip_id": "", "organization_name": "Operador A", "is_producer": "", "is_operator": "1", "is_authority": "", "attribution_url": "https://example.invalid/a"},
+        {"attribution_id": "B_ATTR", "agency_id": "A2", "route_id": "B", "trip_id": "B_TRIP", "organization_name": "Operador B", "is_producer": "", "is_operator": "1", "is_authority": "", "attribution_url": "https://example.invalid/b"}
+      ]
+    }
+  }
+}

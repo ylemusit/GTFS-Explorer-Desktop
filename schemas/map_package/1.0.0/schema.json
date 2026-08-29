@@ -1,22 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gtfs-explorer.local/schemas/map_package/1.0.0/schema.json",
-  "title": "Paquete de mapa offline GTFS Explorer v1",
+  "title": "Paquete de mapa offline GTFS Explorer v2",
   "type": "object",
-  "required": ["version", "basemap", "style", "license", "license_url", "attribution", "bbox", "min_zoom", "max_zoom", "source", "pmtiles_version", "sha256"],
+  "required": ["version", "package_id", "package_version", "name", "style_profile", "basemap", "style", "license", "license_url", "attribution", "bbox", "min_zoom", "max_zoom", "source", "pmtiles_version", "sha256"],
   "properties": {
-    "version": {"const": 1},
-    "basemap": {"const": "basemap.pmtiles"},
-    "style": {"const": "style.json"},
-    "license": {"type": "string", "minLength": 1},
-    "license_url": {"type": "string", "minLength": 1},
-    "attribution": {"type": "string", "minLength": 1},
-    "bbox": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}},
-    "min_zoom": {"type": "integer", "minimum": 0, "maximum": 30},
-    "max_zoom": {"type": "integer", "minimum": 0, "maximum": 30},
-    "source": {"type": "object", "required": ["reference", "remote"], "properties": {"reference": {"type": "string", "minLength": 1}, "remote": {"type": "boolean"}}},
-    "pmtiles_version": {"type": "string", "minLength": 1},
-    "sha256": {"type": "object", "minProperties": 2, "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+    "version": {"const": 2}, "package_id": {"type": "string", "minLength": 1}, "package_version": {"type": "string", "minLength": 1}, "name": {"type": "string", "minLength": 1},
+    "style_profile": {"type": "object", "required": ["style_id", "style_version", "tileset_profile", "maplibre_style", "required_assets"], "properties": {"style_id": {"type": "string", "minLength": 1}, "style_version": {"type": "string", "minLength": 1}, "tileset_profile": {"enum": ["vector", "raster"]}, "maplibre_style": {"const": "style.json"}, "required_assets": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false},
+    "basemap": {"const": "basemap.pmtiles"}, "style": {"const": "style.json"}, "license": {"type": "string", "minLength": 1}, "license_url": {"type": "string", "minLength": 1}, "attribution": {"type": "string", "minLength": 1},
+    "bbox": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}}, "min_zoom": {"type": "integer", "minimum": 0, "maximum": 30}, "max_zoom": {"type": "integer", "minimum": 0, "maximum": 30},
+    "source": {"type": "object", "required": ["reference", "remote"], "properties": {"reference": {"type": "string", "minLength": 1}, "remote": {"type": "boolean"}}, "additionalProperties": false}, "pmtiles_version": {"type": "string", "minLength": 1}, "sha256": {"type": "object", "minProperties": 2, "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
   },
   "additionalProperties": false
 }

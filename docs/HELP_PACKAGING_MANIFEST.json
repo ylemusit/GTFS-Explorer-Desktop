@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "purpose": "P1-32 debe incluir la ayuda local sin conexión en portable e instalador.",
+  "files": [
+    {
+      "source": "gtfs_explorer/resources/help/index.json",
+      "destination": "gtfs_explorer/resources/help/index.json",
+      "required": true,
+      "role": "catalogo de ayuda integrada"
+    },
+    {
+      "source": "docs/USER_GUIDE.md",
+      "destination": "docs/USER_GUIDE.md",
+      "required": true,
+      "role": "manual de usuario para distribucion y repositorio"
+    }
+  ],
+  "offline": true
+}

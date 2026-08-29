@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gtfs_explorer.domain.spec import FieldSpec, FileSpec, ScheduleSpec
-from gtfs_explorer.domain.validation import ValidationContext
+from gtfs_explorer.domain.spec import FieldSpec, FileSpec, ScheduleSpec, load_schedule_spec
+from gtfs_explorer.domain.validation import ValidationContext, ValidationRuleRegistry
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseSettings, ProjectDatabase
+from gtfs_explorer.infrastructure.validation.engine import ValidationEngine
 from gtfs_explorer.infrastructure.validation.fields import FieldValidationRule
 from gtfs_explorer.infrastructure.validation.references import ReferenceValidationRule
+
+SPEC_PATH = Path("schemas/gtfs_schedule/2026-04-27/spec.json")
 
 
 def _database(tmp_path: Path) -> ProjectDatabase:
@@ -88,6 +91,108 @@ def test_field_rule_reports_row_field_type_and_enum_issues(tmp_path: Path) -> No
         ("STOP_LAT", 7, "stop_lat"),
         ("LOCATION_TYPE", 7, "location_type"),
     ]
+
+
+def test_real_stop_time_enums_accept_zero_and_reject_out_of_domain_values(
+    tmp_path: Path,
+) -> None:
+    database = _database(tmp_path)
+    specification = load_schedule_spec(SPEC_PATH)
+    with database.connection() as connection:
+        connection.execute(
+            "INSERT INTO projects VALUES ('project', 'Test', 'READY', now(), now(), 8)"
+        )
+        connection.execute(
+            "INSERT INTO feeds VALUES ('feed', 'project', 'test', 'hash', 'STRICT', '2026-04-27', "
+            "'0.1.0', now(), 'READY')"
+        )
+        connection.execute(
+            "CREATE TABLE stg_stop_times (source_row BIGINT, pickup_type VARCHAR, "
+            "drop_off_type VARCHAR, start_pickup_drop_off_window VARCHAR, "
+            "end_pickup_drop_off_window VARCHAR)"
+        )
+        for row, pickup_type, drop_off_type in (
+            (2, "0", "0"),
+            (3, "1", "1"),
+            (4, "2", "2"),
+            (5, "3", "3"),
+            (6, "4", "4"),
+        ):
+            connection.execute(
+                "INSERT INTO stg_stop_times VALUES (?, ?, ?, NULL, NULL)",
+                [row, pickup_type, drop_off_type],
+            )
+
+        registry = ValidationRuleRegistry()
+        registry.register(FieldValidationRule(connection, specification))
+        result = ValidationEngine(registry).execute(
+            connection,
+            feed_id="feed",
+            batch_id="batch",
+        )
+        issues = connection.execute(
+            "SELECT rule_code, row_number, field_name FROM validation_issues "
+            "WHERE batch_id = 'batch' ORDER BY position"
+        ).fetchall()
+
+    assert result.total_issue_count == 2
+    assert issues == [
+        (
+            "GTFS_STOP_TIMES_TXT_PICKUP_TYPE_CONDITIONALLY_FORBIDDEN",
+            6,
+            "pickup_type",
+        ),
+        (
+            "GTFS_STOP_TIMES_TXT_DROP_OFF_TYPE_CONDITIONALLY_FORBIDDEN",
+            6,
+            "drop_off_type",
+        ),
+    ]
+
+
+def test_route_type_accepts_known_extensions_but_rejects_unknown_numeric_values(
+    tmp_path: Path,
+) -> None:
+    database = _database(tmp_path)
+    specification = load_schedule_spec(SPEC_PATH)
+    with database.connection() as connection:
+        connection.execute("CREATE TABLE stg_routes (source_row BIGINT, route_type VARCHAR)")
+        connection.executemany(
+            "INSERT INTO stg_routes VALUES (?, ?)", [(2, "3"), (3, "715"), (4, "1301"), (5, "999")]
+        )
+        issues = tuple(
+            FieldValidationRule(connection, specification).evaluate(
+                ValidationContext("feed", "batch")
+            )
+        )
+
+    assert [(issue.row_number, issue.field_name) for issue in issues] == [(5, "route_type")]
+
+
+def test_conditional_stop_time_enums_remain_coherent_with_semantics() -> None:
+    specification = load_schedule_spec(SPEC_PATH)
+    stop_times = specification.files["stop_times.txt"].fields
+
+    assert specification.enums["GTFS_ENUM_STOP_TIMES_TXT_PICKUP_TYPE"] == (
+        "0",
+        "1",
+        "2",
+        "3",
+    )
+    assert specification.enums["GTFS_ENUM_STOP_TIMES_TXT_DROP_OFF_TYPE"] == (
+        "0",
+        "1",
+        "2",
+        "3",
+    )
+    assert stop_times["pickup_type"].rule_id == (
+        "GTFS_STOP_TIMES_TXT_PICKUP_TYPE_CONDITIONALLY_FORBIDDEN"
+    )
+    assert stop_times["drop_off_type"].rule_id == (
+        "GTFS_STOP_TIMES_TXT_DROP_OFF_TYPE_CONDITIONALLY_FORBIDDEN"
+    )
+    assert "pickup_type=0" in (stop_times["pickup_type"].condition or "")
+    assert "drop_off_type=0" in (stop_times["drop_off_type"].condition or "")
 
 
 def test_reference_rule_uses_set_query_and_reports_missing_target(tmp_path: Path) -> None:

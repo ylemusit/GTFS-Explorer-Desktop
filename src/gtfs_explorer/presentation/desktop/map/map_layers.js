@@ -10,6 +10,11 @@
   let mapReadyReported = false;
   let pendingReplacement = null;
   let latestReplacement = null;
+  let pendingCamera = null;
+  let activeBasemapSource = "unavailable";
+  let activeBasemapRequest = 0;
+  let reportedErrorRequest = null;
+  let styleTransitionPending = false;
 
   function reportMapReadyWhenBridgeIsAvailable() {
     const bridge = window.GTFSExplorerMapBridge;
@@ -52,6 +57,33 @@
     });
   }
 
+  function captureCamera() {
+    if (!map || typeof map.getCenter !== "function") return null;
+    const center = map.getCenter();
+    const values = [center && center.lng, center && center.lat, map.getZoom(), map.getBearing(), map.getPitch()];
+    if (!values.every((value) => Number.isFinite(value))) return null;
+    return {center: [values[0], values[1]], zoom: values[2], bearing: values[3], pitch: values[4]};
+  }
+
+  function restoreCamera() {
+    if (!map || !pendingCamera || typeof map.jumpTo !== "function") return;
+    const camera = pendingCamera;
+    pendingCamera = null;
+    try { map.jumpTo(camera); } catch (_) { pendingCamera = null; }
+  }
+
+  function overlayForStyle() {
+    if (!latestReplacement) return null;
+    return {payload: latestReplacement.payload, fit: false, resetSelection: false};
+  }
+
+  function reportMapError(kind) {
+    if (reportedErrorRequest === activeBasemapRequest) return;
+    reportedErrorRequest = activeBasemapRequest;
+    const bridge = window.GTFSExplorerMapBridge;
+    if (bridge) bridge.mapError({source: activeBasemapSource, kind, request: activeBasemapRequest});
+  }
+
   function fitData(shapes, stops) {
     const coordinates = [...shapes.features, ...stops.features].flatMap((feature) =>
       feature.geometry.type === "LineString" ? feature.geometry.coordinates : [feature.geometry.coordinates]
@@ -71,7 +103,14 @@
     const stops = payload.stops || EMPTY;
     if (resetSelection) selectedStopId = null;
     map.getSource("gtfs-shapes").setData(shapes);
-    map.getSource("gtfs-stops").setData(stops);
+    const selectedStops = Array.isArray(stops.features) ? {
+      ...stops,
+      features: stops.features.map((feature) => ({
+        ...feature,
+        properties: {...feature.properties, selected: feature.properties && feature.properties.id === selectedStopId},
+      })),
+    } : stops;
+    map.getSource("gtfs-stops").setData(selectedStops);
     if (fit) fitData(shapes, stops);
     return true;
   }
@@ -82,14 +121,23 @@
     if (applyReplacement(payload, fit, resetSelection)) pendingReplacement = null;
   }
 
+  function neutralStyle() {
+    return {
+      version: 8,
+      sources: {},
+      layers: [{id: "empty-background", type: "background", paint: {"background-color": "#f8fafc"}}],
+    };
+  }
+
   function initialize() {
     const {maplibregl} = window.GTFSExplorerMap;
     maplibregl.setWorkerUrl("map_worker.mjs");
     map = new maplibregl.Map({
       container: "map",
       center: [0, 0], zoom: 1,
-      style: {version: 8, sources: {}, layers: [{id: "empty-background", type: "background", paint: {"background-color": "#f8fafc"}}]},
+      style: neutralStyle(),
     });
+    map.on("error", () => reportMapError("map"));
     map.on("load", () => {
       mapLoaded = true;
       installTransitLayers();
@@ -120,8 +168,10 @@
     });
     map.on("style.load", () => {
       if (!mapLoaded) return;
+      styleTransitionPending = false;
       installTransitLayers();
-      pendingReplacement = latestReplacement;
+      restoreCamera();
+      if (!pendingReplacement) pendingReplacement = overlayForStyle();
       flushPendingReplacement();
     });
   }
@@ -129,7 +179,7 @@
   window.GTFSExplorerLayers = {
     replace: function (payload, fit = true, resetSelection = true) {
       latestReplacement = {payload, fit, resetSelection};
-      if (applyReplacement(payload, fit, resetSelection)) {
+      if (!styleTransitionPending && applyReplacement(payload, fit, resetSelection)) {
         pendingReplacement = null;
         return true;
       }
@@ -139,8 +189,29 @@
       return false;
     },
     selectStop: function (stopId) { selectedStopId = stopId; updateSelection(); },
-    setBasemap: async function (styleUrl, pmtilesUrl) {
+    clearBasemap: function (request = 0) {
       if (!map) return false;
+      activeBasemapSource = "unavailable";
+      activeBasemapRequest = request;
+      reportedErrorRequest = null;
+      pendingCamera = captureCamera();
+      pendingReplacement = overlayForStyle();
+      styleTransitionPending = true;
+      try {
+        map.setStyle(neutralStyle());
+        return true;
+      } catch (_) {
+        reportMapError("style");
+        return false;
+      }
+    },
+    setBasemap: async function (styleUrl, pmtilesUrl, request = 0) {
+      if (!map) return false;
+      activeBasemapSource = "local";
+      activeBasemapRequest = request;
+      reportedErrorRequest = null;
+      pendingCamera = captureCamera();
+      styleTransitionPending = true;
       const {maplibregl, PMTiles, Protocol} = window.GTFSExplorerMap;
       const protocol = new Protocol();
       protocol.add(new PMTiles(pmtilesUrl));
@@ -149,14 +220,36 @@
         if (!response.ok) throw new Error("No se pudo cargar el estilo offline.");
         return response.json();
       });
+      if (request !== activeBasemapRequest || activeBasemapSource !== "local") return false;
       const replace = (value) => typeof value === "string"
         ? value.replaceAll("pmtiles://basemap.pmtiles", `pmtiles://${pmtilesUrl}`)
         : Array.isArray(value) ? value.map(replace)
           : value && typeof value === "object"
             ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replace(item)]))
             : value;
-      pendingReplacement = latestReplacement;
+      pendingReplacement = overlayForStyle();
       map.setStyle(replace(style));
+      return true;
+    },
+    setOnlineBasemap: async function (tileUrl, tileSize = 256, minZoom = 0, maxZoom = 19, request = 0) {
+      if (!map) return false;
+      if (typeof tileUrl !== "string" || !tileUrl.includes("{z}") || !tileUrl.includes("{x}") || !tileUrl.includes("{y}")) {
+        throw new Error("La plantilla de teselas online no es válida.");
+      }
+      if (tileUrl.includes("?") || tileUrl.includes("#")) {
+        throw new Error("La plantilla de teselas online no admite query ni fragmentos.");
+      }
+      activeBasemapSource = "online";
+      activeBasemapRequest = request;
+      reportedErrorRequest = null;
+      pendingCamera = captureCamera();
+      pendingReplacement = overlayForStyle();
+      styleTransitionPending = true;
+      map.setStyle({
+        version: 8,
+        sources: {"online-basemap": {type: "raster", tiles: [tileUrl], tileSize, minzoom: minZoom, maxzoom: maxZoom}},
+        layers: [{id: "online-basemap-layer", type: "raster", source: "online-basemap"}],
+      });
       return true;
     },
   };

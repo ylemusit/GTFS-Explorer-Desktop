@@ -8,8 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
-from gtfs_explorer.application.jobs.import_job import CancelToken, ImportPhase, ImportProgress
+from gtfs_explorer.application.jobs.import_job import (
+    CancelToken,
+    ImportPhase,
+    ImportProgress,
+    ProgressMode,
+)
 from gtfs_explorer.domain.errors import ImportCancelled
+from gtfs_explorer.domain.operations import OperationStatus, OperationType, utc_now_naive
 from gtfs_explorer.domain.project import (
     FeedMetadata,
     FeedStatus,
@@ -77,6 +83,8 @@ class ImportFeed:
         self._on_progress = on_progress or (lambda progress: None)
         self._has_free_space = has_free_space or self._default_has_free_space
         self._manifest: SourceManifest | None = None
+        self._operation_started = False
+        self._staging_counts: dict[str, int] = {}
 
     def execute(self, cancel_token: CancelToken | None = None) -> ImportFeedResult:
         """Ejecuta una vez el feed y deja siempre un estado terminal persistido."""
@@ -97,12 +105,22 @@ class ImportFeed:
                 manifest,
                 self._specification,
                 is_cancelled=token.is_cancelled,
+                on_progress=self._staging_progress,
             )
 
             self._start(ImportPhase.NORMALIZING, token)
-            core = CoreNormalizer().normalize(self._database, self._specification)
-            geometry = GeometryNormalizer().normalize(self._database, self._specification)
-            optional = OptionalNormalizer().normalize(self._database, self._specification)
+            self._detail(ImportPhase.NORMALIZING, "core")
+            core = CoreNormalizer().normalize(
+                self._database, self._specification, is_cancelled=token.is_cancelled
+            )
+            self._detail(ImportPhase.NORMALIZING, "shapes")
+            geometry = GeometryNormalizer().normalize(
+                self._database, self._specification, is_cancelled=token.is_cancelled
+            )
+            self._detail(ImportPhase.NORMALIZING, "opcionales")
+            optional = OptionalNormalizer().normalize(
+                self._database, self._specification, is_cancelled=token.is_cancelled
+            )
             issue_count = core.issue_count + geometry.issue_count + optional.issue_count
             self._raise_if_cancelled(token)
 
@@ -122,6 +140,7 @@ class ImportFeed:
                     feed_id=self._feed_id,
                     batch_id=f"{self._job_id}:structure",
                     is_cancelled=token.is_cancelled,
+                    on_progress=lambda rule: self._detail(ImportPhase.VALIDATING, rule),
                 )
             issue_count = self._error_count()
             if issue_count:
@@ -163,13 +182,39 @@ class ImportFeed:
     def _start(self, phase: ImportPhase, token: CancelToken) -> None:
         completed = _WORK_PHASES.index(phase)
         self._save(JobState.RUNNING, phase, completed / len(_WORK_PHASES))
-        self._on_progress(ImportProgress(phase, completed, len(_WORK_PHASES)))
+        self._on_progress(
+            ImportProgress(
+                phase,
+                completed,
+                len(_WORK_PHASES),
+                mode=ProgressMode.INDETERMINATE,
+            )
+        )
         self._raise_if_cancelled(token)
+
+    def _detail(self, phase: ImportPhase, detail: str) -> None:
+        completed = _WORK_PHASES.index(phase)
+        self._on_progress(ImportProgress(phase, completed, len(_WORK_PHASES), detail=detail))
+
+    def _staging_progress(self, filename: str, count: int) -> None:
+        self._staging_counts[filename] = count
+        self._on_progress(
+            ImportProgress(
+                ImportPhase.STAGING,
+                _WORK_PHASES.index(ImportPhase.STAGING),
+                len(_WORK_PHASES),
+                detail=filename,
+                completed=count,
+                unit="filas",
+                mode=ProgressMode.INDETERMINATE,
+            )
+        )
 
     def _save(
         self, state: JobState, phase: ImportPhase, progress: float, error_code: str | None = None
     ) -> None:
         manifest_hash = self._manifest.manifest_sha256 if self._manifest else "0" * 64
+        operation_started = False
         with DuckDbUnitOfWork(self._database) as unit_of_work:
             unit_of_work.projects.save_metadata(self._project)
             unit_of_work.feeds.save_metadata(
@@ -180,12 +225,43 @@ class ImportFeed:
                     manifest_hash,
                     self._source.kind.value,
                     self._specification.revision,
-                    FeedStatus.IMPORTED if state is JobState.READY else FeedStatus.FAILED,
+                    FeedStatus.IMPORTED
+                    if state in {JobState.READY, JobState.INVALID}
+                    else FeedStatus.CANCELLED
+                    if state is JobState.CANCELLED
+                    else FeedStatus.FAILED,
                 )
             )
             unit_of_work.import_jobs.save_metadata(
                 ImportJobMetadata(self._job_id, self._feed_id, state, phase, progress, error_code)
             )
+            if state is JobState.RUNNING and not self._operation_started:
+                unit_of_work.operations.start(
+                    self._job_id,
+                    self._project.project_id,
+                    OperationType.IMPORT,
+                    utc_now_naive(),
+                )
+                unit_of_work.operations.attach_import_detail(
+                    self._job_id, self._feed_id, self._job_id
+                )
+                operation_started = True
+            elif state is not JobState.RUNNING:
+                unit_of_work.operations.finish(
+                    self._job_id,
+                    {
+                        JobState.READY: OperationStatus.COMPLETED,
+                        JobState.INVALID: OperationStatus.COMPLETED,
+                        JobState.CANCELLED: OperationStatus.CANCELLED,
+                        JobState.FAILED: OperationStatus.FAILED,
+                    }[state],
+                    utc_now_naive(),
+                    error_code.upper()
+                    if error_code is not None and state in {JobState.CANCELLED, JobState.FAILED}
+                    else None,
+                )
+        if operation_started:
+            self._operation_started = True
 
     def _error_count(self) -> int:
         with self._database.connection() as connection:

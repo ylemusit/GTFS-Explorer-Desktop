@@ -37,7 +37,7 @@ def test_repositories_implement_ports_and_page_feed_inventory(tmp_path: Path) ->
 
     with DuckDbUnitOfWork(database) as unit_of_work:
         port: UnitOfWork = unit_of_work
-        assert port.projects.schema_version() == 8
+        assert port.projects.schema_version() == 9
         result = port.feeds.source_files(PageRequest(offset=1, limit=1))
 
     assert result.total == 3

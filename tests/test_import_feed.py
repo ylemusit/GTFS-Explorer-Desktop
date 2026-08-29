@@ -11,10 +11,17 @@ import pytest
 
 from gtfs_explorer.application.commands.import_feed import ImportFeed
 from gtfs_explorer.application.jobs.import_job import CancelToken, ImportPhase
-from gtfs_explorer.domain.project import JobState, ProjectMetadata, ProjectStatus
+from gtfs_explorer.application.queries.raw import RawInspectorQueries
+from gtfs_explorer.domain.operations import OperationStatus
+from gtfs_explorer.domain.ports import PageRequest
+from gtfs_explorer.domain.project import FeedStatus, JobState, ProjectMetadata, ProjectStatus
+from gtfs_explorer.domain.raw import RawQuery
 from gtfs_explorer.domain.source import InputSource, InputSourceKind
 from gtfs_explorer.domain.spec import load_schedule_spec
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseSettings, ProjectDatabase
+from gtfs_explorer.infrastructure.duckdb.repositories import DuckDbUnitOfWork
+from gtfs_explorer.infrastructure.duckdb.repositories.base import DuckDbRawInspectorRepository
+from gtfs_explorer.infrastructure.validation.engine import ValidationEngine
 
 SPEC_PATH = Path("schemas/gtfs_schedule/2026-04-27/spec.json")
 
@@ -58,10 +65,25 @@ def test_success_is_ready_only_after_all_phases_commit(tmp_path: Path) -> None:
     source.mkdir()
     _write_fixture(source)
 
-    result = _command(_database(tmp_path), source).execute()
+    database = _database(tmp_path)
+    result = _command(database, source).execute()
 
     assert result.state is JobState.READY
     assert result.issue_count == 0
+    with database.connection() as connection:
+        assert connection.execute("SELECT status FROM feeds").fetchone() == ("IMPORTED",)
+        assert connection.execute("SELECT count(*) FROM operations").fetchone() == (1,)
+        assert connection.execute(
+            "SELECT o.status, d.feed_id, d.job_id "
+            "FROM operations o JOIN operation_import_details d "
+            "ON d.operation_id = o.operation_id"
+        ).fetchone() == (OperationStatus.COMPLETED.value, "feed-1", "job-1")
+    with DuckDbUnitOfWork(database) as unit_of_work:
+        operation = unit_of_work.operations.list_operations("project-1", PageRequest()).items[0]
+    assert operation.operation_type.value == "IMPORT"
+    assert operation.validation_batch_id == "job-1:structure"
+    assert operation.validation_result == "VALID"
+    assert operation.validation_issue_count == 1
 
 
 @pytest.mark.integration
@@ -76,7 +98,59 @@ def test_validation_errors_finish_invalid_never_ready(tmp_path: Path) -> None:
     assert result.state is JobState.INVALID
     with database.connection() as connection:
         assert connection.execute("SELECT state FROM import_jobs").fetchone() == ("INVALID",)
+        assert connection.execute("SELECT status FROM feeds").fetchone() == ("IMPORTED",)
+        assert connection.execute("SELECT status FROM validation_runs").fetchone() == ("INVALID",)
         assert connection.execute("SELECT count(*) FROM normalization_issues").fetchone()[0] > 0
+        assert connection.execute("SELECT status FROM operations").fetchone() == (
+            OperationStatus.COMPLETED.value,
+        )
+        assert connection.execute("SELECT count(*) FROM operations").fetchone() == (1,)
+
+    with DuckDbUnitOfWork(database) as unit_of_work:
+        operation = unit_of_work.operations.list_operations("project-1", PageRequest()).items[0]
+    assert operation.operation_type.value == "IMPORT"
+    assert operation.validation_batch_id == "job-1:structure"
+    assert operation.validation_result == "INVALID"
+    assert operation.validation_issue_count is not None
+
+    with DuckDbUnitOfWork(database) as unit_of_work:
+        feed = unit_of_work.feeds.latest_metadata()
+        assert feed is not None
+        assert feed.status is FeedStatus.IMPORTED
+        assert unit_of_work.overview.overview().feed == feed
+
+
+@pytest.mark.integration
+def test_blank_physical_lines_are_ignored_without_failed_import_and_remain_inspectable(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_fixture(source)
+    stops = source / "stops.txt"
+    stops.write_text(
+        "stop_id,stop_name,stop_lat,stop_lon\n\nS1,Norte,43.1,-5.8\n\n\nS2,Sur,43.2,-5.9\n",
+        encoding="utf-8",
+    )
+
+    database = _database(tmp_path)
+    result = _command(database, source).execute()
+
+    assert result.state is not JobState.FAILED
+    with database.connection() as connection:
+        assert connection.execute("SELECT status FROM feeds").fetchone() == ("IMPORTED",)
+        assert connection.execute("SELECT count(*) FROM stg_stops").fetchone() == (2,)
+        assert connection.execute(
+            "SELECT loaded_row_count FROM stg_source_inventory WHERE original_name = 'stops.txt'"
+        ).fetchone() == (2,)
+        raw = RawInspectorQueries(
+            DuckDbRawInspectorRepository(connection, load_schedule_spec(SPEC_PATH))
+        ).query(RawQuery("stops.txt", ("stop_id", "stop_name")))
+
+    assert [(row.source_row, row.values) for row in raw.rows] == [
+        (3, ("S1", "Norte")),
+        (6, ("S2", "Sur")),
+    ]
 
 
 @pytest.mark.integration
@@ -96,6 +170,121 @@ def test_cancellation_is_reproducible_at_every_work_phase(
     result = _command(_database(tmp_path), source, on_progress=cancel_at_progress).execute(token)
 
     assert result.state is JobState.CANCELLED
+
+
+@pytest.mark.integration
+def test_first_cancellation_is_cancelled_not_failed_and_has_no_validation_result(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_fixture(source)
+    token = CancelToken()
+
+    def cancel_at_progress(progress: object) -> None:
+        if getattr(progress, "phase") is ImportPhase.NORMALIZING:
+            token.cancel()
+
+    database = _database(tmp_path)
+    result = _command(database, source, on_progress=cancel_at_progress).execute(token)
+
+    assert result.state is JobState.CANCELLED
+    with database.connection() as connection:
+        assert connection.execute("SELECT status FROM feeds").fetchone() == ("CANCELLED",)
+        assert connection.execute("SELECT state FROM import_jobs").fetchone() == ("CANCELLED",)
+        assert connection.execute("SELECT count(*) FROM validation_runs").fetchone() == (0,)
+        assert connection.execute("SELECT started_at, finished_at FROM import_jobs").fetchone() == (
+            None,
+            None,
+        )
+        assert connection.execute("SELECT status, error_code FROM operations").fetchone() == (
+            OperationStatus.CANCELLED.value,
+            "CANCELLED",
+        )
+    with DuckDbUnitOfWork(database) as unit_of_work:
+        operation = unit_of_work.operations.list_operations("project-1", PageRequest()).items[0]
+    assert operation.operation_type.value == "IMPORT"
+    assert operation.validation_batch_id is None
+    assert operation.validation_result is None
+    assert operation.validation_issue_count is None
+
+
+@pytest.mark.integration
+def test_reimport_cancellation_keeps_previous_imported_feed(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_fixture(source)
+    database = _database(tmp_path)
+    assert _command(database, source).execute().state is JobState.READY
+
+    token = CancelToken()
+    token.cancel()
+    cancelled = ImportFeed(
+        database,
+        _project(),
+        InputSource(source, InputSourceKind.DIRECTORY),
+        load_schedule_spec(SPEC_PATH),
+        job_id="job-2",
+        feed_id="feed-2",
+    ).execute(token)
+
+    assert cancelled.state is JobState.CANCELLED
+    with DuckDbUnitOfWork(database) as unit_of_work:
+        feed = unit_of_work.feeds.latest_metadata()
+        assert feed is not None
+        assert feed.status is FeedStatus.IMPORTED
+    with database.connection() as connection:
+        assert connection.execute(
+            "SELECT status FROM feeds WHERE feed_id = 'feed-2' ORDER BY imported_at DESC LIMIT 1"
+        ).fetchone() == ("CANCELLED",)
+
+
+@pytest.mark.integration
+def test_cancellation_during_validation_persists_cancelled_run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_fixture(source)
+    token = CancelToken()
+    original_execute = ValidationEngine.execute
+
+    def cancel_inside_validation(self: object, connection: object, **kwargs: object) -> object:
+        token.cancel()
+        return original_execute(self, connection, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(ValidationEngine, "execute", cancel_inside_validation)
+    database = _database(tmp_path)
+    result = _command(database, source).execute(token)
+
+    assert result.state is JobState.CANCELLED
+    with database.connection() as connection:
+        assert connection.execute("SELECT status FROM validation_runs").fetchone() == ("CANCELLED",)
+        assert connection.execute("SELECT status FROM feeds").fetchone() == ("CANCELLED",)
+
+
+@pytest.mark.integration
+def test_validation_failure_has_no_fictitious_result(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_fixture(source)
+
+    def fail_persist(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("fallo de persistencia de validación")
+
+    monkeypatch.setattr(ValidationEngine, "_persist", staticmethod(fail_persist))
+    database = _database(tmp_path)
+    result = _command(database, source).execute()
+
+    assert result.state is JobState.FAILED
+    with DuckDbUnitOfWork(database) as unit_of_work:
+        operation = unit_of_work.operations.list_operations("project-1", PageRequest()).items[0]
+    assert operation.operation_type.value == "IMPORT"
+    assert operation.validation_batch_id == "job-1:structure"
+    assert operation.validation_result is None
+    assert operation.validation_issue_count is None
 
 
 @pytest.mark.integration
@@ -122,4 +311,8 @@ def test_simulated_disk_failure_finishes_failed_and_cleans_extraction(tmp_path: 
         assert connection.execute("SELECT state, error_code FROM import_jobs").fetchone() == (
             "FAILED",
             "ImportSecurityError",
+        )
+        assert connection.execute("SELECT status, error_code FROM operations").fetchone() == (
+            OperationStatus.FAILED.value,
+            "IMPORTSECURITYERROR",
         )

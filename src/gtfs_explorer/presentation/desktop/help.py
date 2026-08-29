@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from html import escape
 from importlib.resources import files
 
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -17,6 +19,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from gtfs_explorer.presentation.desktop.i18n import t
+from gtfs_explorer.product import IDENTITY
 
 
 @dataclass(frozen=True)
@@ -85,19 +90,22 @@ class HelpDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self._catalog = catalog
-        self.setWindowTitle("Ayuda local")
+        self.setWindowTitle(t("identity.help_window_title", product_name=IDENTITY.name))
         self.resize(720, 460)
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Manual integrado (sin conexión)", self))
+        layout.addWidget(QLabel(t("identity.help_manual_label", product_name=IDENTITY.name), self))
         self._search = QLineEdit(self)
-        self._search.setPlaceholderText("Buscar en la ayuda…")
+        self._search.setAccessibleName(t("identity.help_search_placeholder"))
+        self._search.setPlaceholderText(t("identity.help_search_placeholder"))
         self._search.textChanged.connect(self._refresh_topics)
         layout.addWidget(self._search)
         content = QHBoxLayout()
         self._topics = QListWidget(self)
+        self._topics.setAccessibleName(t("accessibility.help_topics"))
         self._topics.currentRowChanged.connect(self._show_topic)
         content.addWidget(self._topics, 1)
         self._body = QTextBrowser(self)
+        self._body.setAccessibleName(t("accessibility.help_content"))
         self._body.setOpenExternalLinks(False)
         content.addWidget(self._body, 3)
         layout.addLayout(content)
@@ -105,6 +113,12 @@ class HelpDialog(QDialog):
         self._refresh_topics()
         target = self._catalog.resolve(help_id)
         self._select(target.topic_id)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 - API Qt
+        if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
+            self.reject()
+            return
+        super().keyPressEvent(event)
 
     def _refresh_topics(self) -> None:
         selected = self._topics.currentItem().data(0x0100) if self._topics.currentItem() else None

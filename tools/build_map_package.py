@@ -109,6 +109,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--min-zoom", required=True, type=int)
     parser.add_argument("--max-zoom", required=True, type=int)
     parser.add_argument("--style", required=True, type=Path)
+    parser.add_argument("--tileset-profile", choices=("vector", "raster"), default="vector")
     parser.add_argument(
         "--assets", type=Path, help="Directorio opcional de assets locales del estilo."
     )
@@ -173,7 +174,17 @@ def main() -> int:
             copied.extend(_copy_tree(args.assets.resolve(), root / "assets"))
         hashes = {item.relative_to(root).as_posix(): _sha256(item) for item in copied}
         manifest = {
-            "version": 1,
+            "version": 2,
+            "package_id": output.name,
+            "package_version": "1",
+            "name": output.name,
+            "style_profile": {
+                "style_id": f"local-{args.tileset_profile}-v1",
+                "style_version": "1",
+                "tileset_profile": args.tileset_profile,
+                "maplibre_style": "style.json",
+                "required_assets": [item.relative_to(root).as_posix() for item in copied[2:]],
+            },
             "basemap": "basemap.pmtiles",
             "style": "style.json",
             "license": args.license_name.strip(),

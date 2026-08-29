@@ -41,7 +41,7 @@ def _table(name: str, headers: tuple[str, ...], *rows: tuple[str, ...]) -> MiniG
     return MiniGtfsTable(name, headers, rows)
 
 
-def _tables() -> tuple[MiniGtfsTable, ...]:
+def _tables(route_type: str = "3") -> tuple[MiniGtfsTable, ...]:
     return (
         _table(
             "agency.txt",
@@ -67,7 +67,7 @@ def _tables() -> tuple[MiniGtfsTable, ...]:
         _table(
             "routes.txt",
             ("route_id", "agency_id", "route_short_name", "route_type"),
-            ("R1", "A1", "1", "3"),
+            ("R1", "A1", "1", route_type),
         ),
         _table(
             "stops.txt",
@@ -152,6 +152,19 @@ def test_mini_gtfs_is_rooted_reimported_deterministic_and_matches_selection(tmp_
         "format": "gtfs_schedule_zip",
         "internal_revalidation": "passed",
     }
+
+
+@pytest.mark.integration
+def test_mini_gtfs_roundtrip_preserves_known_extended_route_type(tmp_path: Path) -> None:
+    destination = tmp_path / "extended.zip"
+
+    MiniGtfsSubsetExporter(load_schedule_spec(SPEC_PATH)).write(
+        destination, _tables("715"), expected=_expected()
+    )
+
+    with ZipFile(destination) as archive:
+        rows = list(csv.reader(io.TextIOWrapper(archive.open("routes.txt"), encoding="utf-8")))
+    assert rows[1][3] == "715"
 
 
 @pytest.mark.integration

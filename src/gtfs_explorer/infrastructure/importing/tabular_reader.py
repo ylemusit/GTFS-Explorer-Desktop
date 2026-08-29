@@ -6,7 +6,7 @@ import csv
 import io
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from gtfs_explorer.domain.errors import TabularReadError
 
@@ -64,8 +64,8 @@ class TabularReader:
                 if not header or any(not value for value in header):
                     raise TabularReadError("cabecera ausente o vacía", reader.line_num or 1)
                 batch: list[TabularRow] = []
-                for values in reader:
-                    batch.append(TabularRow(reader.line_num, tuple(values)))
+                for row in _iter_rows(reader, reader.line_num):
+                    batch.append(row)
                     if len(batch) == batch_size:
                         yield TabularBatch(header, tuple(batch))
                         batch = []
@@ -120,9 +120,21 @@ class TabularReader:
                 raise TabularReadError("archivo tabular vacío", 1) from error
             if not header or any(not value for value in header):
                 raise TabularReadError("cabecera ausente o vacía", reader.line_num or 1)
-            rows = tuple(TabularRow(reader.line_num, tuple(values)) for values in reader)
+            rows = tuple(_iter_rows(reader, reader.line_num))
         except csv.Error as error:
             raise TabularReadError(str(error), reader.line_num or 1) from error
         finally:
             csv.field_size_limit(previous_limit)
         return TabularData(header, rows)
+
+
+def _iter_rows(reader: Any, previous_line: int) -> Iterator[TabularRow]:
+    """Produce filas con el inicio físico del registro CSV, base 1."""
+    while True:
+        start_line = previous_line + 1
+        try:
+            values = next(reader)
+        except StopIteration:
+            return
+        previous_line = reader.line_num
+        yield TabularRow(start_line, tuple(values))

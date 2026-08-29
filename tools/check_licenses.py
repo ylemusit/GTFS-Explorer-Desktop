@@ -14,7 +14,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.0"
+sys.path.insert(0, str(ROOT / "src"))
+
+from gtfs_explorer.product import IDENTITY  # noqa: E402
 
 # Cada patron debe corresponder a software que puede llegar al standalone.
 COMPONENTS = (
@@ -26,17 +28,18 @@ COMPONENTS = (
         ("_*.pyd", "select.pyd", "unicodedata.pyd", "python*.dll"),
     ),
     ("duckdb", "DuckDB", "1.1.3", "MIT", ("duckdb/*",)),
+    ("shapely", "Shapely", "2.1.2", "BSD-3-Clause", ("shapely/*",)),
     (
         "pyside6",
         "PySide6",
-        "6.8.2.1",
+        "6.8.3",
         "LGPL-3.0-only OR GPL-3.0-only",
         ("PySide6/*", "pyside6.abi3.dll", "shiboken6*"),
     ),
     (
         "qt",
         "Qt 6",
-        "6.8.2",
+        "6.8.3",
         "LGPL-3.0-only OR GPL-3.0-only",
         ("qt6*", "qtwebengine*", "QtWebEngineProcess.exe", "qt6.conf", "v8_context_snapshot*"),
     ),
@@ -62,6 +65,7 @@ COMPONENTS = (
 ALLOWED_NON_BINARIES = (
     "portable.flag",
     "manifest.json",
+    "docs/USER_GUIDE.md",
     "THIRD_PARTY_NOTICES.html",
     "SBOM.cdx.json",
 )
@@ -79,11 +83,11 @@ def _component_payload() -> list[dict[str, object]]:
     result = [
         {
             "type": "application",
-            "bom-ref": "gtfs-explorer-desktop@0.1.0",
-            "name": "GTFS Explorer Desktop",
-            "version": VERSION,
+            "bom-ref": f"gtfs-explorer-desktop@{IDENTITY.version}",
+            "name": IDENTITY.name,
+            "version": IDENTITY.version,
             "licenses": [{"license": {"id": "LicenseRef-Proprietary"}}],
-            "author": "Yeison Arbey Carrillo Lemus",
+            "author": IDENTITY.author,
         }
     ]
     for identifier, name, version, license_id, _ in COMPONENTS:
@@ -128,8 +132,9 @@ def _write_notices(destination: Path) -> Path:
     )
     output.write_text(
         '<!doctype html><meta charset="utf-8"><title>Avisos de terceros</title>'
-        "<h1>GTFS Explorer Desktop: avisos de terceros</h1>"
-        "<p>Copyright 2026 Yeison Arbey Carrillo Lemus. Todos los derechos reservados.</p>"
+        f"<h1>{IDENTITY.name}: avisos de terceros</h1>"
+        f"<p>Copyright {IDENTITY.copyright_year} {IDENTITY.author}. "
+        f"{IDENTITY.rights_notice}</p>"
         "<p>Qt/PySide6 se distribuyen bajo LGPLv3 o GPLv3. La revision juridica de "
         "cumplimiento LGPL "
         "queda pendiente antes de cualquier venta o publicacion. Los datos de mapa no se "

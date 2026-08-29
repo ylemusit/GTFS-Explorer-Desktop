@@ -16,3 +16,7 @@ class ValidationQueries:
         self, report_filter: ValidationIssueFilter, page: PageRequest
     ) -> PagedResult[ValidationIssueSummary]:
         return self._repository.issues(report_filter, page)
+
+    def files(self, *, feed_id: str | None = None) -> tuple[str, ...]:
+        """Devuelve solo nombres de archivo presentes en el contexto consultado."""
+        return self._repository.files(ValidationIssueFilter(feed_id=feed_id))

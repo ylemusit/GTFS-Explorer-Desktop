@@ -99,6 +99,12 @@ class ValidationIssueFilter:
 
     severities: frozenset[ValidationSeverity] | None = None
     categories: frozenset[ValidationCategory] | None = None
+    file_name: str | None = None
+    search_text: str | None = None
+    # Contexto de consulta; no es un campo persistido ni un filtro que el
+    # usuario tenga que conocer. Evita mezclar lotes de feeds distintos del
+    # mismo workspace.
+    feed_id: str | None = None
 
 
 @dataclass(frozen=True)

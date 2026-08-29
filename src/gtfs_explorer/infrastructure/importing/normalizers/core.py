@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
+from gtfs_explorer.domain.route_types import is_known_extended_route_type
 from gtfs_explorer.domain.spec import FieldSpec, ScheduleSpec
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseConnection, ProjectDatabase
 
@@ -38,7 +40,11 @@ class CoreNormalizer:
     """Convierte staging core sin perder lexemas ni ocultar conversiones fallidas."""
 
     def normalize(
-        self, database: ProjectDatabase, specification: ScheduleSpec
+        self,
+        database: ProjectDatabase,
+        specification: ScheduleSpec,
+        *,
+        is_cancelled: Callable[[], bool] = lambda: False,
     ) -> CoreNormalizationResult:
         """Sustituye el modelo core y sus problemas en una única transacción."""
         row_counts: dict[str, int] = {}
@@ -51,9 +57,12 @@ class CoreNormalizer:
                 present = self._present_files(connection)
                 self._record_missing_file_issues(present, issues)
                 for filename in _CORE_FILES:
+                    _raise_if_cancelled(is_cancelled)
                     if filename not in present:
                         continue
-                    count = self._normalize_file(connection, filename, specification, issues)
+                    count = self._normalize_file(
+                        connection, filename, specification, issues, is_cancelled
+                    )
                     row_counts[filename] = count
                 if issues:
                     connection.executemany(
@@ -111,6 +120,7 @@ class CoreNormalizer:
         filename: str,
         specification: ScheduleSpec,
         issues: list[tuple[object, ...]],
+        is_cancelled: Callable[[], bool],
     ) -> int:
         fields = specification.files[filename].fields
         rows = connection.execute(f"SELECT * FROM stg_{filename.removesuffix('.txt')}").fetchall()
@@ -124,6 +134,8 @@ class CoreNormalizer:
         ]
         count = 0
         for row in rows:
+            if count % 128 == 0:
+                _raise_if_cancelled(is_cancelled)
             raw = dict(zip(columns, row, strict=True))
             source_row = int(raw.pop("source_row"))
             source_filename = str(raw.pop("source_filename"))
@@ -170,7 +182,14 @@ class CoreNormalizer:
                     )
                 continue
             try:
-                values[field_name] = _convert(lexeme, field, specification)
+                values[field_name] = _convert(
+                    lexeme,
+                    field,
+                    specification,
+                    allow_known_extended_route_type=(
+                        filename == "routes.txt" and field_name == "route_type"
+                    ),
+                )
             except ValueError as error:
                 values[field_name] = None
                 issues.append(
@@ -187,7 +206,20 @@ class CoreNormalizer:
         return values
 
 
-def _convert(lexeme: str, field: FieldSpec, specification: ScheduleSpec) -> object:
+def _raise_if_cancelled(is_cancelled: Callable[[], bool]) -> None:
+    if is_cancelled():
+        from gtfs_explorer.domain.errors import ImportCancelled
+
+        raise ImportCancelled("La normalización se ha cancelado.")
+
+
+def _convert(
+    lexeme: str,
+    field: FieldSpec,
+    specification: ScheduleSpec,
+    *,
+    allow_known_extended_route_type: bool = False,
+) -> object:
     value_type = field.value_type
     if value_type == "Time":
         if _TIME.fullmatch(lexeme) is None:
@@ -220,6 +252,7 @@ def _convert(lexeme: str, field: FieldSpec, specification: ScheduleSpec) -> obje
             field.enum is not None
             and specification.enums[field.enum]
             and lexeme not in specification.enums[field.enum]
+            and not (allow_known_extended_route_type and is_known_extended_route_type(lexeme))
         ):
             raise ValueError("El valor no pertenece a la enumeración GTFS.")
         return int(lexeme)

@@ -43,6 +43,8 @@ class ReferenceValidationRule:
                 if not field_spec.references or field_name not in source_columns:
                     continue
                 targets = _available_targets(self.connection, field_spec)
+                if filename == "calendar_dates.txt" and field_name == "service_id":
+                    targets = (*targets, (source_table, field_name))
                 if not targets:
                     continue
                 clauses = " OR ".join(

@@ -10,13 +10,18 @@ import argparse
 import hashlib
 import json
 import shutil
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from gtfs_explorer.product import IDENTITY  # noqa: E402
+
 DIST = ROOT / "dist"
-PRODUCT = "GTFS Explorer Desktop"
+PRODUCT = IDENTITY.name
 PORTABLE_PREFIX = "GTFS-Explorer-Portable-"
 SETUP_PREFIX = "GTFS-Explorer-Setup-"
 REQUIRED_PORTABLE_FILES = (
@@ -40,10 +45,7 @@ def _sha256(path: Path) -> str:
 
 
 def _version() -> str:
-    for line in (ROOT / "src" / "gtfs_explorer" / "__init__.py").read_text("utf-8").splitlines():
-        if line.startswith("__version__ = "):
-            return line.split("=", maxsplit=1)[1].strip().strip('"')
-    raise RuntimeError("No se encontró __version__ en el paquete.")
+    return IDENTITY.version
 
 
 def _single_artifact(pattern: str) -> Path:

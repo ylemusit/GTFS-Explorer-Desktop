@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 
+from gtfs_explorer.domain.route_types import is_known_extended_route_type
 from gtfs_explorer.domain.spec import FieldSpec, ScheduleSpec
 from gtfs_explorer.domain.validation import (
     LocalizedMessage,
@@ -59,18 +60,36 @@ class FieldValidationRule:
                                 value,
                             )
                         continue
-                    message_key = _invalid_value_message(value, field_spec, self.specification)
+                    message_key = _invalid_value_message(
+                        value,
+                        field_spec,
+                        self.specification,
+                        filename=filename,
+                        field_name=field_name,
+                    )
                     if message_key is not None:
                         yield _issue(
                             field_spec, message_key, filename, int(source_row), field_name, value
                         )
 
 
-def _invalid_value_message(value: str, field: FieldSpec, specification: ScheduleSpec) -> str | None:
+def _invalid_value_message(
+    value: str,
+    field: FieldSpec,
+    specification: ScheduleSpec,
+    *,
+    filename: str | None = None,
+    field_name: str | None = None,
+) -> str | None:
     if (
         field.enum is not None
         and specification.enums[field.enum]
         and value not in specification.enums[field.enum]
+        and not (
+            filename == "routes.txt"
+            and field_name == "route_type"
+            and is_known_extended_route_type(value)
+        )
     ):
         return "validation.enum_value_invalid"
     value_type = field.value_type

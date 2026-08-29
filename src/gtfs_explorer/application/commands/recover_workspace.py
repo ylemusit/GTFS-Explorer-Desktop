@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from gtfs_explorer.domain.project import ProjectMetadata, ProjectStatus
 from gtfs_explorer.infrastructure.duckdb.database import ProjectDatabase
 from gtfs_explorer.infrastructure.duckdb.repositories import DuckDbUnitOfWork
 from gtfs_explorer.infrastructure.filesystem.workspace_recovery import (
+    BackupCandidate,
+    RecoveryInspection,
     WorkspaceAction,
     WorkspaceRecovery,
+    inspect_recovery_state,
+    restore_backup,
 )
 
 
@@ -47,3 +52,21 @@ class RecoverWorkspace:
     def cleanup_quarantine(self, *, confirmed: bool) -> tuple[WorkspaceAction, ...]:
         """Borra solamente cuarentenas verificadas cuando el usuario lo confirma."""
         return self._filesystem.cleanup_quarantine(confirmed=confirmed)
+
+
+class RestoreWorkspace:
+    """Ejecuta una restauración elegida por el usuario y validada en staging."""
+
+    def __init__(self, workspace: Path) -> None:
+        self._workspace = workspace
+
+    def inspect(self) -> RecoveryInspection:
+        """Expone el diagnóstico sin realizar ninguna mutación."""
+        from gtfs_explorer.application.commands.open_project import ProjectWriterLock
+
+        lock_state = ProjectWriterLock.probe(self._workspace).value
+        return inspect_recovery_state(self._workspace, lock_state=lock_state)
+
+    def execute(self, candidate: BackupCandidate) -> Path:
+        """Restaura solo el candidato exacto seleccionado explícitamente."""
+        return restore_backup(self._workspace, candidate)

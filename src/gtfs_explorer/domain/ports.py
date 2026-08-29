@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Generic, Protocol, TypeVar
 
 from .geometry import TripShapeGeometry
+from .operations import Operation, OperationStatus, OperationType
 from .overview import FeedOverview
 from .project import FeedMetadata, ImportJobMetadata, ProjectMetadata
 from .raw import RawPage, RawQuery
@@ -107,11 +108,50 @@ class ValidationRepository(Protocol):
         self, report_filter: ValidationIssueFilter, page: PageRequest
     ) -> PagedResult[ValidationIssueSummary]: ...
 
+    def files(self, report_filter: ValidationIssueFilter) -> tuple[str, ...]: ...
+
 
 class ImportJobRepository(Protocol):
     def save_metadata(self, metadata: ImportJobMetadata) -> None: ...
 
     def recover_interrupted(self) -> tuple[str, ...]: ...
+
+
+class OperationRepository(Protocol):
+    def start(
+        self,
+        operation_id: str,
+        project_id: str,
+        operation_type: OperationType,
+        started_at: datetime,
+    ) -> None: ...
+    def finish(
+        self,
+        operation_id: str,
+        status: OperationStatus,
+        finished_at: datetime,
+        error_code: str | None = None,
+    ) -> None: ...
+    def attach_import_detail(self, operation_id: str, feed_id: str, job_id: str) -> None: ...
+    def attach_validation_detail(
+        self, operation_id: str, feed_id: str, validation_batch_id: str | None = None
+    ) -> None: ...
+    def attach_export_detail(
+        self,
+        operation_id: str,
+        feed_id: str,
+        export_format: str,
+        artifact_name: str | None = None,
+        artifact_sha256: str | None = None,
+        artifact_size_bytes: int | None = None,
+    ) -> None: ...
+    def list_operations(
+        self,
+        project_id: str,
+        page: PageRequest,
+        operation_type: OperationType | None = None,
+        status: OperationStatus | None = None,
+    ) -> PagedResult[Operation]: ...
 
 
 class ServiceCalendarRepository(Protocol):
@@ -185,6 +225,9 @@ class UnitOfWork(Protocol):
 
     @property
     def import_jobs(self) -> ImportJobRepository: ...
+
+    @property
+    def operations(self) -> OperationRepository: ...
 
     @property
     def service_calendar(self) -> ServiceCalendarRepository: ...

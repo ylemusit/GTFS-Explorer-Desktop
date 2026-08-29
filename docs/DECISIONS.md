@@ -94,6 +94,65 @@ El render standalone bajo `QT_QPA_PLATFORM=offscreen` pierde el contexto D3D;
 la sesión gráfica normal completa el smoke. Esta limitación afecta al método de
 prueba headless, no al transporte aceptado. T070 pasa a GO y habilita T071.
 
+## DEC-018 — P1-16 política offline-first de mapas
+
+Fecha: 2026-08-26
+
+Estado: Aceptada
+
+GTFS Explorer mantiene `AUTO` como preferencia inicial de sesión: usa primero
+un paquete PMTiles local validado y, fuera de cobertura, el proveedor online
+interactivo configurado. `OFFLINE` no permite orígenes remotos. `ONLINE` es una
+autorización explícita para el proveedor actual OpenStreetMap Standard. Si ese
+proveedor no está disponible, la vista presenta `no disponible` sin convertir
+el modo en `OFFLINE`; sin paquete local ni proveedor disponible se mantiene el
+fondo neutro.
+
+La vista WebEngine usa un interceptor de allowlist. Solo se permiten los
+recursos `file:///`, `qrc:///` y el servidor `127.0.0.1` efímero del paquete
+validado; no se registran URLs bloqueadas. El servidor loopback conserva el
+token aleatorio temporal, el control de `Host`, la lista cerrada de archivos y
+los rangos PMTiles establecidos en DEC-016.
+
+No se añaden proveedores, CDN, API keys, tokens persistentes, descargas,
+tracking, analytics ni telemetría. Una futura URL de tesela externa deberá
+contener únicamente `z/x/y`, sin query, credenciales, bbox o identificadores
+GTFS. La gestión de caché y paquetes offline queda para P1-18; la intermitencia
+del spike WebEngine, si reaparece sin romper este contrato, queda como
+`BACKLOG`.
+
+## DEC-019 — P1-17 convivencia de basemap online y overlay GTFS local
+
+Fecha: 2026-08-26
+
+Estado: Aceptada
+
+La vista separa conceptualmente `Basemap`, `Overlay GTFS` y `Política de fuente`.
+El overlay (`routes`, `shapes` y `stops`) permanece local y no se reconstruye al
+cambiar de basemap. El paquete PMTiles conserva sus bounds declarados en el
+manifiesto; la cobertura se decide comparándolos con la envolvente del overlay,
+sin escanear teselas. La presencia de un fichero PMTiles no se interpreta como
+cobertura mundial.
+
+`AUTO` usa PMTiles cuando cubre el overlay completo y, fuera de cobertura o sin
+paquete compatible, usa el proveedor online central. `OFFLINE` mantiene cero
+requests remotos y muestra el overlay sobre fondo neutro cuando no hay cobertura.
+`ONLINE` fuerza el proveedor remoto, aunque exista PMTiles; si falla por red,
+HTTP, timeout lógico, tesela ausente o estilo/fuente, muestra estado neutral sin
+convertirse en `OFFLINE`. La atribución visible depende de la fuente activa.
+
+El proveedor inicial es `OpenStreetMap Standard`, mediante
+`https://tile.openstreetmap.org/{z}/{x}/{y}.png`, solo para uso interactivo y
+con `© OpenStreetMap contributors`. El allowlist de WebEngine permite únicamente
+recursos locales, loopback validado y el hostname del proveedor configurado. La
+petición externa puede revelar IP, headers normales, `z/x/y` y zona aproximada,
+pero nunca IDs, nombres, shapes, GeoJSON, paths, workspace, historial, selección
+ni tokens del GTFS Explorer.
+
+P1-17 no implementa descarga, prefetch, crawler, caché offline adicional,
+conversión a PMTiles, catálogo regional ni selección de múltiples proveedores.
+La gestión inteligente de paquetes offline queda para P1-18.
+
 ## DEC-006 — Validación trazable sin puntuación numérica
 
 Fecha: 2026-08-11
@@ -157,6 +216,38 @@ Fecha: 2026-08-12
 Estado: Aceptada para evaluación
 
 El ejecutor del piloto T013/T014/T020 será `gpt-5.6-terra` con razonamiento `medium`. La selección prioriza el equilibrio entre capacidad y coste para tareas de implementación con contratos, pruebas y decisiones técnicas. El modelo queda registrado en `docs/TASK_STATUS.json` y cada ejecución conserva evidencia propia. Revisar la decisión con los resultados del piloto; los bloqueos ambientales no se atribuirán al modelo.
+
+## DEC-017 — Alcance y versión objetivo de la actualización posterior a rc1
+
+Fecha: 2026-08-18
+
+Estado: Aceptada para la actualización
+
+La siguiente candidata local se denominará `0.1.0-rc2`. No es una publicación,
+una autorización de distribución ni una versión final. Mantiene la versión base
+`0.1.0` porque el alcance previsto no modifica contratos públicos de
+importación, validación o exportación; en particular, respeta DEC-008 y no
+requiere incrementar la versión mayor del bundle JSON.
+
+El alcance candidato comprende exclusivamente los cambios que superen sus
+tareas y pruebas: identidad y créditos coherentes (A010), presentación de
+inicio accesible y no bloqueante (A011), estados vacíos del resumen (A012),
+actualización del instalador por usuario (A013) y, solo si se aprueba tras su
+auditoría, el mantenimiento técnico de A030--A032. El feed
+`examples/ctm-mallorca-es.zip` queda excluido del alcance de la candidata, de
+los artefactos y de cualquier recorrido de ejemplo; no se planifica auditarlo
+ni incorporarlo.
+
+Los cambios locales inventariados en A000 no se incorporan por esta decisión:
+cada uno sigue condicionado a los criterios de aceptación de su tarea. La
+fuente canónica y los nombres de artefactos se actualizarán únicamente en A032,
+después de cerrar el alcance; hasta entonces `pyproject.toml` y
+`gtfs_explorer.__version__` permanecen sin cambios.
+
+El rollback consiste en no generar ni sustituir artefactos `rc1`: si fallan las
+pruebas, el build, el smoke o el upgrade N-1 de la actualización, la candidata
+`rc2` no se prepara y la corrección se limita a la tarea que haya fallado antes
+de reconstruir artefactos nuevos.
 
 Propietario y autor: Yeison Arbey Carrillo Lemus.
 
