@@ -1,6 +1,6 @@
 # A031 — Actualización y revalidación de dependencias
 
-Fecha: 2026-08-28  
+Fecha: 2026-08-28
 Autor: Yeison Arbey Carrillo Lemus. Todos los derechos reservados.
 
 ## Decisión

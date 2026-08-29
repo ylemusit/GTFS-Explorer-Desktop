@@ -66,5 +66,5 @@ el entorno de desarrollo del 2026-08-27.
 
 ---
 
-Propietario y autor: Yeison Arbey Carrillo Lemus.  
+Propietario y autor: Yeison Arbey Carrillo Lemus.
 Todos los derechos reservados.

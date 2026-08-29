@@ -2,6 +2,19 @@
 
 Última actualización: 2026-08-29
 
+## Checkpoint Git local del RC
+
+- `P1_COMPLETE=YES`
+- `RC_READY=YES`
+- `LOCAL_GIT_CHECKPOINT=COMPLETE`
+- `PUBLICATION=NOT_STARTED`
+- `FINAL_COMMIT_SHA`: el commit final identificado por el tag local `v0.1.0-rc1`.
+- Rama local: `release/0.1.0-rc1`.
+- Tag local: `v0.1.0-rc1`.
+
+La relación exacta tag/commit y el SHA del bundle se conservan en
+`docs/LOCAL_GIT_CHECKPOINT.md`; no se ha realizado ninguna operación remota.
+
 ## P1-34C — Release Candidate — DONE
 
 Se reconstruyó el RC local `0.1.0-rc1` después del fix P1-34B, desde el

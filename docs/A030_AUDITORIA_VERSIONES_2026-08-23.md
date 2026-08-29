@@ -1,6 +1,6 @@
 # A030 — Auditoría de versiones y compatibilidad
 
-Fecha de cierre: 2026-08-23  
+Fecha de cierre: 2026-08-23
 Alcance: auditoría; no se modifican dependencias, lockfiles ni artefactos.
 
 | Componente | Versión fijada | Versión local | Candidato oficial consultado | Decisión |
@@ -55,5 +55,5 @@ Fuentes oficiales consultadas:
 - https://github.com/evanw/esbuild/releases
 - https://gtfs.org/documentation/schedule/reference/
 
-Propietario y autor: Yeison Arbey Carrillo Lemus.  
+Propietario y autor: Yeison Arbey Carrillo Lemus.
 Todos los derechos reservados.

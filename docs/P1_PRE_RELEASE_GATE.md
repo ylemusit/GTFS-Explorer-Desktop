@@ -1,6 +1,6 @@
 # P1 — Gate pre-release de arquitectura
 
-Fecha: 2026-08-27  
+Fecha: 2026-08-27
 Estado: CERRABLE
 
 ## Alcance
