@@ -1,6 +1,6 @@
 # Checkpoint Git local — GTFS Explorer 0.1.0-rc1
 
-Estado: `LOCAL_GIT_CHECKPOINT=COMPLETE`  
+Estado: `LOCAL_GIT_CHECKPOINT=COMPLETE`
 Publicación: `PUBLICATION=NOT_STARTED`
 
 ## Identidad
