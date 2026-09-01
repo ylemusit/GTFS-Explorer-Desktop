@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import os
 from dataclasses import dataclass, replace
@@ -19,7 +21,12 @@ _DIRECTORY_FIELDS: dict[DirectoryKind, str] = {
     DirectoryKind.PMTILES_IMPORT: "last_pmtiles_import_dir",
     DirectoryKind.DIAGNOSTICS: "last_diagnostic_dir",
 }
-_OPTIONAL_SETTINGS_FIELDS = frozenset(_DIRECTORY_FIELDS.values())
+_LAYOUT_FIELD = "explore_splitter_state"
+_MAP_GEOMETRY_FIELD = "map_window_geometry"
+_MAP_MAXIMIZED_FIELD = "map_window_maximized"
+_OPTIONAL_SETTINGS_FIELDS = frozenset(
+    (*_DIRECTORY_FIELDS.values(), _LAYOUT_FIELD, _MAP_GEOMETRY_FIELD, _MAP_MAXIMIZED_FIELD)
+)
 
 
 @dataclass(frozen=True)
@@ -30,6 +37,9 @@ class Settings:
     last_export_dir: Path | None = None
     last_pmtiles_import_dir: Path | None = None
     last_diagnostic_dir: Path | None = None
+    explore_splitter_state: bytes | None = None
+    map_window_geometry: bytes | None = None
+    map_window_maximized: bool = False
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -40,6 +50,9 @@ class Settings:
             "last_export_dir": _serialise_path(self.last_export_dir),
             "last_pmtiles_import_dir": _serialise_path(self.last_pmtiles_import_dir),
             "last_diagnostic_dir": _serialise_path(self.last_diagnostic_dir),
+            _LAYOUT_FIELD: _serialise_splitter_state(self.explore_splitter_state),
+            _MAP_GEOMETRY_FIELD: _serialise_splitter_state(self.map_window_geometry),
+            _MAP_MAXIMIZED_FIELD: self.map_window_maximized,
         }
 
 
@@ -173,6 +186,35 @@ class DirectoryPreferences:
 
         return self.remember(kind, Path(file_path).parent)
 
+    def remember_explore_splitter_state(self, state: bytes) -> bool:
+        """Recuerda el estado Qt del workspace de Explorar en settings.json."""
+
+        if not state:
+            return False
+        self._settings = replace(self._settings, explore_splitter_state=bytes(state))
+        if not self._persist:
+            return True
+        try:
+            save_settings(self._paths.settings_path, self._settings)
+        except (OSError, UnicodeError, ValueError):
+            return False
+        return True
+
+    def remember_map_window_geometry(self, geometry: bytes, maximized: bool) -> bool:
+        """Persiste la geometría nativa de la ventana de mapa."""
+        if not geometry:
+            return False
+        self._settings = replace(
+            self._settings, map_window_geometry=bytes(geometry), map_window_maximized=maximized
+        )
+        if not self._persist:
+            return True
+        try:
+            save_settings(self._paths.settings_path, self._settings)
+        except (OSError, UnicodeError, ValueError):
+            return False
+        return True
+
 
 def _settings_from_payload(payload: Any) -> Settings:
     required = {"version", "recent_project_paths"}
@@ -194,6 +236,9 @@ def _settings_from_payload(payload: Any) -> Settings:
         last_export_dir=_optional_path(payload, "last_export_dir"),
         last_pmtiles_import_dir=_optional_path(payload, "last_pmtiles_import_dir"),
         last_diagnostic_dir=_optional_path(payload, "last_diagnostic_dir"),
+        explore_splitter_state=_optional_splitter_state(payload),
+        map_window_geometry=_optional_splitter_state(payload, _MAP_GEOMETRY_FIELD),
+        map_window_maximized=_optional_bool(payload, _MAP_MAXIMIZED_FIELD),
     )
 
 
@@ -208,6 +253,31 @@ def _optional_path(payload: dict[str, object], field_name: str) -> Path | None:
     if not isinstance(value, str) or not value:
         raise ValueError(f"{field_name} debe ser una ruta o null.")
     return Path(value)
+
+
+def _serialise_splitter_state(state: bytes | None) -> str | None:
+    return base64.b64encode(state).decode("ascii") if state else None
+
+
+def _optional_splitter_state(
+    payload: dict[str, object], field_name: str = _LAYOUT_FIELD
+) -> bytes | None:
+    value = payload.get(field_name)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{field_name} debe ser un estado Qt codificado o null.")
+    try:
+        return base64.b64decode(value, validate=True)
+    except (ValueError, binascii.Error) as error:
+        raise ValueError(f"{field_name} no es válido.") from error
+
+
+def _optional_bool(payload: dict[str, object], field_name: str) -> bool:
+    value = payload.get(field_name, False)
+    if not isinstance(value, bool):
+        raise ValueError(f"{field_name} debe ser booleano.")
+    return value
 
 
 def _directory_kind(kind: DirectoryKind | str) -> DirectoryKind:

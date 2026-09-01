@@ -32,7 +32,9 @@ class ProductIdentity:
     install_directory_name: str = "GTFS Explorer"
     start_menu_directory_name: str = "GTFS Explorer"
     shortcut_name: str = "GTFS Explorer Desktop.lnk"
-    portable_directory_name: str = "GTFS Explorer Portable"
+    # Debe ser corto: Windows Explorer concatena esta raíz con el nombre
+    # completo del ZIP al extraer el Portable.
+    portable_directory_name: str = "GTFS-Explorer"
     version: str = PRODUCT_VERSION
     gtfs_spec_revision: str = GTFS_SPEC_REVISION
 

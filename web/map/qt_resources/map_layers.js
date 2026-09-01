@@ -29,17 +29,46 @@
   function installTransitLayers() {
     if (!map) return;
     if (!map.getSource("gtfs-shapes")) map.addSource("gtfs-shapes", {type: "geojson", data: EMPTY});
-    if (!map.getSource("gtfs-stops")) map.addSource("gtfs-stops", {type: "geojson", data: EMPTY, cluster: true, clusterRadius: 48, clusterMaxZoom: 14});
-    if (!map.getLayer("gtfs-shapes-line")) map.addLayer({id: "gtfs-shapes-line", type: "line", source: "gtfs-shapes", paint: {"line-color": ["get", "color"], "line-width": 4}});
-    if (!map.getLayer("gtfs-stops-cluster")) map.addLayer({id: "gtfs-stops-cluster", type: "circle", source: "gtfs-stops", filter: ["has", "point_count"], paint: {"circle-radius": ["step", ["get", "point_count"], 13, 50, 18, 250, 24], "circle-color": "#2563eb"}});
-    if (!map.getLayer("gtfs-stops-cluster-label")) map.addLayer({id: "gtfs-stops-cluster-label", type: "symbol", source: "gtfs-stops", filter: ["has", "point_count"], layout: {"text-field": ["get", "point_count_abbreviated"], "text-size": 11}, paint: {"text-color": "#ffffff"}});
-    if (!map.getLayer("gtfs-stops-circle")) map.addLayer({id: "gtfs-stops-circle", type: "circle", source: "gtfs-stops", filter: ["!", ["has", "point_count"]], paint: {"circle-radius": ["case", ["get", "selected"], 8, 5], "circle-color": "#ffffff", "circle-stroke-color": "#0f172a", "circle-stroke-width": 2}});
+    if (!map.getSource("gtfs-stops")) map.addSource("gtfs-stops", {type: "geojson", data: EMPTY});
+    if (!map.getLayer("gtfs-route-context")) map.addLayer({id: "gtfs-route-context", type: "line", source: "gtfs-shapes", paint: {"line-color": "#0f172a", "line-width": 9, "line-opacity": 0.82}});
+    if (!map.getLayer("gtfs-shapes-line")) map.addLayer({id: "gtfs-shapes-line", type: "line", source: "gtfs-shapes", paint: {"line-color": ["get", "color"], "line-width": 5, "line-opacity": 1}});
+    if (!map.getLayer("gtfs-stops-circle")) map.addLayer({id: "gtfs-stops-circle", type: "circle", source: "gtfs-stops", paint: {"circle-radius": ["case", ["get", "selected"], 8, 5], "circle-color": "#ffffff", "circle-stroke-color": "#0f172a", "circle-stroke-width": 2}});
+    if (!map.getLayer("gtfs-stops-endpoints")) map.addLayer({id: "gtfs-stops-endpoints", type: "circle", source: "gtfs-stops", filter: ["in", ["get", "endpoint"], ["literal", ["origin", "destination"]]], paint: {"circle-radius": 7, "circle-color": ["match", ["get", "endpoint"], "origin", "#16a34a", "destination", "#dc2626", "#ffffff"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 2}});
   }
 
   function popupText(feature) {
     const properties = feature.properties || {};
     const content = document.createElement("div");
-    content.textContent = `${properties.name || "Sin nombre"} (${properties.id || "Sin ID"})`;
+    const popup = properties.popup || {};
+    const line = (label, value) => {
+      if (!value) return;
+      const item = document.createElement("div");
+      item.textContent = `${label}${value}`;
+      content.appendChild(item);
+    };
+    const title = document.createElement("strong");
+    title.textContent = properties.name || "Sin nombre";
+    content.appendChild(title);
+    line("Parada ", properties.id || "Sin ID");
+    if (Number.isInteger(properties.sequence)) line("Secuencia ", String(properties.sequence));
+    line("Línea ", popup.route || "");
+    line("Destino ", popup.headsign || "");
+    line("Operador: ", popup.agency || "");
+    line("Llegada ", popup.arrival || "");
+    line("Salida ", popup.departure || "");
+    const others = Array.isArray(popup.other_routes) ? popup.other_routes : [];
+    if (others.length) {
+      const heading = document.createElement("div");
+      heading.textContent = "También pasan:";
+      content.appendChild(heading);
+      others.forEach((other) => {
+        const item = document.createElement("div");
+        const times = Array.isArray(other.times) ? other.times.join(" · ") : "";
+        item.textContent = `${other.route || "Ruta"}${other.agency ? ` · ${other.agency}` : ""}${times ? `\nHorario programado: ${times}` : ""}`;
+        item.style.whiteSpace = "pre-line";
+        content.appendChild(item);
+      });
+    }
     return content;
   }
 
@@ -87,11 +116,31 @@
   function fitData(shapes, stops) {
     const coordinates = [...shapes.features, ...stops.features].flatMap((feature) =>
       feature.geometry.type === "LineString" ? feature.geometry.coordinates : [feature.geometry.coordinates]
-    );
+    ).filter((coordinate) => Array.isArray(coordinate) && coordinate.length >= 2
+      && Number.isFinite(coordinate[0]) && Number.isFinite(coordinate[1])
+      && coordinate[0] >= -180 && coordinate[0] <= 180 && coordinate[1] >= -90 && coordinate[1] <= 90);
     if (!coordinates.length) return;
     const bounds = coordinates.reduce(
       (result, coordinate) => result.extend(coordinate),
       new window.GTFSExplorerMap.maplibregl.LngLatBounds(coordinates[0], coordinates[0])
+    );
+    map.fitBounds(bounds, {padding: 36, maxZoom: 16, duration: 0});
+  }
+
+  function fitBounds(west, south, east, north) {
+    if (![west, south, east, north].every(Number.isFinite)) return;
+    const safeWest = Math.max(-180, Math.min(180, west));
+    const safeEast = Math.max(-180, Math.min(180, east));
+    const safeSouth = Math.max(-90, Math.min(90, south));
+    const safeNorth = Math.max(-90, Math.min(90, north));
+    if (safeWest > safeEast || safeSouth > safeNorth) return;
+    const epsilon = 0.0001;
+    const expandedWest = safeWest === safeEast ? safeWest - epsilon : safeWest;
+    const expandedEast = safeWest === safeEast ? safeEast + epsilon : safeEast;
+    const expandedSouth = safeSouth === safeNorth ? safeSouth - epsilon : safeSouth;
+    const expandedNorth = safeSouth === safeNorth ? safeNorth + epsilon : safeNorth;
+    const bounds = new window.GTFSExplorerMap.maplibregl.LngLatBounds(
+      [expandedWest, expandedSouth], [expandedEast, expandedNorth]
     );
     map.fitBounds(bounds, {padding: 36, maxZoom: 16, duration: 0});
   }
@@ -135,6 +184,9 @@
     map = new maplibregl.Map({
       container: "map",
       center: [0, 0], zoom: 1,
+      // QWebEngine puede cambiar de tamaño al arrastrar el splitter de Explorar.
+      // MapLibre mantiene el canvas sincronizado mediante ResizeObserver.
+      trackResize: true,
       style: neutralStyle(),
     });
     map.on("error", () => reportMapError("map"));
@@ -255,8 +307,9 @@
   };
   window.addEventListener("gtfs-explorer-map-command", (event) => {
     if (!map) return;
-    const {longitude, latitude, zoom} = event.detail.payload;
-    map.jumpTo({center: [longitude, latitude], zoom});
+    const {command, payload} = event.detail;
+    if (command === "fitBounds") fitBounds(payload.west, payload.south, payload.east, payload.north);
+    else map.jumpTo({center: [payload.longitude, payload.latitude], zoom: payload.zoom});
   });
   window.addEventListener("gtfs-explorer-map-bridge-ready", reportMapReadyWhenBridgeIsAvailable);
   initialize();

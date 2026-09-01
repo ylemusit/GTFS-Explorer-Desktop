@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QWidget
 
 from gtfs_explorer.application.settings import DirectoryPreferences, Settings, load_settings
@@ -175,6 +176,21 @@ def _replace_web_map(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("gtfs_explorer.presentation.desktop.routes.widget.MapWidget", FakeMap)
 
 
+def _click_zip_import_option(application: QApplication) -> None:
+    """Selecciona el botón ZIP del selector modal real de tipo de importación."""
+
+    def click() -> None:
+        for widget in application.topLevelWidgets():
+            if isinstance(widget, QMessageBox) and widget.isVisible():
+                button = widget.button(QMessageBox.StandardButton.No)
+                if button is not None:
+                    button.click()
+                    return
+        QTimer.singleShot(10, click)
+
+    QTimer.singleShot(0, click)
+
+
 def test_main_dialogs_use_defaults_and_remember_selected_directories(
     application: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -209,11 +225,13 @@ def test_main_dialogs_use_defaults_and_remember_selected_directories(
     requested: list[Path] = []
     monkeypatch.setattr(window, "_request_import", lambda selected: requested.append(selected.path))
 
+    _click_zip_import_option(application)
     window._choose_import_source()
 
     assert open_calls[0][2] == str(paths.imports_directory)
     assert requested == [source]
     assert load_settings(paths.settings_path).last_import_dir == source.parent
+    window._close_project()
     window.deleteLater()
     application.processEvents()
 
@@ -244,11 +262,13 @@ def test_cancelled_import_dialog_preserves_last_directory_then_remembers_unicode
     window = MainWindow(application_paths=paths)
     monkeypatch.setattr(window, "_request_import", lambda selected: requested.append(selected.path))
 
+    _click_zip_import_option(application)
     window._choose_import_source()
 
     assert load_settings(paths.settings_path).last_import_dir == previous
     assert calls[0][2] == str(previous)
 
+    _click_zip_import_option(application)
     window._choose_import_source()
 
     assert requested == [source]

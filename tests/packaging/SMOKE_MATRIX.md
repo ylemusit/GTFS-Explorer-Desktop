@@ -92,7 +92,7 @@ No cerrar T094 mientras haya un caso pendiente o fallido. Bloqueos graves: no ar
 ## Corrección de recursos y smoke gráfico del binario 2026-08-15
 
 - La inspección remota del portable defectuoso demostró que el HTML intentaba
-  cargar `web/map/qt_resources` un nivel por encima de `GTFS Explorer Portable`.
+  cargar `web/map/qt_resources` un nivel por encima de `GTFS-Explorer`.
   Nuitka no garantizaba `sys.frozen`, por lo que el resolver tomaba erróneamente
   la ruta del árbol fuente aunque los recursos sí estuvieran incluidos.
 - El mapa localiza ahora primero los recursos junto a `sys.executable` y conserva

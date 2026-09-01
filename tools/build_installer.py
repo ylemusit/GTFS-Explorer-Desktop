@@ -44,6 +44,8 @@ def _validate_label(label: str | None) -> str | None:
 
 
 def _artifact_name(prefix: str, version: str, label: str | None, suffix: str) -> str:
+    if label and label.startswith("P2A-"):
+        return f"{prefix}-{label}-win-x64{suffix}"
     label_part = f"-{label}" if label else ""
     return f"{prefix}-{version}{label_part}-win-x64{suffix}"
 

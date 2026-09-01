@@ -386,6 +386,9 @@ def _export_from_ui(
     exporter._destination.setText(str(destination))
     artifact = exporter.request().destination
     assert exporter._export.isEnabled()
+    # El journey técnico valida el artefacto y su reimportación; la UX modal
+    # de finalización tiene cobertura focal propia.
+    exporter._show_export_completed = lambda *_args: None  # type: ignore[method-assign]
     exporter._execute()
     assert artifact.is_file()
     manifest = artifact.with_name(f"{artifact.name}.manifest.json")
@@ -821,6 +824,26 @@ def test_e2e_05_ui_exports_publish_manifests_history_and_reimport_mini_gtfs(
             target.close()
         assert target_result.state is JobState.READY
         assert target_result.issue_count == 0
+        with target.database.connection() as connection:
+            counts = {
+                "rutas": connection.execute("SELECT count(*) FROM gtfs_routes").fetchone()[0],
+                "servicios": connection.execute(
+                    "SELECT count(*) FROM (SELECT service_id FROM gtfs_calendar UNION "
+                    "SELECT service_id FROM gtfs_calendar_dates)"
+                ).fetchone()[0],
+                "viajes": connection.execute("SELECT count(*) FROM gtfs_trips").fetchone()[0],
+                "paradas": connection.execute("SELECT count(*) FROM gtfs_stops").fetchone()[0],
+                "validation": connection.execute("SELECT status FROM validation_runs").fetchone()[
+                    0
+                ],
+            }
+        assert counts == {
+            "rutas": 1,
+            "servicios": 2,
+            "viajes": 2,
+            "paradas": 4,
+            "validation": "VALID",
+        }
     finally:
         _close_window(application, window)
 

@@ -10,7 +10,7 @@ import pytest
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 
 from gtfs_explorer.application.map_policy import MapMode
 from gtfs_explorer.application.ui_state import UiAction
@@ -68,6 +68,9 @@ def test_forms_associate_labels_and_compact_actions(application: QApplication) -
     )
     route_label = next(label for label in routes.findChildren(QLabel) if label.text() == "Ruta:")
     assert route_label.buddy() is routes._routes
+    assert routes.findChild(QPushButton, "openMapWindow") is not None
+    assert routes.findChild(QPushButton, "expandExploreMap") is None
+    assert routes.findChild(QPushButton, "restoreExploreView") is None
 
     exporter = ExportAssistantWidget()
     format_label = next(

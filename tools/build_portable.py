@@ -16,6 +16,7 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -32,6 +33,7 @@ MAP_ASSETS = ROOT / "web" / "map" / "qt_resources"
 USER_GUIDE = ROOT / "docs" / "USER_GUIDE.md"
 DIST_ROOT = ROOT / "dist"
 PRODUCT_DIRECTORY = IDENTITY.portable_directory_name
+PORTABLE_WINDOWS_PATH_LIMIT = 190
 LICENSE_CHECK = ROOT / "tools" / "check_licenses.py"
 LABEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -88,6 +90,8 @@ def _validate_label(label: str | None) -> str | None:
 
 
 def _artifact_name(prefix: str, version: str, label: str | None, suffix: str) -> str:
+    if label and label.startswith("P2A-"):
+        return f"{prefix}-{label}-win-x64{suffix}"
     label_part = f"-{label}" if label else ""
     return f"{prefix}-{version}{label_part}-win-x64{suffix}"
 
@@ -219,12 +223,13 @@ def _smoke_map_runtime(directory: Path) -> dict[str, object]:
                 "El standalone no supera el smoke gráfico del mapa: "
                 f"código {result.returncode}, informe={report.is_file()}."
             )
-        evidence = json.loads(report.read_text(encoding="utf-8"))
+        evidence = cast(dict[str, object], json.loads(report.read_text(encoding="utf-8")))
+    route_blue_pixels = evidence.get("route_blue_pixels")
     if (
         evidence.get("success") is not True
         or evidence.get("bridge_ready") is not True
-        or not isinstance(evidence.get("route_blue_pixels"), int)
-        or evidence["route_blue_pixels"] < 20
+        or not isinstance(route_blue_pixels, int)
+        or route_blue_pixels < 20
     ):
         raise RuntimeError(f"El smoke gráfico del mapa no aportó evidencia válida: {evidence}")
     print(
@@ -271,6 +276,43 @@ def _write_zip(source: Path, destination: Path) -> None:
             archive.writestr(info, path.read_bytes())
 
 
+def _portable_path_report(archive_path: Path) -> dict[str, object]:
+    """Mide rutas ZIP y su extracción estimada desde las carpetas del usuario."""
+    with zipfile.ZipFile(archive_path) as archive:
+        entries = [name for name in archive.namelist() if not name.endswith("/")]
+    if not entries:
+        raise RuntimeError("El Portable no contiene archivos.")
+    roots = {name.split("/", 1)[0] for name in entries}
+    if roots != {PRODUCT_DIRECTORY}:
+        raise RuntimeError("El Portable debe tener una única raíz interna corta.")
+    relative_lengths = [len(name.split("/", 1)[1]) for name in entries]
+    longest = max(relative_lengths)
+    estimates = {
+        folder: len(str(Path.home() / folder / archive_path.stem / PRODUCT_DIRECTORY)) + 1 + longest
+        for folder in ("Desktop", "Downloads")
+    }
+    return {
+        "max_internal": max(map(len, entries)),
+        "longest_entries": sorted(((len(name), name) for name in entries), reverse=True)[:20],
+        "estimated_absolute": estimates,
+    }
+
+
+def _guard_portable_paths(archive_path: Path) -> dict[str, object]:
+    report = _portable_path_report(archive_path)
+    estimates = report["estimated_absolute"]
+    assert isinstance(estimates, dict)
+    exceeded = {
+        name: value for name, value in estimates.items() if value > PORTABLE_WINDOWS_PATH_LIMIT
+    }
+    if exceeded:
+        raise RuntimeError(
+            "El Portable supera el umbral seguro de rutas Windows "
+            f"({PORTABLE_WINDOWS_PATH_LIMIT}): {exceeded}"
+        )
+    return report
+
+
 def build(
     *, dry_run: bool = False, output_dir: Path | None = None, label: str | None = None
 ) -> Path | None:
@@ -310,6 +352,13 @@ def build(
         )
         _write_manifest(package_root, version)
         _write_zip(package_root, zip_path)
+        report = _guard_portable_paths(zip_path)
+        print(
+            "Portable path guard: "
+            f"max_internal={report['max_internal']}, "
+            f"Desktop={cast(dict[str, int], report['estimated_absolute'])['Desktop']}, "
+            f"Downloads={cast(dict[str, int], report['estimated_absolute'])['Downloads']}"
+        )
     hash_path = zip_path.with_suffix(".zip.sha256")
     archive_hash = _sha256(zip_path)
     hash_path.write_text(f"{archive_hash}  {zip_path.name}\n", encoding="ascii")

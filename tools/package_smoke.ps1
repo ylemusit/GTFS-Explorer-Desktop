@@ -17,13 +17,16 @@ function Get-Sha256([System.IO.FileInfo]$Path) {
 $temp = Join-Path $out.FullName ('package-smoke-extracted-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $temp | Out-Null
 Expand-Archive -LiteralPath $portable.FullName -DestinationPath $temp
-$root = Join-Path $temp 'GTFS Explorer Portable'
+$root = Join-Path $temp 'GTFS-Explorer'
 $exe = Join-Path $root 'GTFS Explorer.exe'
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Falta GTFS Explorer.exe en el portable.' }
 foreach ($required in @('portable.flag', 'manifest.json', 'docs\USER_GUIDE.md', 'QtWebEngineProcess.exe', 'qtwebengine_resources.pak', 'web\map\qt_resources\map_bundle.js')) {
     if (-not (Test-Path -LiteralPath (Join-Path $root $required))) { throw "Falta recurso portable: $required" }
 }
-$forbidden = Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.FullName -match '\\tests\\|\\\.git\\|\\.env$|\\__pycache__\\|ctm' }
+$forbidden = Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
+    $relative = [System.IO.Path]::GetRelativePath($root, $_.FullName)
+    $relative -match '(^|\\)tests(\\|$)|(^|\\)\.git(\\|$)|(^|\\)\.env$|(^|\\)__pycache__(\\|$)|(^|\\)ctm(\\|$)'
+}
 if ($forbidden) { throw ('Archivos prohibidos en portable: ' + (($forbidden | ForEach-Object FullName) -join ', ')) }
 $process = Start-Process -FilePath $exe -ArgumentList '--runtime-smoke' -WorkingDirectory $root -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw "Portable runtime smoke falló con código $($process.ExitCode)." }

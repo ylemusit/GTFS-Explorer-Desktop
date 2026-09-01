@@ -46,6 +46,7 @@ class MapStop:
     stop_id: str
     name: str | None
     coordinate: Coordinate
+    stop_sequence: int | None = None
 
 
 @dataclass(frozen=True)
@@ -64,3 +65,5 @@ class TripShapeGeometry:
     issues: tuple[GeometryIssue, ...]
     stops: tuple[MapStop, ...] = ()
     route_color: str | None = None
+    route_text_color: str | None = None
+    route_id: str | None = None

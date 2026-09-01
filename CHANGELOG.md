@@ -1,5 +1,29 @@
 # Historial de cambios
 
+## 0.1.0-rc2 — 2026-09-01
+
+Candidata local para aceptación manual. No está publicada ni autorizada para
+distribución.
+
+- Cierre técnico de Fase 2: importación, validación, exploración y exportación
+  Mini-GTFS con round-trip cubierto por E2E.
+- Correcciones de workflows de importación, export pack, layout maximizado,
+  ventana desacoplable del mapa, rutas y ayuda local.
+- Portable e instalador preparados con etiqueta `rc2`; CTM, smokes de paquete,
+  runtime instalado y mapa quedan sujetos a la evidencia de los artefactos
+  generados en esta candidata.
+
+### Límites y backlog diferido
+
+- La aceptación visual nativa de Windows y la revisión manual con lector de
+  pantalla siguen siendo pendientes.
+- El benchmark LARGE y la firma de código siguen fuera de este cierre.
+- No se incluyen datos CTM ni cartografía comercial en los artefactos.
+
+Propietario y autor: Yeison Arbey Carrillo Lemus.
+
+Todos los derechos reservados.
+
 ## 0.1.0-rc1 — 2026-08-15
 
 Primera candidata local de GTFS Explorer Desktop. No está publicada ni

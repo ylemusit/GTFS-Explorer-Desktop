@@ -43,7 +43,7 @@ def test_map_assets_are_resolved_next_to_the_compiled_executable(
 
 
 def test_portable_zip_contains_the_offline_runtime_contract(tmp_path: Path) -> None:
-    root = tmp_path / "GTFS Explorer Portable"
+    root = tmp_path / "GTFS-Explorer"
     (root / "web" / "map" / "qt_resources").mkdir(parents=True)
     (root / "GTFS Explorer.exe").write_bytes(b"exe")
     (root / "portable.flag").touch()
@@ -59,12 +59,12 @@ def test_portable_zip_contains_the_offline_runtime_contract(tmp_path: Path) -> N
                 packaged.write(path, path.relative_to(tmp_path).as_posix())
     with zipfile.ZipFile(archive) as packaged:
         names = set(packaged.namelist())
-    assert "GTFS Explorer Portable/GTFS Explorer.exe" in names
-    assert "GTFS Explorer Portable/portable.flag" in names
-    assert "GTFS Explorer Portable/web/map/qt_resources/map_bundle.js" in names
-    assert "GTFS Explorer Portable/LICENSES/README.md" in names
-    assert "GTFS Explorer Portable/THIRD_PARTY_NOTICES.html" in names
-    assert "GTFS Explorer Portable/SBOM.cdx.json" in names
+    assert "GTFS-Explorer/GTFS Explorer.exe" in names
+    assert "GTFS-Explorer/portable.flag" in names
+    assert "GTFS-Explorer/web/map/qt_resources/map_bundle.js" in names
+    assert "GTFS-Explorer/LICENSES/README.md" in names
+    assert "GTFS-Explorer/THIRD_PARTY_NOTICES.html" in names
+    assert "GTFS-Explorer/SBOM.cdx.json" in names
 
 
 def test_distribution_includes_manifested_user_guide(tmp_path: Path, monkeypatch) -> None:
@@ -179,3 +179,40 @@ def test_packaged_map_smoke_requires_rendered_route_evidence(tmp_path: Path, mon
     assert evidence["bridge_ready"] is True
     assert evidence["route_blue_pixels"] == 250
     assert not (tmp_path / "debug.log").exists()
+
+
+def test_portable_path_guard_reports_short_root_and_windows_estimates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    builder = _load_builder()
+    monkeypatch.setattr(builder, "PRODUCT_DIRECTORY", "GTFS-Explorer")
+    archive_path = tmp_path / "GTFS-Explorer-Portable-0.1.0-phase2-win-x64.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(
+            "GTFS-Explorer/gtfs_explorer/infrastructure/duckdb/migrations/005_geometry_optional_normalized.sql",
+            b"sql",
+        )
+
+    report = builder._guard_portable_paths(archive_path)
+
+    assert report["max_internal"] == 97
+    estimates = report["estimated_absolute"]
+    assert isinstance(estimates, dict)
+    assert estimates["Desktop"] < builder.PORTABLE_WINDOWS_PATH_LIMIT
+    assert estimates["Downloads"] < builder.PORTABLE_WINDOWS_PATH_LIMIT
+
+
+def test_portable_path_guard_rejects_a_regressed_long_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    builder = _load_builder()
+    monkeypatch.setattr(builder, "PRODUCT_DIRECTORY", "GTFS Explorer Portable")
+    archive_path = tmp_path / "GTFS-Explorer-Portable-0.1.0-phase2-win-x64.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(
+            "GTFS Explorer Portable/" + "x" * 180 + ".dll",
+            b"dll",
+        )
+
+    with pytest.raises(RuntimeError, match="umbral seguro"):
+        builder._guard_portable_paths(archive_path)

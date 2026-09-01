@@ -52,6 +52,10 @@ SetDateSave on
   !error "INSTALLER_OUTPUT debe definirse al compilar."
 !endif
 
+!define PRODUCT_ICON "${PAYLOAD_DIR}\gtfs_explorer\resources\gtfs_explorer.ico"
+!define MUI_ICON "${PRODUCT_ICON}"
+!define MUI_UNICON "${PRODUCT_ICON}"
+
 !define PRODUCT_REGISTRY_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 
 VIProductVersion "${PRODUCT_FILE_VERSION}"
@@ -70,12 +74,17 @@ ShowInstDetails show
 ShowUninstDetails show
 
 !define MUI_ABORTWARNING
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${PRODUCT_EXECUTABLE}"
+!define MUI_FINISHPAGE_RUN_TEXT "Abrir GTFS Explorer"
+!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\docs\USER_GUIDE.md"
+!define MUI_FINISHPAGE_SHOWREADME_TEXT "Ver guía / README"
 !define MUI_WELCOMEPAGE_TITLE "Bienvenido a ${PRODUCT_NAME}"
 !define MUI_WELCOMEPAGE_TEXT "${PRODUCT_NAME} es una herramienta profesional para importar, explorar, validar, visualizar y exportar GTFS Schedule de forma local y offline-first.$\r$\n$\r$\nEdición ${PRODUCT_EDITION}$\r$\nCreado y desarrollado por ${PRODUCT_PUBLISHER}.$\r$\n© ${PRODUCT_COPYRIGHT_YEAR} ${PRODUCT_PUBLISHER} · ${PRODUCT_RIGHTS_NOTICE}$\r$\n$\r$\nEl instalador configurará la aplicación para el usuario actual, sin requerir permisos de administrador."
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "Spanish"

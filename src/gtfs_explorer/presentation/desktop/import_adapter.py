@@ -24,6 +24,8 @@ class _ImportWorker(QObject):
         super().__init__()
         self._command_factory = command_factory
         self._token = CancelToken()
+        self.result: ImportFeedResult | None = None
+        self.error: str | None = None
 
     def cancel(self) -> None:
         """Solicita la cancelación cooperativa desde el hilo de interfaz."""
@@ -34,9 +36,11 @@ class _ImportWorker(QObject):
         self.started.emit()
         try:
             command = self._command_factory(self.progress.emit)
-            self.finished.emit(command.execute(self._token))
+            self.result = command.execute(self._token)
+            self.finished.emit(self.result)
         except Exception as error:
-            self.failed.emit(str(error) or type(error).__name__)
+            self.error = str(error) or type(error).__name__
+            self.failed.emit(self.error)
 
 
 class ImportJobAdapter(QObject):
@@ -51,8 +55,6 @@ class ImportJobAdapter(QObject):
         super().__init__(parent)
         self._thread: QThread | None = None
         self._worker: _ImportWorker | None = None
-        self._pending_result: ImportFeedResult | None = None
-        self._pending_error: str | None = None
 
     @property
     def is_running(self) -> bool:
@@ -69,8 +71,6 @@ class ImportJobAdapter(QObject):
         thread.started.connect(worker.run)
         worker.started.connect(self.started)
         worker.progress.connect(self.progress)
-        worker.finished.connect(self._complete)
-        worker.failed.connect(self._fail)
         worker.finished.connect(thread.quit)
         worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
@@ -84,19 +84,13 @@ class ImportJobAdapter(QObject):
         if self._worker is not None:
             self._worker.cancel()
 
-    def _complete(self, result: ImportFeedResult) -> None:
-        self._pending_result = result
-
-    def _fail(self, message: str) -> None:
-        self._pending_error = message
-
     @Slot()
     def _clear_finished_thread(self) -> None:
+        worker = self._worker
+        result = worker.result if worker is not None else None
+        error = worker.error if worker is not None else None
         self._worker = None
         self._thread = None
-        result, error = self._pending_result, self._pending_error
-        self._pending_result = None
-        self._pending_error = None
         if result is not None:
             self.finished.emit(result)
         elif error is not None:

@@ -43,6 +43,8 @@ def test_map_layers_emit_wgs84_features_and_sanitize_invalid_colors() -> None:
     assert shape["properties"]["color"] == "#2563eb"  # type: ignore[index]
     assert stop["geometry"]["coordinates"] == [-5.0, 43.0]  # type: ignore[index]
     assert stop["properties"]["name"] == "<img src=x onerror=alert(1)>"  # type: ignore[index]
+    assert stop["properties"]["endpoint"] == "origin"  # type: ignore[index]
+    assert stop["properties"]["popup"] == {}  # type: ignore[index]
     assert sanitize_route_color("#1a2b3c") == "#1A2B3C"
 
 
@@ -70,8 +72,18 @@ def test_map_javascript_uses_text_content_fit_bounds_and_clicks_without_html_inj
     assert "textContent" in source
     assert "innerHTML" not in source
     assert "fitBounds" in source
+    assert "maxZoom: 16" in source
+    assert "Number.isFinite" in source
     assert "map.resize();" in source
+    assert "trackResize: true" in source
     assert '"gtfs-stops-circle"' in source
+    assert '"gtfs-route-context"' in source
+    assert '"gtfs-stops-cluster"' not in source
+    assert '"cluster": true' not in source
+    assert '"gtfs-stops-endpoints"' in source
+    assert "properties.sequence" in source
+    assert "Horario programado" in source
+    assert "other_routes" in source
     assert "gtfs-explorer-map-bridge-ready" in source
     assert "reportMapReadyWhenBridgeIsAvailable" in source
     assert "mapLoaded = true;" in source
@@ -83,6 +95,75 @@ def test_packaged_map_layers_match_the_source_contract() -> None:
     assert (root / "src/gtfs_explorer/presentation/desktop/map/map_layers.js").read_bytes() == (
         root / "web/map/qt_resources/map_layers.js"
     ).read_bytes()
+
+
+def test_endpoint_layer_expressions_are_validated_by_maplibre_style_spec() -> None:
+    root = Path(__file__).parents[1]
+    layers_path = root / "src/gtfs_explorer/presentation/desktop/map/map_layers.js"
+    source = layers_path.read_text(encoding="utf-8")
+    style_spec_path = (root / "web/map/node_modules/@maplibre/maplibre-gl-style-spec").as_posix()
+    harness = f"""
+const styleSpec = require({style_spec_path!r});
+const handlers = {{}};
+class Source {{ constructor(data) {{ this.data = data; }} setData(data) {{ this.data = data; }} }}
+class Bounds {{ extend() {{ return this; }} }}
+class FakeMap {{
+  constructor() {{
+    this.sources = {{}}; this.layers = {{}}; this.styleLoaded = true;
+    globalThis.testMap = this;
+  }}
+  on(event, ...args) {{ (handlers[event] ||= []).push(args.at(-1)); }}
+  emit(event) {{ for (const handler of handlers[event] || []) handler({{}}); }}
+  addSource(id, specification) {{ this.sources[id] = new Source(specification.data); }}
+  getSource(id) {{ return this.sources[id]; }}
+  addLayer(layer) {{ this.layers[layer.id] = layer; }}
+  getLayer(id) {{ return this.layers[id]; }}
+  isStyleLoaded() {{ return this.styleLoaded; }}
+  resize() {{}} fitBounds() {{}} getCanvas() {{ return {{style: {{}}}}; }}
+}}
+globalThis.document = {{createElement: () => ({{textContent: ""}})}};
+globalThis.fetch = async () => ({{
+  ok: true, json: async () => ({{version: 8, sources: {{}}, layers: []}}),
+}});
+globalThis.window = {{
+  GTFSExplorerMap: {{maplibregl: {{
+    setWorkerUrl() {{}}, addProtocol() {{}}, Map: FakeMap,
+    LngLatBounds: Bounds, Popup: class {{}},
+  }}, PMTiles: class {{}}, Protocol: class {{add() {{}}}}}},
+  GTFSExplorerMapBridge: {{mapReady: () => true}}, addEventListener: () => {{}},
+}};
+eval({source!r});
+testMap.emit("load");
+const layer = testMap.getLayer("gtfs-stops-endpoints");
+const filter = styleSpec.featureFilter(layer.filter, "layers.gtfs-stops-endpoints.filter");
+const color = styleSpec.createPropertyExpression(
+  layer.paint["circle-color"],
+  "layers.gtfs-stops-endpoints.paint.circle-color",
+  styleSpec.latest.paint_circle["circle-color"],
+);
+if (!filter || !color.result) throw new Error(JSON.stringify(color.errors || []));
+console.log(JSON.stringify({{filter: layer.filter, color: layer.paint["circle-color"]}}));
+"""
+    result = subprocess.run(
+        ["node", "--input-type=commonjs", "--eval", harness],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=root / "web/map",
+    )
+    expressions = json.loads(result.stdout)
+    assert expressions == {
+        "filter": ["in", ["get", "endpoint"], ["literal", ["origin", "destination"]]],
+        "color": [
+            "match",
+            ["get", "endpoint"],
+            "origin",
+            "#16a34a",
+            "destination",
+            "#dc2626",
+            "#ffffff",
+        ],
+    }
 
 
 def test_map_queues_layers_until_the_style_is_really_ready() -> None:

@@ -6,6 +6,7 @@ from gtfs_explorer.presentation.map_bridge.protocol import (
     PROTOCOL_VERSION,
     MapBridge,
     MapBridgeEvent,
+    MapFitBounds,
     MapNavigation,
 )
 
@@ -15,5 +16,6 @@ __all__ = [
     "PROTOCOL_VERSION",
     "MapBridge",
     "MapBridgeEvent",
+    "MapFitBounds",
     "MapNavigation",
 ]

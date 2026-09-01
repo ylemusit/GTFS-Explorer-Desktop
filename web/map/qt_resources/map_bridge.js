@@ -26,9 +26,15 @@
     if (!sizeIsAllowed(serialized)) return;
     let command;
     try { command = JSON.parse(serialized); } catch (_) { return; }
-    if (command.version !== VERSION || command.type !== "command" || command.command !== "navigate") return;
+    if (command.version !== VERSION || command.type !== "command" || !["navigate", "fitBounds"].includes(command.command)) return;
     const payload = command.payload;
-    if (!payload || !Number.isFinite(payload.longitude) || !Number.isFinite(payload.latitude) || !Number.isFinite(payload.zoom)) return;
+    if (!payload) return;
+    const valid = command.command === "navigate"
+      ? Number.isFinite(payload.longitude) && Number.isFinite(payload.latitude) && Number.isFinite(payload.zoom)
+      : Number.isFinite(payload.west) && Number.isFinite(payload.south)
+        && Number.isFinite(payload.east) && Number.isFinite(payload.north)
+        && payload.west <= payload.east && payload.south <= payload.north;
+    if (!valid) return;
     if (!mapReady) {
       if (pending.length < MAX_PENDING_COMMANDS) pending.push(serialized);
       return;

@@ -12,14 +12,18 @@ from .widget import (
     ExportPreview,
     ExportRequest,
     ExportResult,
+    ExportRouteOption,
+    ExportServiceOption,
 )
 
 __all__ = [
     "ExportAssistantWidget",
     "ExportFormat",
     "ExportPreview",
+    "ExportRouteOption",
     "ExportRequest",
     "ExportResult",
+    "ExportServiceOption",
     "EXPORT_BASENAME_MAX_LENGTH",
     "normalize_export_destination",
     "sanitize_export_component",

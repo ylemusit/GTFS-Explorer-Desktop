@@ -25,8 +25,10 @@ def build_trip_shape_geometry(
     shape_rows: Iterable[tuple[object, object, object]],
     stop_rows: Iterable[tuple[object, object, object]],
     *,
-    map_stops: Iterable[tuple[object, object, object, object]] = (),
+    map_stops: Iterable[tuple[object, ...]] = (),
     route_color: str | None = None,
+    route_text_color: str | None = None,
+    route_id: str | None = None,
 ) -> TripShapeGeometry:
     """Construye línea, bbox y distancias sin propagar errores de geometría almacenada."""
     issues: list[GeometryIssue] = []
@@ -64,12 +66,21 @@ def build_trip_shape_geometry(
         distance_method=_DISTANCE_METHOD,
         issues=tuple(issues),
         stops=tuple(
-            MapStop(str(stop_id), str(name) if name is not None else None, coordinate)
-            for stop_id, name, latitude, longitude in map_stops
+            MapStop(
+                str(row[0]),
+                str(row[1]) if row[1] is not None else None,
+                coordinate,
+                int(row[4]) if len(row) > 4 and isinstance(row[4], int) else None,
+            )
+            for row in map_stops
+            if len(row) >= 4
+            for stop_id, name, latitude, longitude in [row[:4]]
             if stop_id is not None
             if (coordinate := _coordinate(latitude, longitude)) is not None
         ),
         route_color=route_color,
+        route_text_color=route_text_color,
+        route_id=route_id,
     )
 
 

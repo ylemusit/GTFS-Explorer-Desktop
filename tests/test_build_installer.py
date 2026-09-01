@@ -19,7 +19,7 @@ def _module():
 
 def _portable_archive(path: Path, *, safe: bool = True) -> None:
     with zipfile.ZipFile(path, "w") as archive:
-        root = "GTFS Explorer Portable/"
+        root = "GTFS-Explorer/"
         archive.writestr(root + "GTFS Explorer.exe", b"exe")
         archive.writestr(root + "portable.flag", b"")
         archive.writestr(root + "web/map/qt_resources/map_bundle.js", b"")
@@ -56,6 +56,16 @@ def test_nsis_script_keeps_workspace_outside_the_installation() -> None:
     assert "CreateShortcut" in script
     assert 'RMDir /r "$LOCALAPPDATA\\GTFS Explorer"' not in script
     assert ".zip" not in script
+
+
+def test_nsis_script_exposes_clear_completion_actions() -> None:
+    script = Path("packaging/nsis/installer.nsi").read_text(encoding="utf-8-sig")
+
+    assert "!insertmacro MUI_PAGE_FINISH" in script
+    assert '!define MUI_FINISHPAGE_RUN "$INSTDIR\\${PRODUCT_EXECUTABLE}"' in script
+    assert '!define MUI_FINISHPAGE_RUN_TEXT "Abrir GTFS Explorer"' in script
+    assert '!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\\docs\\USER_GUIDE.md"' in script
+    assert '!define MUI_FINISHPAGE_SHOWREADME_TEXT "Ver guía / README"' in script
 
 
 def test_installer_identity_is_provided_by_the_build_script(

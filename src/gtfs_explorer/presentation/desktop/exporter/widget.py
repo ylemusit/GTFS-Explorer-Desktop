@@ -7,7 +7,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -15,6 +18,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -48,6 +53,11 @@ class ExportRequest:
     spreadsheet_safe: bool = False
     overwrite: bool = False
 
+    @property
+    def is_pack(self) -> bool:
+        """Indica que la selección agrupa más de una ruta o servicio."""
+        return len(self.route_ids) > 1 or len(self.service_ids) > 1
+
 
 @dataclass(frozen=True)
 class ExportPreview:
@@ -55,6 +65,19 @@ class ExportPreview:
 
     dependencies: tuple[str, ...]
     warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ExportRouteOption:
+    route_id: str
+    label: str
+
+
+@dataclass(frozen=True)
+class ExportServiceOption:
+    service_id: str
+    label: str
+    route_ids: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -94,6 +117,8 @@ class ExportAssistantWidget(QWidget):
         self._on_destination_directory_used = on_destination_directory_used
         self._cancelled = False
         self._suggested_destination_text = ""
+        self._route_options: tuple[ExportRouteOption, ...] = ()
+        self._service_options: tuple[ExportServiceOption, ...] = ()
         self._build()
         self._refresh()
 
@@ -110,6 +135,7 @@ class ExportAssistantWidget(QWidget):
         self._format.blockSignals(False)
         for editor in (self._routes, self._trips, self._services):
             editor.clear()
+        self.set_inventory((), ())
         self._destination.clear()
         self._bbox.setChecked(False)
         self._spreadsheet_safe.setChecked(False)
@@ -127,13 +153,76 @@ class ExportAssistantWidget(QWidget):
         return ExportRequest(
             format_,
             destination,
-            route_ids=_identifiers(self._routes.toPlainText()),
+            route_ids=(
+                self._selected_ids(self._route_inventory)
+                or _identifiers(self._routes.toPlainText())
+            ),
             trip_ids=_identifiers(self._trips.toPlainText()),
-            service_ids=_identifiers(self._services.toPlainText()),
+            service_ids=(
+                self._selected_ids(self._service_inventory)
+                or _identifiers(self._services.toPlainText())
+            ),
             include_bbox=self._bbox.isChecked(),
             spreadsheet_safe=self._spreadsheet_safe.isChecked(),
             overwrite=destination.exists(),
         )
+
+    def set_inventory(
+        self,
+        routes: tuple[ExportRouteOption, ...],
+        services: tuple[ExportServiceOption, ...],
+    ) -> None:
+        """Carga inventario GTFS; la UI selecciona IDs sin exigir que se conozcan."""
+        self._route_options, self._service_options = routes, services
+        self._populate_inventory(self._route_inventory, routes, self._route_search.text())
+        self._refresh_service_inventory()
+
+    @staticmethod
+    def _selected_ids(widget: QListWidget) -> frozenset[str]:
+        return frozenset(
+            str(widget.item(index).data(Qt.ItemDataRole.UserRole))
+            for index in range(widget.count())
+            if widget.item(index).checkState() == Qt.CheckState.Checked
+        )
+
+    def _populate_inventory(
+        self, widget: QListWidget, options: tuple[object, ...], query: str = ""
+    ) -> None:
+        selected = self._selected_ids(widget)
+        widget.blockSignals(True)
+        widget.clear()
+        needle = query.casefold().strip()
+        for option in options:
+            identifier_value = getattr(option, "route_id", None)
+            if identifier_value is None:
+                identifier_value = getattr(option, "service_id")
+            identifier = str(identifier_value)
+            label = str(getattr(option, "label"))
+            if needle and needle not in f"{label} {identifier}".casefold():
+                continue
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, identifier)
+            item.setCheckState(
+                Qt.CheckState.Checked if identifier in selected else Qt.CheckState.Unchecked
+            )
+            widget.addItem(item)
+        widget.blockSignals(False)
+
+    def _refresh_service_inventory(self) -> None:
+        selected_routes = self._selected_ids(self._route_inventory)
+        options = tuple(
+            option
+            for option in self._service_options
+            if not selected_routes or not option.route_ids or option.route_ids & selected_routes
+        )
+        self._populate_inventory(self._service_inventory, options)
+
+    @staticmethod
+    def _set_all(widget: QListWidget, checked: bool) -> None:
+        for index in range(widget.count()):
+            widget.item(index).setCheckState(
+                Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+            )
 
     def _build(self) -> None:
         layout = QVBoxLayout(self)
@@ -157,14 +246,50 @@ class ExportAssistantWidget(QWidget):
         self._routes.setAccessibleName(t("export.routes"))
         self._trips.setAccessibleName(t("export.trips"))
         self._services.setAccessibleName(t("export.services"))
-        for label_text, editor in (
-            (t("export.routes_label"), self._routes),
-            (t("export.trips_label"), self._trips),
-            (t("export.services_label"), self._services),
-        ):
+        self._route_search = QLineEdit()
+        self._route_search.setObjectName("exportRouteSearch")
+        self._route_search.setPlaceholderText("Buscar rutas")
+        self._route_inventory = QListWidget()
+        self._route_inventory.setObjectName("exportRouteInventory")
+        self._route_inventory.setAccessibleName(t("export.routes"))
+        self._route_inventory.setMaximumHeight(130)
+        route_controls = QHBoxLayout()
+        all_routes = QPushButton("Seleccionar todas")
+        clear_routes = QPushButton("Limpiar")
+        route_controls.addWidget(all_routes)
+        route_controls.addWidget(clear_routes)
+        route_box = QVBoxLayout()
+        route_box.addWidget(self._route_search)
+        route_box.addWidget(self._route_inventory)
+        route_box.addLayout(route_controls)
+        form.addRow(QLabel(t("export.routes_label")), route_box)
+        self._service_inventory = QListWidget()
+        self._service_inventory.setObjectName("exportServiceInventory")
+        self._service_inventory.setAccessibleName(t("export.services"))
+        self._service_inventory.setMaximumHeight(110)
+        service_controls = QHBoxLayout()
+        all_services = QPushButton("Seleccionar todos")
+        clear_services = QPushButton("Limpiar")
+        service_controls.addWidget(all_services)
+        service_controls.addWidget(clear_services)
+        service_box = QVBoxLayout()
+        service_box.addWidget(self._service_inventory)
+        service_box.addLayout(service_controls)
+        form.addRow(QLabel(t("export.services_label")), service_box)
+        # Los viajes siguen disponibles como filtro avanzado, no como requisito normal.
+        for label_text, editor in ((t("export.trips_label") + " (avanzado)", self._trips),):
             label = QLabel(label_text)
             label.setBuddy(editor)
             form.addRow(label, editor)
+        all_routes.clicked.connect(lambda: self._set_all(self._route_inventory, True))
+        clear_routes.clicked.connect(lambda: self._set_all(self._route_inventory, False))
+        all_services.clicked.connect(lambda: self._set_all(self._service_inventory, True))
+        clear_services.clicked.connect(lambda: self._set_all(self._service_inventory, False))
+        self._route_search.textChanged.connect(
+            lambda value: self._populate_inventory(
+                self._route_inventory, self._route_options, value
+            )
+        )
         destination_row = QHBoxLayout()
         self._destination = QLineEdit()
         self._destination.setObjectName("exportDestination")
@@ -230,14 +355,21 @@ class ExportAssistantWidget(QWidget):
                 widget.currentIndexChanged if isinstance(widget, QComboBox) else widget.textChanged
             )
             signal.connect(self._refresh)
+        self._route_inventory.itemChanged.connect(self._refresh_service_inventory)
+        self._route_inventory.itemChanged.connect(self._refresh)
+        self._service_inventory.itemChanged.connect(self._refresh)
         self._bbox.toggled.connect(self._refresh)
         self._spreadsheet_safe.toggled.connect(self._refresh)
 
     def _refresh(self) -> None:
         format_ = ExportFormat(self._format.currentData())
-        route_ids = _identifiers(self._routes.toPlainText())
+        route_ids = self._selected_ids(self._route_inventory) or _identifiers(
+            self._routes.toPlainText()
+        )
         trip_ids = _identifiers(self._trips.toPlainText())
-        service_ids = _identifiers(self._services.toPlainText())
+        service_ids = self._selected_ids(self._service_inventory) or _identifiers(
+            self._services.toPlainText()
+        )
         # Todas las salidas se acotan por rutas; incluso el CSV es una vista
         # compatible de las rutas seleccionadas, no una exportación implícita
         # de todo el feed.
@@ -278,12 +410,19 @@ class ExportAssistantWidget(QWidget):
             self._export.setEnabled(False)
             return
         preview = self._previewer(request)
+        selection_summary = (
+            f"{len(request.route_ids)} rutas · {len(request.service_ids)} servicios · "
+            f"{len(request.trip_ids)} viajes"
+        )
         lines = [
+            selection_summary,
             t(
                 "export.preview_dependencies",
                 dependencies=", ".join(preview.dependencies) or t("export.preview_no_dependencies"),
-            )
+            ),
         ]
+        if request.is_pack:
+            lines.insert(1, "Export Pack")
         lines.extend(t("export.preview_warning", warning=warning) for warning in preview.warnings)
         if request.destination.exists():
             lines.append(t("export.preview_existing_destination"))
@@ -339,7 +478,7 @@ class ExportAssistantWidget(QWidget):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
-            is not QMessageBox.StandardButton.Yes
+            != QMessageBox.StandardButton.Yes
         ):
             return
         self._cancelled = False
@@ -361,17 +500,41 @@ class ExportAssistantWidget(QWidget):
         warnings = "\n".join(
             t("export.preview_warning", warning=item) for item in result.warnings
         ) or t("export.no_warnings")
-        QMessageBox.information(
-            self,
-            t("dialog.export_completed_title"),
+        self._show_export_completed(request.destination, result, warnings)
+
+    def _show_export_completed(
+        self, destination: Path, result: ExportResult, warnings: str
+    ) -> None:
+        """Muestra el artefacto publicado y deja continuar hacia la reimportación."""
+        destination = destination.resolve()
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle(t("dialog.export_completed_title"))
+        dialog.setText(
             t(
                 "dialog.export_completed_message",
                 classification=result.classification,
+                filename=result.manifest.artifact_name,
+                destination=destination,
                 sha256=result.manifest.sha256,
                 warnings=warnings,
-            ),
-            QMessageBox.StandardButton.Ok,
+            )
         )
+        open_folder = dialog.addButton(
+            t("dialog.export_open_folder_action"), QMessageBox.ButtonRole.ActionRole
+        )
+        copy_path = dialog.addButton(
+            t("dialog.export_copy_path_action"), QMessageBox.ButtonRole.ActionRole
+        )
+        accept_button = dialog.addButton(QMessageBox.StandardButton.Ok)
+        accept_button.setText(t("dialog.accept"))
+
+        open_folder.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(destination.parent)))
+        )
+        copy_path.clicked.connect(lambda: QApplication.clipboard().setText(str(destination)))
+        open_folder.setToolTip(t("dialog.export_open_folder_tooltip"))
+        copy_path.setToolTip(t("dialog.export_copy_path_tooltip"))
+        dialog.exec()
 
     def _request_cancel(self) -> None:
         self._cancelled = True
@@ -432,6 +595,11 @@ def _format_help(
         "export.help_summary",
         description=descriptions[format_],
         selection=selection,
+        pack=(
+            t("export.pack_description")
+            if len(route_ids) > 1 or len(service_ids) > 1
+            else t("export.single_description")
+        ),
         proposed_name=proposed_name,
     )
 

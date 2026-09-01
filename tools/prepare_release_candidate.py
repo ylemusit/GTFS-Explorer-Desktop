@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import sys
 import zipfile
@@ -24,6 +25,7 @@ DIST = ROOT / "dist"
 PRODUCT = IDENTITY.name
 PORTABLE_PREFIX = "GTFS-Explorer-Portable-"
 SETUP_PREFIX = "GTFS-Explorer-Setup-"
+LABEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 REQUIRED_PORTABLE_FILES = (
     "GTFS Explorer.exe",
     "portable.flag",
@@ -46,6 +48,11 @@ def _sha256(path: Path) -> str:
 
 def _version() -> str:
     return IDENTITY.version
+
+
+def _artifact_name(prefix: str, version: str, label: str | None, suffix: str) -> str:
+    label_part = f"-{label}" if label else ""
+    return f"{prefix}{version}{label_part}-win-x64{suffix}"
 
 
 def _single_artifact(pattern: str) -> Path:
@@ -72,9 +79,11 @@ def _expected_sidecar_hash(path: Path) -> str:
     return fields[0].lower()
 
 
-def verify(version: str) -> dict[str, Any]:
-    portable = _single_artifact(f"{PORTABLE_PREFIX}{version}-win-x64.zip")
-    setup = _single_artifact(f"{SETUP_PREFIX}{version}-win-x64.exe")
+def verify(version: str, label: str | None = None) -> dict[str, Any]:
+    if label is not None and not LABEL_PATTERN.fullmatch(label):
+        raise ValueError("La etiqueta solo puede contener letras, números, '.', '_' o '-'.")
+    portable = _single_artifact(_artifact_name(PORTABLE_PREFIX, version, label, ".zip"))
+    setup = _single_artifact(_artifact_name(SETUP_PREFIX, version, label, ".exe"))
     portable_hash = _sha256(portable)
     setup_hash = _sha256(setup)
     if _expected_sidecar_hash(portable) != portable_hash:
@@ -101,9 +110,9 @@ def verify(version: str) -> dict[str, Any]:
             raise RuntimeError(f"El ZIP portable está dañado en: {invalid}")
         names = set(archive.namelist())
         roots = {name.split("/", maxsplit=1)[0] for name in names if name}
-        if roots != {"GTFS Explorer Portable"}:
+        if roots != {"GTFS-Explorer"}:
             raise RuntimeError("El ZIP portable no tiene una única raíz esperada.")
-        root = "GTFS Explorer Portable/"
+        root = "GTFS-Explorer/"
         missing = [relative for relative in REQUIRED_PORTABLE_FILES if root + relative not in names]
         if missing:
             raise RuntimeError("Faltan archivos obligatorios en el portable: " + ", ".join(missing))
@@ -125,7 +134,7 @@ def verify(version: str) -> dict[str, Any]:
 
 
 def prepare(version: str, label: str) -> Path:
-    artifacts = verify(version)
+    artifacts = verify(version, label)
     candidate = DIST / f"GTFS-Explorer-{version}-{label}"
     candidate.mkdir(parents=True, exist_ok=True)
     hashes = (
@@ -155,7 +164,7 @@ def prepare(version: str, label: str) -> Path:
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     with zipfile.ZipFile(DIST / artifacts["portable"]["file"]) as archive:
-        root = "GTFS Explorer Portable/"
+        root = "GTFS-Explorer/"
         for filename in ("THIRD_PARTY_NOTICES.html", "SBOM.cdx.json"):
             (candidate / filename).write_bytes(archive.read(root + filename))
     shutil.copy2(ROOT / "CHANGELOG.md", candidate / "CHANGELOG.md")
@@ -169,7 +178,7 @@ def main() -> int:
     arguments = parser.parse_args()
     version = _version()
     if arguments.verify_only:
-        verify(version)
+        verify(version, arguments.label)
         print(f"Artefactos {version} verificados correctamente.")
     else:
         print(prepare(version, arguments.label))

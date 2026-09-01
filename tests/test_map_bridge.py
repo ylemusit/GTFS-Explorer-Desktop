@@ -9,6 +9,7 @@ from gtfs_explorer.presentation.map_bridge.protocol import (
     MAX_PENDING_COMMANDS,
     DispatchStatus,
     MapBridge,
+    MapFitBounds,
     MapNavigation,
     serialize_navigation,
 )
@@ -58,6 +59,20 @@ def test_navigation_is_queued_until_ready_with_a_fixed_limit() -> None:
     assert limited.navigate(navigation) is DispatchStatus.REJECTED
 
 
+def test_fit_bounds_is_serialized_and_queued_until_ready() -> None:
+    bridge = MapBridge()
+    commands: list[str] = []
+    bridge.command_available.connect(commands.append)
+    bounds = MapFitBounds(-6.0, 36.0, -5.0, 37.0)
+
+    assert bridge.navigate(bounds) is DispatchStatus.QUEUED
+    bridge.receive(_event("mapReady", 1))
+
+    command = json.loads(commands[0])
+    assert command["command"] == "fitBounds"
+    assert command["payload"] == {"west": -6.0, "south": 36.0, "east": -5.0, "north": 37.0}
+
+
 def test_events_out_of_order_or_before_readiness_are_rejected() -> None:
     bridge = MapBridge()
     errors: list[str] = []
@@ -95,7 +110,7 @@ def test_javascript_contract_has_one_channel_and_same_limits() -> None:
     assert "const VERSION = 1;" in source
     assert "const MAX_MESSAGE_BYTES = 16 * 1024;" in source
     assert "const MAX_PENDING_COMMANDS = 32;" in source
-    assert 'command.command !== "navigate"' in source
+    assert '["navigate", "fitBounds"].includes(command.command)' in source
     assert "bridge.command_available.connect(dispatchCommand);" in source
     assert 'new Event("gtfs-explorer-map-bridge-ready")' in source
     assert "filesystem" in source and "SQL" in source

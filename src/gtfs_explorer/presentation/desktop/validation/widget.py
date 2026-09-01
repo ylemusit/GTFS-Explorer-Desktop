@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QComboBox,
-    QHBoxLayout,
+    QGridLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
@@ -145,7 +145,7 @@ class ValidationWidget(QWidget):
         intro.setWordWrap(True)
         layout.addWidget(intro)
 
-        controls = QHBoxLayout()
+        controls = QGridLayout()
         self._severity = QComboBox()
         self._severity.setAccessibleName(t("validation.severity"))
         self._severity.addItem("Todas las severidades", None)
@@ -189,19 +189,24 @@ class ValidationWidget(QWidget):
         self._export.setAccessibleName(t("validation.export"))
         self._export.setToolTip(t("validation.export"))
         self._export.clicked.connect(self._export_current_report)
-        for widget in (
+        filter_controls = (
             self._severity,
             self._category,
             self._file_filter,
             self._search,
             apply,
+        )
+        action_controls = (
             self._previous,
             self._next,
             self._go_to_raw,
             self._help,
             self._export,
-        ):
-            controls.addWidget(widget)
+        )
+        for column, widget in enumerate(filter_controls):
+            controls.addWidget(widget, 0, column)
+        for column, widget in enumerate(action_controls):
+            controls.addWidget(widget, 1, column)
         layout.addLayout(controls)
 
         self._summary = QLabel("Sin corrida de validación cargada.")

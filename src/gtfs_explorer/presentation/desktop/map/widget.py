@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineUrlRequestInterceptor
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from gtfs_explorer.application.map_policy import (
     DEFAULT_ONLINE_MAP_PROVIDER,
@@ -34,7 +34,7 @@ from gtfs_explorer.infrastructure.maps.loopback import MapPackageServer
 from gtfs_explorer.infrastructure.maps.offline_library import OfflineMapLibrary, OfflineMapPackage
 from gtfs_explorer.infrastructure.maps.package import MapPackage, load_map_package
 from gtfs_explorer.presentation.desktop.i18n import t
-from gtfs_explorer.presentation.map_bridge import MapBridge, MapBridgeEvent
+from gtfs_explorer.presentation.map_bridge import MapBridge, MapBridgeEvent, MapFitBounds
 
 
 class MapNetworkInterceptor(QWebEngineUrlRequestInterceptor):
@@ -70,6 +70,7 @@ class MapWidget(QWidget):
         provider: OnlineMapProvider | None = DEFAULT_ONLINE_MAP_PROVIDER,
     ) -> None:
         super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setAccessibleName(t("accessibility.trip_map"))
         self.setAccessibleDescription(t("accessibility.trip_map_description"))
         self._layers_for_trip = layers_for_trip
@@ -95,6 +96,7 @@ class MapWidget(QWidget):
         self._network_policy.set_active_availability(MapAvailability.UNAVAILABLE)
         self._view = QWebEngineView(self)
         self._view.setObjectName("tripMap")
+        self._view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._view.setAccessibleName(t("accessibility.map_canvas"))
         self._view.setAccessibleDescription(t("accessibility.map_canvas_description"))
         self._view.setMinimumHeight(240)
@@ -110,7 +112,7 @@ class MapWidget(QWidget):
         self._view.page().setWebChannel(channel)
         self._channel = channel
         layout = QVBoxLayout(self)
-        layout.addWidget(self._view)
+        layout.addWidget(self._view, 1)
         self._attribution = QLabel("Mapa sin paquete offline: fondo neutro.", self)
         self._attribution.setObjectName("mapAttribution")
         self._attribution.setAccessibleName(t("accessibility.map_status"))
@@ -202,6 +204,15 @@ class MapWidget(QWidget):
         self._has_map_context = True
         self._reconcile_basemap()
         self._flush()
+
+    def fit_bounds(self, bounds: tuple[float, float, float, float] | None) -> None:
+        """Encuadra un contexto GTFS sin modificar las capas ni el modo de mapa."""
+        if bounds is None:
+            return
+        try:
+            self._bridge.navigate(MapFitBounds(*bounds))
+        except ValueError:
+            return
 
     def select_stop(self, stop_id: str) -> None:
         self._selected_stop_id = stop_id

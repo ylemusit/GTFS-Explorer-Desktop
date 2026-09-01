@@ -1,8 +1,27 @@
 # Checklist de release candidate
 
-Versión candidata: `0.1.0-rc1`
-Fecha: 2026-08-15
-Estado: **RC local preparada; no autorizada para publicación o distribución.**
+Versión candidata: `0.1.0-rc2`
+Fecha: 2026-09-01
+Estado: **RC local en preparación; no autorizada para publicación o distribución.**
+
+## Fase 3 — Freeze + RC2
+
+- [x] `v0.1.0-rc1` preservado sin modificar.
+- [x] E2E: 11 passed.
+- [x] Full suite: 526 passed.
+- [x] `tools/check.ps1`, Ruff, mypy y `git diff --check`: PASS.
+- [x] Portable RC2, runtime smoke y mapa: PASS.
+- [x] Installed RC2, upgrade/uninstall y package smoke: PASS.
+- [ ] CTM empaquetado y round-trip Mini-GTFS nativo: no reclamar hasta obtener evidencia fresca.
+- [x] Hashes y manifests RC2: PASS.
+- [ ] Tag anotado: se creará solo tras incorporar el estado final congelado.
+
+### Artefactos RC2
+
+- Portable: `dist/GTFS-Explorer-Portable-0.1.0-rc2-win-x64.zip` —
+  `b99060d6201fe4459292ecd4bf1b0b72a92140500fbacbe4597af71f01ca79bd`.
+- Setup: `dist/GTFS-Explorer-Setup-0.1.0-rc2-win-x64.exe` —
+  `314545b35d7c965f2a1e3865c5801d427c6fa1b064f9fd86cc04f823ca60d20f`.
 
 ## Gates técnicos
 

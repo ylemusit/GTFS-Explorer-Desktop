@@ -33,7 +33,7 @@ def test_product_identity_has_complete_and_consistent_metadata() -> None:
     assert IDENTITY.install_directory_name == "GTFS Explorer"
     assert IDENTITY.start_menu_directory_name == "GTFS Explorer"
     assert IDENTITY.shortcut_name == "GTFS Explorer Desktop.lnk"
-    assert IDENTITY.portable_directory_name == "GTFS Explorer Portable"
+    assert IDENTITY.portable_directory_name == "GTFS-Explorer"
     assert project["dynamic"] == ["version"]
     assert "version" not in project
     assert metadata["tool"]["setuptools"]["dynamic"]["version"]["attr"] == (

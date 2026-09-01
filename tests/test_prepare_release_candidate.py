@@ -26,7 +26,7 @@ def _artifacts(root: Path, version: str = "0.1.0") -> tuple[Path, Path]:
     setup = dist / f"GTFS-Explorer-Setup-{version}-win-x64.exe"
     setup.write_bytes(b"setup")
     with zipfile.ZipFile(portable, "w") as archive:
-        prefix = "GTFS Explorer Portable/"
+        prefix = "GTFS-Explorer/"
         for name in _module().REQUIRED_PORTABLE_FILES:
             if name in {"manifest.json", "SBOM.cdx.json"}:
                 continue

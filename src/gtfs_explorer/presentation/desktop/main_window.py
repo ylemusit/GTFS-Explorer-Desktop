@@ -10,9 +10,17 @@ from collections.abc import Callable, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import cast
+from zipfile import ZipFile
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDropEvent, QKeySequence
+from PySide6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QDragEnterEvent,
+    QDropEvent,
+    QFontMetrics,
+    QKeySequence,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -25,6 +33,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -47,7 +58,10 @@ from gtfs_explorer.application.map_policy import MapMode, normalize_map_mode
 from gtfs_explorer.application.queries.feed_overview import FeedOverviewQueries
 from gtfs_explorer.application.queries.geometry import GeometryQueries
 from gtfs_explorer.application.queries.map_layers import MapLayerPayload, map_layers_for_trip
-from gtfs_explorer.application.queries.project_map_coverage import project_map_coverage
+from gtfs_explorer.application.queries.project_map_coverage import (
+    project_map_coverage,
+    route_map_coverage,
+)
 from gtfs_explorer.application.queries.raw import RawInspectorQueries
 from gtfs_explorer.application.queries.routes import RouteExplorerQueries
 from gtfs_explorer.application.queries.stops import StopInspectorQueries
@@ -123,9 +137,12 @@ from gtfs_explorer.presentation.desktop.exporter import (
     ExportFormat,
     ExportRequest,
     ExportResult,
+    ExportRouteOption,
+    ExportServiceOption,
 )
 from gtfs_explorer.presentation.desktop.help import HelpCatalog, HelpDialog
 from gtfs_explorer.presentation.desktop.i18n import t
+from gtfs_explorer.presentation.desktop.icon import configure_application_icon
 from gtfs_explorer.presentation.desktop.import_adapter import ImportJobAdapter
 from gtfs_explorer.presentation.desktop.overview.history import OperationHistoryWidget
 from gtfs_explorer.presentation.desktop.overview.widget import FeedOverviewWidget
@@ -191,6 +208,10 @@ class MainWindow(QMainWindow):
         elapsed_clock: Callable[[], float] | None = None,
     ) -> None:
         super().__init__()
+        application = cast(QApplication, QApplication.instance())
+        if application is None:  # pragma: no cover - QMainWindow requiere QApplication
+            raise RuntimeError("MainWindow requiere una QApplication activa.")
+        self.setWindowIcon(configure_application_icon(application))
         self._has_persistent_paths = application_paths is not None
         self._application_paths = application_paths or resolve_application_paths(Path(sys.argv[0]))
         self._directory_preferences = DirectoryPreferences(
@@ -221,7 +242,7 @@ class MainWindow(QMainWindow):
         self._import_completed: int | None = None
         self._import_unit: str | None = None
         self._import_started_at: float | None = None
-        application = QApplication.instance()
+        application = cast(QApplication, QApplication.instance())
         if application is not None:
             application.setApplicationName(IDENTITY.name)
             application.setApplicationVersion(IDENTITY.version)
@@ -275,8 +296,24 @@ class MainWindow(QMainWindow):
         if self._state.mode is UiMode.JOB_CANCELLING:
             event.ignore()
             return
+        self._explorer.save_layout_state()
+        self._explorer.close_map_window()
         self._close_project()
         event.accept()
+
+    def _show_main_window(self) -> None:
+        """Devuelve el foco a los datos sin cerrar la ventana del mapa."""
+        self.show()
+        if self.isMinimized():
+            self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _show_explore(self) -> None:
+        """Devuelve la ventana principal a la vista Explorar tras acoplar."""
+        self._show_main_window()
+        self._navigation.setCurrentRow(1)
+        self._explore_tabs.setCurrentWidget(self._explorer)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:  # noqa: N802 - nombre impuesto por Qt
         mime_data = event.mimeData()
@@ -327,9 +364,11 @@ class MainWindow(QMainWindow):
         self._import_context_label.hide()
         layout.addWidget(self._import_context_label)
         self._overview = FeedOverviewWidget(self._show_validation)
-        layout.addWidget(self._overview, 1)
         self._operation_history = OperationHistoryWidget(self._query_operations)
-        layout.addWidget(self._operation_history, 1)
+        project_page = QWidget()
+        project_layout = QVBoxLayout(project_page)
+        project_layout.addWidget(self._overview, 1)
+        project_layout.addWidget(self._operation_history, 1)
         self._explorer = RouteExplorerWidget(
             self._query_routes,
             self._query_services,
@@ -339,6 +378,15 @@ class MainWindow(QMainWindow):
             self._query_stop,
             self._query_timetable,
             self._query_map_layers,
+            splitter_state=self._directory_preferences.settings.explore_splitter_state,
+            save_splitter_state=self._directory_preferences.remember_explore_splitter_state,
+            feed_bounds=self._query_feed_bounds,
+            route_bounds=self._query_route_bounds,
+            map_window_geometry=self._directory_preferences.settings.map_window_geometry,
+            map_window_maximized=self._directory_preferences.settings.map_window_maximized,
+            save_map_window_geometry=self._directory_preferences.remember_map_window_geometry,
+            on_return_to_data=self._show_main_window,
+            on_dock_to_explore=self._show_explore,
         )
         self._raw_inspector = RawInspectorWidget(
             self._query_raw,
@@ -373,20 +421,26 @@ class MainWindow(QMainWindow):
         self._explore_tabs.addTab(self._explorer, t("explore.routes"))
         self._explore_tabs.addTab(self._raw_inspector, t("explore.raw"))
         self._explore_tabs.setAccessibleName(t("navigation.explore"))
-        self._explore_tabs.hide()
-        layout.addWidget(self._explore_tabs, 1)
-        self._validation.hide()
-        layout.addWidget(self._validation, 1)
-        self._exporter.hide()
-        layout.addWidget(self._exporter, 1)
+        self._page_stack = QStackedWidget()
+        self._page_stack.setObjectName("mainPageStack")
+        self._page_stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        # La altura mínima no debe ser el máximo de todas las páginas: cada
+        # página se muestra de forma exclusiva y se adapta al viewport actual.
+        self._page_stack.setMinimumSize(0, 0)
+        project_scroll = self._page_scroll(project_page, "projectPageScroll")
+        validation_scroll = self._page_scroll(self._validation, "validationPageScroll")
+        export_scroll = self._page_scroll(self._exporter, "exportPageScroll")
+        for page in (project_scroll, self._explore_tabs, validation_scroll, export_scroll):
+            self._page_stack.addWidget(page)
+        layout.addWidget(self._page_stack, 1)
         self.setCentralWidget(central)
 
         settings = QDockWidget(t("action.settings"), self)
         settings.setObjectName("settingsDock")
-        settings_widget = QWidget(settings)
-        settings_layout = QVBoxLayout(settings_widget)
-        map_mode_label = QLabel(t("settings.map_mode_label"), settings_widget)
-        self._map_mode_combo = QComboBox(settings_widget)
+        settings_content = QWidget()
+        settings_layout = QVBoxLayout(settings_content)
+        map_mode_label = QLabel(t("settings.map_mode_label"), settings_content)
+        self._map_mode_combo = QComboBox(settings_content)
         self._map_mode_combo.setObjectName("mapModeSelector")
         self._map_mode_combo.setAccessibleName(t("settings.map_mode_label"))
         self._map_mode_combo.addItem(t("settings.map_mode_auto"), MapMode.AUTO)
@@ -395,20 +449,20 @@ class MainWindow(QMainWindow):
         map_mode_label.setBuddy(self._map_mode_combo)
         settings_layout.addWidget(map_mode_label)
         settings_layout.addWidget(self._map_mode_combo)
-        self._map_policy_status = QLabel(self._explorer.map_status, settings_widget)
+        self._map_policy_status = QLabel(self._explorer.map_status, settings_content)
         self._map_policy_status.setObjectName("mapPolicyStatus")
         self._map_policy_status.setWordWrap(True)
         settings_layout.addWidget(self._map_policy_status)
-        map_label = QLabel(t("settings.map_label"), settings_widget)
+        map_label = QLabel(t("settings.map_label"), settings_content)
         settings_layout.addWidget(map_label)
-        choose_map = QPushButton(t("settings.choose_map"), settings_widget)
+        choose_map = QPushButton(t("settings.choose_map"), settings_content)
         choose_map.setAccessibleDescription(t("settings.choose_map_description"))
         choose_map.setObjectName("selectMapPackage")
         choose_map.setAccessibleName(t("settings.choose_map"))
         choose_map.setToolTip(t("settings.choose_map_description"))
         choose_map.clicked.connect(self._select_map_package)
         settings_layout.addWidget(choose_map)
-        import_pmtiles = QPushButton(t("settings.import_pmtiles"), settings_widget)
+        import_pmtiles = QPushButton(t("settings.import_pmtiles"), settings_content)
         import_pmtiles.setObjectName("importPmtiles")
         import_pmtiles.setAccessibleName(t("settings.import_pmtiles"))
         import_pmtiles.setToolTip(t("settings.import_pmtiles"))
@@ -417,9 +471,9 @@ class MainWindow(QMainWindow):
         self._map_package_status = QLabel(t("settings.map_empty"))
         self._map_package_status.setWordWrap(True)
         settings_layout.addWidget(self._map_package_status)
-        offline_maps_label = QLabel(t("settings.offline_maps"), settings_widget)
+        offline_maps_label = QLabel(t("settings.offline_maps"), settings_content)
         settings_layout.addWidget(offline_maps_label)
-        self._offline_maps = QTableWidget(0, 6, settings_widget)
+        self._offline_maps = QTableWidget(0, 6, settings_content)
         self._offline_maps.setObjectName("offlineMapsTable")
         self._offline_maps.setHorizontalHeaderLabels(
             (
@@ -435,7 +489,7 @@ class MainWindow(QMainWindow):
         self._offline_maps.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._offline_maps.setAccessibleName(t("settings.offline_maps"))
         settings_layout.addWidget(self._offline_maps)
-        remove_map = QPushButton(t("settings.remove_map"), settings_widget)
+        remove_map = QPushButton(t("settings.remove_map"), settings_content)
         remove_map.setObjectName("removeOfflineMap")
         remove_map.setAccessibleName(t("settings.remove_map"))
         remove_map.setToolTip(t("settings.remove_map"))
@@ -444,22 +498,48 @@ class MainWindow(QMainWindow):
         self._refresh_offline_maps()
         settings_layout.addStretch()
         self._map_mode_combo.currentIndexChanged.connect(self._set_map_mode)
-        settings.setWidget(settings_widget)
+        settings_scroll = QScrollArea(settings)
+        settings_scroll.setObjectName("settingsScrollArea")
+        settings_scroll.setWidgetResizable(True)
+        settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        settings_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        settings_scroll.setWidget(settings_content)
+        settings.setWidget(settings_scroll)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, settings)
         settings.hide()
         self._settings_dock = settings
         self._status_label = QLabel()
+        self._status_label.setObjectName("applicationStatus")
         self._status_label.setAccessibleName(t("accessibility.application_state"))
-        self.statusBar().addWidget(self._status_label)
+        self.statusBar().addWidget(self._status_label, 1)
         self._project_identity_label = QLabel()
         self._project_identity_label.setObjectName("projectIdentityStatus")
         self._project_identity_label.setAccessibleName(t("accessibility.project_identity"))
-        self.statusBar().addPermanentWidget(self._project_identity_label, 1)
+        self._project_identity_label.setMaximumWidth(280)
+        self._project_identity_label.setToolTip("")
+        self.statusBar().addPermanentWidget(self._project_identity_label)
+        self._workspace_status_label = QLabel()
+        self._workspace_status_label.setObjectName("workspaceStatus")
+        self._workspace_status_label.setAccessibleName("Workspace del proyecto")
+        self._workspace_status_label.setMinimumWidth(120)
+        self._workspace_status_label.setMaximumWidth(300)
+        self.statusBar().addPermanentWidget(self._workspace_status_label)
         self._progress_bar = QProgressBar()
         self._progress_bar.setAccessibleName(t("accessibility.import_progress"))
         self._progress_bar.setRange(0, 100)
         self._progress_bar.hide()
         self.statusBar().addPermanentWidget(self._progress_bar)
+
+    @staticmethod
+    def _page_scroll(page: QWidget, object_name: str) -> QScrollArea:
+        """Da scroll al contenido alto sin propagarlo al mínimo de la ventana."""
+        scroll = QScrollArea()
+        scroll.setObjectName(object_name)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setWidget(page)
+        return scroll
 
     def _build_actions(self) -> None:
         self._actions = {
@@ -528,7 +608,10 @@ class MainWindow(QMainWindow):
         self._directory_preferences.remember_file(kind, file_path)
 
     def _choose_project(self) -> None:
-        start_directory = self._dialog_directory(DirectoryKind.PROJECTS)
+        # Abrir proyecto siempre parte del contenedor de proyectos del usuario;
+        # no debe heredar el workspace actualmente abierto ni una subcarpeta
+        # recordada como si fuera el catálogo de proyectos.
+        start_directory = self._directory_preferences.default_directory(DirectoryKind.PROJECTS)
         directory = QFileDialog.getExistingDirectory(
             self, t("dialog.open_project_title"), str(start_directory)
         )
@@ -600,10 +683,10 @@ class MainWindow(QMainWindow):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
-        return candidate if confirmation is QMessageBox.StandardButton.Yes else None
+        return candidate if confirmation == QMessageBox.StandardButton.Yes else None
 
     def _choose_new_project(self) -> None:
-        start_directory = self._dialog_directory(DirectoryKind.PROJECTS)
+        start_directory = self._directory_preferences.default_directory(DirectoryKind.PROJECTS)
         directory = QFileDialog.getExistingDirectory(
             self, t("dialog.new_project_title"), str(start_directory)
         )
@@ -657,26 +740,45 @@ class MainWindow(QMainWindow):
         self._show_section(0)
 
     def _choose_import_source(self) -> None:
-        choice = QMessageBox.question(
-            self,
-            t("dialog.import_source_title"),
-            t("dialog.import_source_message"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle(t("dialog.import_source_title"))
+        dialog.setText(t("dialog.import_source_message"))
+        dialog.setInformativeText(t("dialog.import_source_detail"))
+        folder_button = dialog.addButton(QMessageBox.StandardButton.Yes)
+        folder_button.setText(t("dialog.import_folder_action"))
+        archive_button = dialog.addButton(QMessageBox.StandardButton.No)
+        archive_button.setText(t("dialog.import_zip_action"))
+        archive_button.setToolTip(t("dialog.import_zip_tooltip"))
+        csv_button = dialog.addButton(
+            t("dialog.import_csv_action"), QMessageBox.ButtonRole.AcceptRole
         )
-        if choice is QMessageBox.StandardButton.Yes:
+        cancel_button = dialog.addButton(QMessageBox.StandardButton.Cancel)
+        cancel_button.setText(t("dialog.cancel"))
+        dialog.exec()
+        choice = dialog.clickedButton()
+        if choice is folder_button:
             start_directory = self._dialog_directory(DirectoryKind.IMPORTS)
             selected = QFileDialog.getExistingDirectory(
                 self, t("dialog.import_folder_title"), str(start_directory)
             )
-        else:
+        elif choice is archive_button:
             start_directory = self._dialog_directory(DirectoryKind.IMPORTS)
             selected, _ = QFileDialog.getOpenFileName(
                 self,
                 t("dialog.import_file_title"),
                 str(start_directory),
-                filter=t("dialog.import_file_filter"),
+                filter=t("dialog.import_zip_filter"),
             )
+        elif choice is csv_button:
+            start_directory = self._dialog_directory(DirectoryKind.IMPORTS)
+            selected, _ = QFileDialog.getOpenFileName(
+                self,
+                t("dialog.import_file_title"),
+                str(start_directory),
+                filter=t("dialog.import_csv_filter"),
+            )
+        else:
+            return
         if not selected:
             return
         try:
@@ -693,11 +795,17 @@ class MainWindow(QMainWindow):
         confirm = QMessageBox.question(
             self,
             t("dialog.confirm_import_title"),
-            t("dialog.confirm_import_message", source_name=source.path.name),
+            t(
+                "dialog.confirm_import_message",
+                source_kind=t(f"dialog.import_kind_{source.kind.value}"),
+                source_name=source.path.name,
+                source_path=str(source.path),
+                next_step=t("dialog.confirm_import_next_step"),
+            ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
-        if confirm is not QMessageBox.StandardButton.Yes:
+        if confirm != QMessageBox.StandardButton.Yes:
             return
         self.start_import(source)
 
@@ -710,8 +818,49 @@ class MainWindow(QMainWindow):
         self._progress_bar.setValue(0)
         self._progress_bar.setRange(0, 0)
         self._progress_bar.show()
+        if self._is_high_volume_source(source):
+            QMessageBox.warning(
+                self,
+                "Volumen elevado",
+                "Este feed contiene un volumen elevado de datos.\n\n"
+                "La importación puede tardar varios minutos.\n"
+                "Podrás seguir el progreso y cancelarla en cualquier momento.",
+                QMessageBox.StandardButton.Ok,
+            )
         self._import_adapter.start(
             lambda on_progress: self._build_import_command(source, on_progress)
+        )
+
+    @staticmethod
+    def _is_high_volume_source(source: InputSource) -> bool:
+        """Clasifica volumen con metadatos baratos, sin leer el contenido."""
+        if source.kind is InputSourceKind.ARCHIVE:
+            with ZipFile(source.path) as archive:
+                zip_entries = [entry for entry in archive.infolist() if not entry.is_dir()]
+            total_uncompressed = sum(entry.file_size for entry in zip_entries)
+            important_size = sum(
+                entry.file_size
+                for entry in zip_entries
+                if Path(entry.filename).name.casefold() in {"shapes.txt", "stop_times.txt"}
+            )
+            return (
+                total_uncompressed >= 512 * 1024 * 1024
+                or important_size >= 256 * 1024 * 1024
+                or len(zip_entries) >= 128
+            )
+        if source.kind is InputSourceKind.FILE:
+            return source.path.stat().st_size >= 512 * 1024 * 1024
+        entries = [path for path in source.path.iterdir() if path.is_file()]
+        total_size = sum(path.stat().st_size for path in entries)
+        important_size = sum(
+            path.stat().st_size
+            for path in entries
+            if path.name.casefold() in {"shapes.txt", "stop_times.txt"}
+        )
+        return (
+            total_size >= 512 * 1024 * 1024
+            or important_size >= 256 * 1024 * 1024
+            or len(entries) >= 128
         )
 
     def _build_import_command(
@@ -812,7 +961,11 @@ class MainWindow(QMainWindow):
         if self._import_feed_name is None:
             return
         cancellation = self._state.mode is UiMode.JOB_CANCELLING
-        prefix = "Cancelando…" if cancellation else "Importación activa"
+        prefix = (
+            "Cancelando…"
+            if cancellation
+            else ("Importando" if self._import_phase is None else "Importación activa")
+        )
         phase = self._import_phase_text(self._import_phase)
         elapsed = self._elapsed_text()
         if self._import_progress_mode is ProgressMode.DETERMINATE:
@@ -826,11 +979,13 @@ class MainWindow(QMainWindow):
             progress_text = "Actividad en curso"
             compact_progress = "en curso"
         detail = f"\nDetalle: {self._import_detail}" if self._import_detail else ""
+        preparing = "\nPreparando importación…" if self._import_phase is None else ""
         self._import_context_label.setText(
-            f"{prefix}\nFeed: {self._import_feed_name}\nFase: {phase}\n"
+            f"{prefix}\nFeed: {self._import_feed_name}{preparing}\nFase: {phase}\n"
             f"{progress_text}{detail}\nTiempo transcurrido: {elapsed}"
         )
-        self._status_label.setText(
+        self._status_label.setText("Cancelando…" if cancellation else "Importando…")
+        self._status_label.setToolTip(
             f"{'Cancelando' if cancellation else 'Importando'}: {self._import_feed_name} · "
             f"{phase} · {compact_progress} · {elapsed}"
         )
@@ -850,6 +1005,7 @@ class MainWindow(QMainWindow):
             self._import_context_label.hide()
 
     def _import_finished(self, result: ImportFeedResult) -> None:
+        duration = self._elapsed_text()
         self._clear_import_context()
         self._progress_bar.hide()
         self.job_finished()
@@ -860,21 +1016,31 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 t("dialog.import_completed_title"),
-                t("dialog.import_completed_message"),
+                t(
+                    "dialog.import_completed_message",
+                    duration=duration,
+                    state=result.state.value,
+                    issue_count=result.issue_count,
+                ),
                 QMessageBox.StandardButton.Ok,
             )
         elif result.state is JobState.INVALID:
             QMessageBox.information(
                 self,
                 t("dialog.import_invalid_title"),
-                t("dialog.import_invalid_message"),
+                t(
+                    "dialog.import_invalid_message",
+                    duration=duration,
+                    state=result.state.value,
+                    issue_count=result.issue_count,
+                ),
                 QMessageBox.StandardButton.Ok,
             )
         elif result.state is JobState.CANCELLED:
             QMessageBox.information(
                 self,
                 t("dialog.import_cancelled_title"),
-                t("dialog.import_cancelled_message"),
+                t("dialog.import_cancelled_message", duration=duration),
                 QMessageBox.StandardButton.Ok,
             )
         else:
@@ -971,7 +1137,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
-            is not QMessageBox.StandardButton.Yes
+            != QMessageBox.StandardButton.Yes
         ):
             return
         start_directory = self._prepare_directory(DirectoryKind.DIAGNOSTICS)
@@ -1005,7 +1171,16 @@ class MainWindow(QMainWindow):
     def _apply_state(self) -> None:
         for action, widget_action in self._actions.items():
             widget_action.setEnabled(self._state.allows(action))
-        self._status_label.setText(self._state.status_message)
+        self._status_label.setText(
+            {
+                UiMode.NO_PROJECT: "Sin proyecto",
+                UiMode.PROJECT_READY: "Listo",
+                UiMode.RECOVERY_REQUIRED: "Recuperación necesaria",
+                UiMode.JOB_RUNNING: "Trabajo en curso…",
+                UiMode.JOB_CANCELLING: "Cancelando…",
+            }[self._state.mode]
+        )
+        self._status_label.setToolTip(self._state.status_message)
         self._content_label.setText(self._state.status_message)
         self._navigation.setEnabled(self._state.mode is not UiMode.NO_PROJECT)
         self._refresh_project_identity()
@@ -1014,12 +1189,24 @@ class MainWindow(QMainWindow):
         if self._opened_project is None:
             self._project_identity_label.setText("Sin proyecto abierto")
             self._project_identity_label.setToolTip("")
+            self._workspace_status_label.setText("")
+            self._workspace_status_label.setToolTip("")
             self._overview.clear_project_identity()
             return
         name = self._opened_project.descriptor.name
         workspace = str(self._opened_project.directory)
-        self._project_identity_label.setText(f"Proyecto: {name} · Workspace: {workspace}")
-        self._project_identity_label.setToolTip(workspace)
+        self._project_identity_label.setText(
+            QFontMetrics(self._project_identity_label.font()).elidedText(
+                f"Proyecto: {name}", Qt.TextElideMode.ElideRight, 280
+            )
+        )
+        self._project_identity_label.setToolTip(name)
+        self._workspace_status_label.setText(
+            QFontMetrics(self._workspace_status_label.font()).elidedText(
+                f"Workspace: {workspace}", Qt.TextElideMode.ElideMiddle, 300
+            )
+        )
+        self._workspace_status_label.setToolTip(workspace)
         self._overview.show_project_identity(name, workspace)
 
     def _refresh_overview(self) -> None:
@@ -1040,6 +1227,7 @@ class MainWindow(QMainWindow):
         self._overview.show_overview(overview)
         self._refresh_operation_history()
         self._exporter.set_executor(self._export_feed_from_ui)
+        self._exporter.set_inventory(*self._export_inventory())
         specification = load_schedule_spec(_SPECIFICATION_PATH)
         self._raw_inspector.configure(
             {
@@ -1117,7 +1305,154 @@ class MainWindow(QMainWindow):
             raise RuntimeError("Abra un proyecto antes de consultar el mapa.")
         with DuckDbUnitOfWork(self._opened_project.database) as unit_of_work:
             geometry = GeometryQueries(unit_of_work.geometry).trip_shape(trip_id)
-        return map_layers_for_trip(geometry)
+            popup_by_stop = self._map_stop_popup_data(unit_of_work._connection, trip_id)
+        return map_layers_for_trip(geometry, popup_by_stop)
+
+    @staticmethod
+    def _map_stop_popup_data(
+        connection: DatabaseConnection, trip_id: str
+    ) -> dict[str, dict[str, object]]:
+        """Obtiene horarios GTFS programados sin inferir tiempo real ni propietario de parada."""
+        agency = (
+            "LEFT JOIN gtfs_agency a ON a.agency_id = COALESCE(NULLIF(r.agency_id, ''), "
+            "(SELECT CASE WHEN count(*) = 1 THEN max(agency_id) END FROM gtfs_agency)) "
+        )
+        selected_rows = connection.execute(
+            "SELECT st.stop_id, r.route_id, r.route_short_name, r.route_long_name, "
+            "t.trip_headsign, "
+            "a.agency_name, st.arrival_time_lexeme, st.departure_time_lexeme, "
+            "coalesce(st.departure_service_seconds, st.arrival_service_seconds) "
+            "FROM gtfs_stop_times st JOIN gtfs_trips t ON t.trip_id = st.trip_id "
+            "JOIN gtfs_routes r ON r.route_id = t.route_id "
+            + agency
+            + "WHERE st.trip_id = ? ORDER BY st.stop_sequence NULLS LAST, st.source_row",
+            [trip_id],
+        ).fetchall()
+        result: dict[str, dict[str, object]] = {}
+        references: dict[str, int | None] = {}
+        for row in selected_rows:
+            stop_id = str(row[0])
+            result[stop_id] = {
+                "selected_route_id": str(row[1]),
+                "route": " · ".join(str(value) for value in row[2:4] if value),
+                "headsign": str(row[4]) if row[4] is not None else "",
+                "agency": str(row[5]) if row[5] is not None else "",
+                "arrival": str(row[6]) if row[6] is not None else "",
+                "departure": str(row[7]) if row[7] is not None else "",
+                "other_routes": [],
+            }
+            references[stop_id] = int(row[8]) if isinstance(row[8], int) else None
+        if not references:
+            return result
+        placeholders = ", ".join("?" for _ in references)
+        rows = connection.execute(
+            "SELECT st.stop_id, r.route_id, r.route_short_name, r.route_long_name, a.agency_name, "
+            "coalesce(st.departure_time_lexeme, st.arrival_time_lexeme), "
+            "coalesce(st.departure_service_seconds, st.arrival_service_seconds) "
+            "FROM gtfs_stop_times st JOIN gtfs_trips t ON t.trip_id = st.trip_id "
+            "JOIN gtfs_routes r ON r.route_id = t.route_id "
+            + agency
+            + f"WHERE st.stop_id IN ({placeholders}) "
+            "ORDER BY st.stop_id, r.route_id, "
+            "coalesce(st.departure_service_seconds, st.arrival_service_seconds) NULLS LAST",
+            list(references),
+        ).fetchall()
+        grouped: dict[tuple[str, str], list[tuple[int | None, str]]] = {}
+        labels: dict[tuple[str, str], tuple[str, str]] = {}
+        for row in rows:
+            stop_id, route_id = str(row[0]), str(row[1])
+            time = str(row[5]) if row[5] is not None else ""
+            seconds = int(row[6]) if isinstance(row[6], int) else None
+            key = (stop_id, route_id)
+            grouped.setdefault(key, []).append((seconds, time))
+            labels[key] = (
+                " · ".join(str(value) for value in row[2:4] if value) or route_id,
+                str(row[4]) if row[4] is not None else "",
+            )
+        for (stop_id, _route_id), times in grouped.items():
+            if _route_id == result[stop_id]["selected_route_id"]:
+                continue
+            reference = references[stop_id]
+            ordered = sorted(
+                times,
+                key=lambda item: (
+                    0 if reference is None or item[0] is None or item[0] >= reference else 1,
+                    item[0] if item[0] is not None else 10**9,
+                ),
+            )
+            route, agency_name = labels[(stop_id, _route_id)]
+            other_routes = result[stop_id]["other_routes"]
+            if isinstance(other_routes, list):
+                other_routes.append(
+                    {
+                        "route": route,
+                        "agency": agency_name,
+                        "times": [time for _seconds, time in ordered if time][:3],
+                    }
+                )
+        return result
+
+    def _export_inventory(
+        self,
+    ) -> tuple[tuple[ExportRouteOption, ...], tuple[ExportServiceOption, ...]]:
+        if self._opened_project is None:
+            return (), ()
+        with self._opened_project.database.connection() as connection:
+            agencies = (
+                "LEFT JOIN gtfs_agency a ON a.agency_id = "
+                "COALESCE(NULLIF(r.agency_id, ''), "
+                "(SELECT CASE WHEN count(*) = 1 THEN max(agency_id) END FROM gtfs_agency)) "
+            )
+            route_rows = connection.execute(
+                "SELECT r.route_id, r.route_short_name, r.route_long_name, a.agency_name "
+                "FROM gtfs_routes r "
+                + agencies
+                + "ORDER BY r.route_sort_order NULLS LAST, r.route_id, r.source_row"
+            ).fetchall()
+            service_rows = connection.execute(
+                "SELECT t.service_id, string_agg(DISTINCT t.route_id, '|') FROM gtfs_trips t "
+                "WHERE t.service_id IS NOT NULL GROUP BY t.service_id ORDER BY t.service_id"
+            ).fetchall()
+            calendar_rows = connection.execute(
+                "SELECT service_id, monday, tuesday, wednesday, thursday, friday, saturday, "
+                "sunday, start_date, end_date "
+                "FROM gtfs_calendar"
+            ).fetchall()
+        calendar = {str(row[0]): row for row in calendar_rows}
+        routes = tuple(
+            ExportRouteOption(
+                str(row[0]),
+                " — ".join(str(value) for value in row[1:4] if value) + f"  ({row[0]})",
+            )
+            for row in route_rows
+        )
+        services: list[ExportServiceOption] = []
+        for row in service_rows:
+            service_id = str(row[0])
+            details = calendar.get(service_id)
+            if details is None:
+                label = service_id
+            else:
+                days = "".join(day for day, active in zip("LMMJVSD", details[1:8]) if active)
+                label = (
+                    f"{service_id} · {days or 'fechas excepcionales'} · {details[8]}–{details[9]}"
+                )
+            services.append(
+                ExportServiceOption(service_id, label, frozenset(str(row[1]).split("|")))
+            )
+        return routes, tuple(services)
+
+    def _query_feed_bounds(self) -> tuple[float, float, float, float] | None:
+        if self._opened_project is None:
+            return None
+        with self._opened_project.database.connection() as connection:
+            return project_map_coverage(connection).bounds
+
+    def _query_route_bounds(self, route_id: str) -> tuple[float, float, float, float] | None:
+        if self._opened_project is None:
+            return None
+        with self._opened_project.database.connection() as connection:
+            return route_map_coverage(connection, route_id).bounds
 
     def _query_stop(self, stop_id: str) -> StopInspection:
         if self._opened_project is None:
@@ -1175,16 +1510,11 @@ class MainWindow(QMainWindow):
             return FeedOverviewQueries(unit_of_work.overview).get().validation
 
     def _show_section(self, index: int) -> None:
+        index = max(0, min(index, self._page_stack.count() - 1))
+        self._page_stack.setCurrentIndex(index)
         explorer_visible = index == 1
         validation_visible = index == 2
         export_visible = index == 3
-        self._explore_tabs.setVisible(explorer_visible)
-        self._validation.setVisible(validation_visible)
-        self._exporter.setVisible(export_visible)
-        self._overview.setVisible(not (explorer_visible or validation_visible or export_visible))
-        self._operation_history.setVisible(
-            not (explorer_visible or validation_visible or export_visible)
-        )
         if explorer_visible:
             self._content_label.setText("Explore rutas, viajes, paradas y horarios programados.")
         elif validation_visible:
@@ -1290,12 +1620,27 @@ class MainWindow(QMainWindow):
                 )
                 return ExportResult(manifest, classification="compatible")
             if request.format is ExportFormat.CSV:
+                filters = ["r.route_id IN (" + ",".join("?" for _ in request.route_ids) + ")"]
+                parameters: list[object] = []
+                parameters.extend(sorted(request.route_ids))
+                if request.service_ids:
+                    filters.append(
+                        "EXISTS (SELECT 1 FROM gtfs_trips t WHERE t.route_id = r.route_id "
+                        "AND t.service_id IN (" + ",".join("?" for _ in request.service_ids) + "))"
+                    )
+                    parameters.extend(sorted(request.service_ids))
+                if request.trip_ids:
+                    filters.append(
+                        "EXISTS (SELECT 1 FROM gtfs_trips t WHERE t.route_id = r.route_id "
+                        "AND t.trip_id IN (" + ",".join("?" for _ in request.trip_ids) + "))"
+                    )
+                    parameters.extend(sorted(request.trip_ids))
                 rows = connection.execute(
                     "SELECT route_id, route_short_name, route_long_name, "
-                    "CAST(route_type AS VARCHAR) FROM gtfs_routes WHERE route_id IN ("
-                    + ",".join("?" for _ in request.route_ids)
-                    + ") ORDER BY route_id, source_row",
-                    sorted(request.route_ids),
+                    "CAST(route_type AS VARCHAR) FROM gtfs_routes r WHERE "
+                    + " AND ".join(filters)
+                    + " ORDER BY route_id, source_row",
+                    parameters,
                 ).fetchall()
                 mode = (
                     CsvExportMode.SPREADSHEET_SAFE
@@ -1480,6 +1825,9 @@ class MainWindow(QMainWindow):
 
     def _show_validation(self) -> None:
         self._navigation.setCurrentRow(2)
+        # El botón contextual pertenece a Proyecto y queda oculto al navegar.
+        # El foco debe pasar al control que ahora gobierna la navegación.
+        self._navigation.setFocus(Qt.FocusReason.OtherFocusReason)
 
     def _query_operations(
         self, operation_type: OperationType | None, status: OperationStatus | None
@@ -1648,7 +1996,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
-            is not QMessageBox.StandardButton.Yes
+            != QMessageBox.StandardButton.Yes
         ):
             return
         try:
@@ -1702,7 +2050,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
-            is not QMessageBox.StandardButton.Yes
+            != QMessageBox.StandardButton.Yes
         ):
             return
         try:
@@ -1740,9 +2088,10 @@ def run_window(
     logs_directory: Path | None = None,
     debug: bool = False,
 ) -> int:
-    app = QApplication.instance() or QApplication(sys.argv)
+    app = cast(QApplication, QApplication.instance() or QApplication(sys.argv))
     app.setApplicationName(IDENTITY.name)
     app.setApplicationVersion(IDENTITY.version)
+    configure_application_icon(app)
     StartupIntroDialog().exec()
     window = MainWindow(
         application_paths=application_paths,
@@ -1750,5 +2099,5 @@ def run_window(
         logs_directory=logs_directory,
         debug=debug,
     )
-    window.show()
+    window.showMaximized()
     return app.exec()

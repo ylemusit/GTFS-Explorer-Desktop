@@ -6,9 +6,10 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QPushButton, QWidget
+from PySide6.QtWidgets import QApplication, QPushButton, QSplitter, QWidget
 
 from gtfs_explorer.application.queries.timetable import (
     TimetableCell,
@@ -115,6 +116,282 @@ def test_relational_selection_resets_and_exposes_ids_and_extended_hours(
     assert not widget._timetable.isVisible()
     widget.deleteLater()
     application.processEvents()
+
+
+@pytest.mark.parametrize("logical_size", [(1366, 768), (1600, 900), (1920, 1080)])
+def test_explore_workspace_splitter_resizes_data_and_map(
+    application: QApplication, monkeypatch, logical_size: tuple[int, int]
+) -> None:
+    class FakeMap(QWidget):
+        def __init__(self, _layers, _stop_selected) -> None:
+            super().__init__()
+            self.setMinimumHeight(120)
+
+        def clear(self) -> None:
+            pass
+
+        def show_trip(self, _trip_id: str) -> None:
+            pass
+
+        def select_stop(self, _stop_id: str) -> None:
+            pass
+
+    monkeypatch.setattr("gtfs_explorer.presentation.desktop.routes.widget.MapWidget", FakeMap)
+    widget = RouteExplorerWidget(
+        lambda: _page(()),  # type: ignore[arg-type]
+        lambda _: _page(()),  # type: ignore[arg-type]
+        lambda *_: _page(()),  # type: ignore[arg-type]
+        lambda *_: _page(()),  # type: ignore[arg-type]
+        lambda _: _page(()),  # type: ignore[arg-type]
+        lambda _: StopInspection(
+            StopSummary("S1", "Central", None), None, _page(()), _page(()), _page(())
+        ),
+        _matrix,
+        lambda _: None,  # type: ignore[arg-type]
+    )
+    widget.resize(*logical_size)
+    widget.show()
+    application.processEvents()
+
+    splitter = widget.findChild(QSplitter, "exploreWorkspaceSplitter")
+    assert splitter is not None
+    assert splitter.orientation().value == 2  # Qt.Vertical
+    initial_data, initial_map = splitter.sizes()
+    assert initial_data > 0 and initial_map > 0
+
+    splitter.setSizes([initial_data + 180, max(120, initial_map - 180)])
+    application.processEvents()
+    expanded_data, reduced_map = splitter.sizes()
+    assert expanded_data > initial_data
+    assert reduced_map < initial_map
+
+    splitter.setSizes([max(120, initial_data - 180), initial_map + 180])
+    application.processEvents()
+    compact_data, large_map = splitter.sizes()
+    assert compact_data < initial_data
+    assert large_map > initial_map
+    widget.resize(1200, 700)
+    application.processEvents()
+    assert splitter.sizes()[0] > 0 and splitter.sizes()[1] > 0
+    widget.close()
+    widget.deleteLater()
+    application.processEvents()
+
+
+def test_explore_workspace_persistence_restores_without_losing_minimums(
+    application: QApplication, monkeypatch
+) -> None:
+    class FakeMap(QWidget):
+        def __init__(self, _layers, _stop_selected) -> None:
+            super().__init__()
+
+        def clear(self) -> None:
+            pass
+
+        def show_trip(self, _trip_id: str) -> None:
+            pass
+
+        def select_stop(self, _stop_id: str) -> None:
+            pass
+
+    monkeypatch.setattr("gtfs_explorer.presentation.desktop.routes.widget.MapWidget", FakeMap)
+
+    def build(state: bytes | None = None, saved: list[bytes] | None = None) -> RouteExplorerWidget:
+        return RouteExplorerWidget(
+            lambda: _page(()),  # type: ignore[arg-type]
+            lambda _: _page(()),  # type: ignore[arg-type]
+            lambda *_: _page(()),  # type: ignore[arg-type]
+            lambda *_: _page(()),  # type: ignore[arg-type]
+            lambda _: _page(()),  # type: ignore[arg-type]
+            lambda _: StopInspection(
+                StopSummary("S1", "Central", None), None, _page(()), _page(()), _page(())
+            ),
+            _matrix,
+            lambda _: None,  # type: ignore[arg-type]
+            splitter_state=state,
+            save_splitter_state=(saved.append if saved is not None else None),
+        )
+
+    saved: list[bytes] = []
+    first = build(saved=saved)
+    first.resize(1366, 768)
+    first.show()
+    application.processEvents()
+    first_splitter = first.findChild(QSplitter, "exploreWorkspaceSplitter")
+    assert first_splitter is not None
+    first_splitter.setSizes([240, 480])
+    first._splitter_moved(240, 1)
+    first_state = saved[-1]
+    first_sizes = first_splitter.sizes()
+    assert first_sizes[1] > first_sizes[0]
+    first.close()
+
+    restored = build(first_state)
+    restored.resize(1920, 1080)
+    restored.show()
+    application.processEvents()
+    splitter = restored.findChild(QSplitter, "exploreWorkspaceSplitter")
+    assert splitter is not None
+    assert splitter.sizes()[1] > splitter.sizes()[0]
+    assert splitter.sizes()[0] >= splitter.widget(0).minimumHeight()
+    assert splitter.sizes()[1] >= splitter.widget(1).minimumHeight()
+
+    restored._set_balanced_splitter()
+    balanced = splitter.sizes()
+    assert abs(balanced[0] - balanced[1]) <= 2
+    splitter.setSizes([240, 480])
+    restored._splitter_moved(240, 1)
+    restored.resize(1366, 768)
+    application.processEvents()
+    assert all(size > 0 for size in splitter.sizes())
+    restored.close()
+
+
+def test_map_window_navigation_is_single_instance_and_returns_to_main(
+    application: QApplication, monkeypatch
+) -> None:
+    class FakeMap(QWidget):
+        def __init__(self, _layers, _stop_selected) -> None:
+            super().__init__()
+            self.view = QWidget(self)
+            self.view.setObjectName("fakeWebEngineView")
+
+        def clear(self) -> None:
+            pass
+
+        def show_trip(self, _trip_id: str) -> None:
+            pass
+
+    monkeypatch.setattr("gtfs_explorer.presentation.desktop.routes.widget.MapWidget", FakeMap)
+    main_window = QWidget()
+    explore_activated: list[bool] = []
+
+    def show_main_window() -> None:
+        main_window.show()
+        main_window.raise_()
+        main_window.activateWindow()
+
+    def show_explore() -> None:
+        show_main_window()
+        explore_activated.append(True)
+
+    widget = RouteExplorerWidget(
+        lambda: _page(()),  # type: ignore[arg-type]
+        lambda _: _page(()),  # type: ignore[arg-type]
+        lambda *_: _page(()),  # type: ignore[arg-type]
+        lambda *_: _page(()),  # type: ignore[arg-type]
+        lambda _: _page(()),  # type: ignore[arg-type]
+        lambda _: StopInspection(
+            StopSummary("S1", "Central", None), None, _page(()), _page(()), _page(())
+        ),
+        _matrix,
+        lambda _: None,  # type: ignore[arg-type]
+        on_return_to_data=show_main_window,
+        on_dock_to_explore=show_explore,
+    )
+    widget.show()
+    application.processEvents()
+    map_widget = widget._map
+    assert map_widget is not None
+    web_view = map_widget.view
+    embedded_host = widget._map_host
+    assert embedded_host is not None
+
+    open_map = widget.findChild(QPushButton, "openMapWindow")
+    assert open_map is not None
+    open_map.click()
+    application.processEvents()
+    first_window = widget._map_window
+    assert first_window is not None
+    open_map.click()
+    application.processEvents()
+    assert widget._map_window is first_window
+    assert [item for item in application.topLevelWidgets() if item.objectName() == "mapWindow"] == [
+        first_window
+    ]
+
+    first_window.close()
+    application.processEvents()
+    assert not first_window.isVisible()
+    assert main_window.isVisible()
+    open_map.click()
+    application.processEvents()
+    assert widget._map_window is first_window
+    assert first_window.isVisible()
+
+    dock_button = first_window.findChild(QPushButton, "dockMap")
+    assert dock_button is not None
+    QTest.mouseClick(dock_button, Qt.MouseButton.LeftButton)
+    application.processEvents()
+    assert first_window is widget._map_window
+    assert not first_window.isVisible()
+    assert map_widget.parentWidget() is embedded_host
+    assert map_widget.isVisible()
+    assert embedded_host.isVisible()
+    assert map_widget.size().width() > 0 and map_widget.size().height() > 0
+    assert web_view.parentWidget() is map_widget
+    assert explore_activated == [True, True]
+
+    # X y botón deben reutilizar el mismo mapa y la misma ventana en ciclos sucesivos.
+    for use_button in (False, True, False):
+        open_map.click()
+        application.processEvents()
+        assert map_widget.parentWidget() is first_window
+        if use_button:
+            QTest.mouseClick(dock_button, Qt.MouseButton.LeftButton)
+        else:
+            first_window.close()
+        application.processEvents()
+        assert map_widget.parentWidget() is embedded_host
+        assert map_widget.isVisible()
+        assert web_view.parentWidget() is map_widget
+        assert not first_window.isVisible()
+
+    widget.close_map_window()
+    widget.deleteLater()
+    main_window.deleteLater()
+    application.processEvents()
+
+
+def test_explore_workspace_invalid_state_falls_back_to_balanced_layout(
+    application: QApplication, monkeypatch
+) -> None:
+    class FakeMap(QWidget):
+        def __init__(self, _layers, _stop_selected) -> None:
+            super().__init__()
+
+        def clear(self) -> None:
+            pass
+
+        def show_trip(self, _trip_id: str) -> None:
+            pass
+
+        def select_stop(self, _stop_id: str) -> None:
+            pass
+
+    monkeypatch.setattr("gtfs_explorer.presentation.desktop.routes.widget.MapWidget", FakeMap)
+    widget = RouteExplorerWidget(
+        lambda: _page(()),  # type: ignore[arg-type]
+        lambda _: _page(()),  # type: ignore[arg-type]
+        lambda *_: _page(()),  # type: ignore[arg-type]
+        lambda *_: _page(()),  # type: ignore[arg-type]
+        lambda _: _page(()),  # type: ignore[arg-type]
+        lambda _: StopInspection(
+            StopSummary("S1", "Central", None), None, _page(()), _page(()), _page(())
+        ),
+        _matrix,
+        lambda _: None,  # type: ignore[arg-type]
+        splitter_state=b"corrupt-state",
+    )
+    widget.resize(1600, 900)
+    widget.show()
+    application.processEvents()
+    splitter = widget.findChild(QSplitter, "exploreWorkspaceSplitter")
+    assert splitter is not None
+    assert abs(splitter.sizes()[0] - splitter.sizes()[1]) <= 2
+    assert splitter.sizes()[0] >= splitter.widget(0).minimumHeight()
+    assert splitter.sizes()[1] >= splitter.widget(1).minimumHeight()
+    widget.close()
 
 
 def test_relational_selector_keeps_basic_keyboard_navigation(

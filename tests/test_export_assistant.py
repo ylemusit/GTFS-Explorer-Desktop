@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from gtfs_explorer.domain.exporting import ExportManifest
@@ -9,6 +11,8 @@ from gtfs_explorer.presentation.desktop.exporter.widget import (
     ExportAssistantWidget,
     ExportFormat,
     ExportResult,
+    ExportRouteOption,
+    ExportServiceOption,
 )
 
 
@@ -45,6 +49,52 @@ def test_formats_explain_classification_and_disable_incompatible_options(
     assert "rutas" in widget._preview.text()
     widget._format.setCurrentIndex(widget._format.findData(ExportFormat.MINI_GTFS.value))
     assert "no certifica" in widget._format_help.text().casefold()
+
+
+def test_multiple_routes_and_services_are_one_explicit_export_pack(
+    application: QApplication, tmp_path: Path
+) -> None:
+    widget = ExportAssistantWidget(executor=lambda request, cancelled: _result())
+    widget._routes.setPlainText("R1\nR2")
+    widget._services.setPlainText("weekday\nweekend")
+    widget._destination.setText(str(tmp_path / "pack.json"))
+
+    request = widget.request()
+
+    assert request.is_pack
+    assert "export pack" in widget._format_help.text().casefold()
+    assert "route-r1-r2" in widget._format_help.text().casefold()
+
+
+def test_inventory_selects_routes_filters_services_and_sends_selected_ids(
+    application: QApplication, tmp_path: Path
+) -> None:
+    captured: list[object] = []
+    widget = ExportAssistantWidget(
+        executor=lambda request, cancelled: captured.append(request) or _result()
+    )
+    widget.set_inventory(
+        (
+            ExportRouteOption("R1", "201 — Centro (R1)"),
+            ExportRouteOption("R2", "205 — Puerto (R2)"),
+        ),
+        (
+            ExportServiceOption("weekday", "weekday · LMJV", frozenset({"R1"})),
+            ExportServiceOption("weekend", "weekend · SD", frozenset({"R2"})),
+        ),
+    )
+    widget._route_search.setText("puerto")
+    assert widget._route_inventory.count() == 1
+    widget._route_inventory.item(0).setCheckState(Qt.CheckState.Checked)
+    assert widget._service_inventory.count() == 1
+    widget._service_inventory.item(0).setCheckState(Qt.CheckState.Checked)
+    widget._destination.setText(str(tmp_path / "selected.json"))
+
+    request = widget.request()
+
+    assert request.route_ids == frozenset({"R2"})
+    assert request.service_ids == frozenset({"weekend"})
+    assert "1 rutas" in widget._preview.text()
 
 
 def test_format_help_describes_current_payload_without_false_table_promises(
@@ -162,7 +212,7 @@ def test_executor_receives_cooperative_cancellation(
     widget.set_executor(execute)  # type: ignore[arg-type]
     _configure(widget, tmp_path / "cancelled.geojson")
     widget._format.setCurrentIndex(widget._format.findData(ExportFormat.GEOJSON.value))
-    monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
+    monkeypatch.setattr(widget, "_show_export_completed", lambda *args: None)
     widget._execute()
 
     assert observed == [True]
@@ -171,22 +221,70 @@ def test_executor_receives_cooperative_cancellation(
 def test_result_shows_hash_and_warnings(
     application: QApplication, tmp_path: Path, monkeypatch
 ) -> None:
-    messages: list[str] = []
+    dialogs: list[QMessageBox] = []
     widget = ExportAssistantWidget(
         executor=lambda request, cancelled: _result(classification="compatible")
     )
     _configure(widget, tmp_path / "result.geojson")
+    widget._format.setCurrentIndex(widget._format.findData(ExportFormat.GEOJSON.value))
     monkeypatch.setattr(
-        QMessageBox,
-        "information",
-        lambda parent, title, message, *buttons: messages.append(message),
+        QMessageBox, "exec", lambda dialog: dialogs.append(dialog) or QMessageBox.StandardButton.Ok
     )
 
     widget._execute()
 
-    assert len(messages) == 1
-    assert "SHA-256: " + "a" * 64 in messages[0]
-    assert "Aviso: una dependencia opcional se omitió" in messages[0]
+    assert len(dialogs) == 1
+    message = dialogs[0].text()
+    assert "Nombre del archivo: salida.json" in message
+    assert f"Ruta completa de destino: {str((tmp_path / 'result.geojson').resolve())}" in message
+    assert "SHA-256: " + "a" * 64 in message
+    assert "Aviso: una dependencia opcional se omitió" in message
+
+
+def _click_completion_action(application: QApplication, label: str) -> None:
+    def click() -> None:
+        for window in application.topLevelWidgets():
+            if isinstance(window, QMessageBox) and window.isVisible():
+                for button in window.buttons():
+                    if button.text() == label:
+                        button.click()
+                        return
+        QTimer.singleShot(10, click)
+
+    QTimer.singleShot(0, click)
+
+
+def test_completion_dialog_shows_destination_and_opens_its_folder(
+    application: QApplication, tmp_path: Path, monkeypatch
+) -> None:
+    destination = tmp_path / "exports" / "mini.zip"
+    destination.parent.mkdir()
+    destination.write_bytes(b"zip")
+    opened: list[object] = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url) or True)
+    widget = ExportAssistantWidget()
+    _click_completion_action(application, "Abrir carpeta")
+    QTimer.singleShot(20, lambda: _click_completion_action(application, "Aceptar"))
+
+    widget._show_export_completed(destination, _result(classification="Mini-GTFS"), "Sin avisos.")
+
+    assert len(opened) == 1
+    assert Path(opened[0].toLocalFile()) == destination.parent.resolve()  # type: ignore[union-attr]
+
+
+def test_completion_dialog_copy_path_action_copies_full_destination(
+    application: QApplication, tmp_path: Path
+) -> None:
+    destination = tmp_path / "exports" / "mini.zip"
+    destination.parent.mkdir()
+    destination.write_bytes(b"zip")
+    widget = ExportAssistantWidget()
+    _click_completion_action(application, "Copiar ruta")
+    QTimer.singleShot(20, lambda: _click_completion_action(application, "Aceptar"))
+
+    widget._show_export_completed(destination, _result(classification="Mini-GTFS"), "Sin avisos.")
+
+    assert application.clipboard().text() == str(destination.resolve())
 
 
 def test_export_error_dialog_does_not_show_technical_exception_text(

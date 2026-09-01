@@ -2,13 +2,21 @@ import os
 import threading
 from pathlib import Path
 from types import SimpleNamespace
+from zipfile import ZipFile
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QFileDialog,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QWidget,
+)
 
 from gtfs_explorer.application.commands.create_project import CreateProject
 from gtfs_explorer.application.commands.import_feed import ImportFeed, ImportFeedResult
@@ -41,7 +49,7 @@ from gtfs_explorer.infrastructure.filesystem.project_descriptor import (
 )
 from gtfs_explorer.infrastructure.logging import configure_logging
 from gtfs_explorer.presentation.desktop.exporter import ExportFormat, ExportRequest
-from gtfs_explorer.presentation.desktop.main_window import MainWindow
+from gtfs_explorer.presentation.desktop.main_window import MainWindow, run_window
 from tests.test_import_feed import _command, _write_fixture
 
 
@@ -74,6 +82,8 @@ def _replace_web_map_in_main_window_tests(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_main_window_smoke_reflects_actions_from_ui_state(application: QApplication) -> None:
     window = MainWindow()
+    assert not application.windowIcon().isNull()
+    assert not window.windowIcon().isNull()
     assert window.ui_state.mode is UiMode.NO_PROJECT
     assert window._project_identity_label.text() == "Sin proyecto abierto"
     assert window._overview._project_name.text() == "Sin proyecto abierto"
@@ -86,6 +96,90 @@ def test_main_window_smoke_reflects_actions_from_ui_state(application: QApplicat
     assert window.statusBar().currentMessage() == ""
     window.close()
     window.deleteLater()
+    application.processEvents()
+
+
+def test_main_window_maximization_uses_work_area_and_can_be_restored(
+    application: QApplication,
+) -> None:
+    window = MainWindow()
+    window.showMaximized()
+    application.processEvents()
+
+    screen = window.screen()
+    assert screen is not None
+    available = screen.availableGeometry()
+    assert window.isMaximized()
+    assert window.geometry().bottom() <= available.bottom()
+
+    window.showNormal()
+    application.processEvents()
+    assert not window.isMaximized()
+
+    window.showMinimized()
+    application.processEvents()
+    assert window.isMinimized()
+    window.showNormal()
+    application.processEvents()
+    assert not window.isMinimized()
+
+    window.showMaximized()
+    application.processEvents()
+    assert window.isMaximized()
+    window.close()
+    application.processEvents()
+
+
+@pytest.mark.parametrize("logical_size", [(1366, 768), (1600, 900), (1920, 1080)])
+def test_maximized_page_switches_never_escape_available_geometry(
+    application: QApplication, logical_size: tuple[int, int]
+) -> None:
+    """Las páginas no deben renegociar el tamaño de una ventana maximizada."""
+    window = MainWindow()
+    window.resize(*logical_size)
+    window.showMaximized()
+    application.processEvents()
+    screen = window.screen()
+    assert screen is not None
+    available = screen.availableGeometry()
+    initial_frame = window.frameGeometry()
+
+    for row in (0, 1, 2, 3, 0, 1):
+        window._navigation.setCurrentRow(row)
+        application.processEvents()
+        assert window.isMaximized()
+        frame = window.frameGeometry()
+        assert frame.left() >= available.left()
+        assert frame.top() >= available.top()
+        assert frame.right() <= available.right()
+        assert frame.bottom() <= available.bottom()
+        assert frame.size() == initial_frame.size()
+
+    window.close()
+    application.processEvents()
+
+
+def test_run_window_requests_native_maximized_start(
+    application: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shown: list[MainWindow] = []
+    original_show_maximized = MainWindow.showMaximized
+
+    def record_show_maximized(window: MainWindow) -> None:
+        original_show_maximized(window)
+        shown.append(window)
+
+    monkeypatch.setattr(MainWindow, "showMaximized", record_show_maximized)
+    monkeypatch.setattr(
+        "gtfs_explorer.presentation.desktop.main_window.StartupIntroDialog.exec",
+        lambda _dialog: 0,
+    )
+    monkeypatch.setattr(QApplication, "exec", lambda _application: 0)
+
+    assert run_window() == 0
+    assert shown
+    assert shown[0].isMaximized()
+    shown[0].close()
     application.processEvents()
 
 
@@ -104,21 +198,23 @@ def test_project_identity_tracks_open_close_switch_and_long_workspace(
     window = MainWindow()
     window._opened_project = OpenProject(project_a_directory).execute()
     window.project_opened()
-    assert window._project_identity_label.text() == (
-        f"Proyecto: {window._opened_project.descriptor.name} · Workspace: {project_a_directory}"
-    )
+    assert window._project_identity_label.text().startswith("Proyecto: workspace-a-")
+    assert "…" in window._project_identity_label.text()
+    assert window._workspace_status_label.text().startswith("Workspace: …")
     assert window._overview._project_workspace.text() == str(project_a_directory)
-    assert window._project_identity_label.toolTip() == str(project_a_directory)
+    assert window._project_identity_label.toolTip() == window._opened_project.descriptor.name
+    assert window._workspace_status_label.toolTip() == str(project_a_directory)
 
     monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: str(project_b_directory))
     window._choose_project()
     assert window._opened_project is not None
     assert window._overview._project_name.text() == window._opened_project.descriptor.name
     assert window._overview._project_workspace.text() == str(project_b_directory)
-    assert str(project_a_directory) not in window._project_identity_label.text()
+    assert str(project_a_directory) not in window._workspace_status_label.text()
 
     window._close_project()
     assert window._project_identity_label.text() == "Sin proyecto abierto"
+    assert window._workspace_status_label.text() == ""
     assert window._overview._project_workspace.text() == "—"
 
     window._opened_project = OpenProject(project_a_directory).execute()
@@ -186,6 +282,159 @@ def test_main_window_exposes_keyboard_actions_and_accessible_navigation(
     application.processEvents()
 
 
+def test_status_bar_prioritizes_application_state_and_keeps_project_context_separate(
+    application: QApplication,
+) -> None:
+    window = MainWindow()
+    assert window._status_label.text() == "Sin proyecto"
+
+    window.project_opened()
+    assert window._status_label.text() == "Listo"
+    window.job_started()
+    assert window._status_label.text() == "Trabajo en curso…"
+    window._state = window._state.cancellation_requested()
+    window._apply_state()
+    assert window._status_label.text() == "Cancelando…"
+    window.job_finished()
+    assert window._status_label.text() == "Listo"
+    assert window._project_identity_label.text() == "Sin proyecto abierto"
+    window.close()
+    window.deleteLater()
+    application.processEvents()
+
+
+def test_status_bar_reserves_compact_workspace_at_supported_widths(
+    application: QApplication,
+) -> None:
+    window = MainWindow()
+    for width, height in ((1366, 768), (1600, 900), (1920, 1080)):
+        window.resize(width, height)
+        application.processEvents()
+        assert window._workspace_status_label.width() <= 300
+        assert window._status_label.width() > 0
+    window.close()
+    window.deleteLater()
+    application.processEvents()
+
+
+def test_reproduce_a3_contextual_validation_keeps_sidebar_navigable(
+    application: QApplication, tmp_path: Path
+) -> None:
+    project_directory = tmp_path / "project"
+    project_directory.mkdir()
+    project = CreateProject(project_directory).execute()
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_fixture(source)
+    assert _command(project.database, source).execute().state is JobState.READY
+    window = MainWindow()
+    window._opened_project = project
+    window.project_opened()
+    window.show()
+
+    contextual = next(
+        button
+        for button in window._overview.findChildren(QPushButton)
+        if button.text() == "Ver incidencias de validación"
+    )
+    contextual.click()
+    application.processEvents()
+
+    assert window._navigation.currentRow() == 2
+    assert window._navigation.isEnabled()
+    assert window.focusWidget() is window._navigation
+    assert window._validation.isVisible()
+    assert "Estado:" in window._validation._summary.text()
+    for row in (0, 1, 3, 0, 2, 1, 2, 3, 2, 0):
+        window._navigation.setCurrentRow(row)
+        application.processEvents()
+        assert window._navigation.currentRow() == row
+        assert window._navigation.isEnabled()
+        assert window._overview.isVisible() is (row == 0)
+        assert window._explore_tabs.isVisible() is (row == 1)
+        assert window._validation.isVisible() is (row == 2)
+        assert window._exporter.isVisible() is (row == 3)
+
+    window._close_project()
+    window.deleteLater()
+    application.processEvents()
+
+
+def test_a3_sidebar_navigation_without_feed_remains_enabled(
+    application: QApplication, tmp_path: Path
+) -> None:
+    project_directory = tmp_path / "project"
+    project_directory.mkdir()
+    project = CreateProject(project_directory).execute()
+    window = MainWindow()
+    window._opened_project = project
+    window.project_opened()
+
+    for row in (2, 0, 1, 3, 0):
+        window._navigation.setCurrentRow(row)
+        application.processEvents()
+        assert window._navigation.isEnabled()
+        assert window._navigation.currentRow() == row
+
+    window._close_project()
+    window.deleteLater()
+    application.processEvents()
+
+
+@pytest.mark.parametrize("logical_size", [(1366, 768), (1600, 900), (1920, 1080)])
+def test_b3_primary_views_keep_essential_controls_inside_their_layout(
+    application: QApplication, logical_size: tuple[int, int]
+) -> None:
+    window = MainWindow()
+    window.resize(*logical_size)
+    window.show()
+    application.processEvents()
+
+    window._settings_dock.show()
+    application.processEvents()
+    settings_scroll = window._settings_dock.findChild(QScrollArea, "settingsScrollArea")
+    assert settings_scroll is not None
+    assert settings_scroll.widgetResizable()
+    assert settings_scroll.verticalScrollBarPolicy().value != 1  # ScrollBarAlwaysOff
+
+    for row, view in (
+        (0, window._overview),
+        (1, window._explore_tabs),
+        (2, window._validation),
+        (3, window._exporter),
+    ):
+        window._navigation.setCurrentRow(row)
+        application.processEvents()
+        assert view.isVisible()
+        assert view.width() > 0 and view.height() > 0
+        inspected_view = view.currentWidget() if hasattr(view, "currentWidget") else view
+        assert inspected_view is not None
+        for control in inspected_view.findChildren(QPushButton):
+            assert control.isVisible(), f"control inaccesible en {type(inspected_view).__name__}"
+
+    # La vista de Validación conserva el acceso a todos sus filtros y acciones
+    # aunque se reduzca el ancho lógico disponible (caso representativo de DPI).
+    window._navigation.setCurrentRow(2)
+    application.processEvents()
+    validation = window._validation
+    for control in (
+        validation._severity,
+        validation._category,
+        validation._file_filter,
+        validation._search,
+        validation._previous,
+        validation._next,
+        validation._go_to_raw,
+        validation._help,
+        validation._export,
+    ):
+        assert control.isVisible()
+        assert validation.rect().contains(control.geometry().center())
+
+    window.close()
+    application.processEvents()
+
+
 def test_p1_02_import_context_shows_feed_phase_progress_and_elapsed(
     application: QApplication, tmp_path: Path
 ) -> None:
@@ -213,6 +462,76 @@ def test_p1_02_import_context_shows_feed_phase_progress_and_elapsed(
     assert not window._import_timer.isActive()
     assert window._import_context_label.text() == ""
     window.job_finished()
+    window.close()
+    window.deleteLater()
+    application.processEvents()
+
+
+def test_p1_a2_immediate_feedback_and_duplicate_import_blocked(
+    application: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    window = MainWindow()
+    window.project_opened()
+    started: list[bool] = []
+    warnings: list[str] = []
+    monkeypatch.setattr(window._import_adapter, "start", lambda _factory: started.append(True))
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        lambda _parent, _title, message, *_args: warnings.append(message),
+    )
+    source_path = tmp_path / "ctm-mallorca-es.zip"
+    with ZipFile(source_path, "w") as archive:
+        archive.writestr("routes.txt", "route_id\nR1\n")
+
+    window.start_import(InputSource(source_path, InputSourceKind.ARCHIVE))
+
+    assert "Importando" in window._import_context_label.text()
+    assert "ctm-mallorca-es.zip" in window._import_context_label.text()
+    assert "Preparando importación…" in window._import_context_label.text()
+    assert not window._actions[UiAction.IMPORT_FEED].isEnabled()
+    assert window._actions[UiAction.CANCEL_JOB].isEnabled()
+    assert started == [True]
+    assert warnings == []
+    window._clear_import_context()
+    window.job_finished()
+    window.close()
+    window.deleteLater()
+    application.processEvents()
+
+
+def test_p1_a2_volume_warning_uses_cheap_zip_metadata(
+    application: QApplication, tmp_path: Path
+) -> None:
+    archive_path = tmp_path / "large.zip"
+    with ZipFile(archive_path, "w") as archive:
+        for index in range(128):
+            archive.writestr(f"file-{index}.txt", "x")
+    source = InputSource(archive_path, InputSourceKind.ARCHIVE)
+    assert MainWindow._is_high_volume_source(source)
+    assert not MainWindow._is_high_volume_source(InputSource(tmp_path, InputSourceKind.DIRECTORY))
+
+
+def test_p1_a2_terminal_feedback_includes_elapsed_state_and_issues(
+    application: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "information",
+        lambda _parent, _title, message, *_args: messages.append(message),
+    )
+    window = MainWindow(elapsed_clock=lambda: 125.0)
+    window.project_opened()
+    window.job_started()
+    window._begin_import_context(InputSource(Path("feed.zip"), InputSourceKind.ARCHIVE))
+    window._import_job_started()
+    window._import_finished(ImportFeedResult("job", "feed", JobState.INVALID, 3))
+    assert messages
+    assert "Importación completada con incidencias" in messages[-1]
+    assert "Duración: 00:00" in messages[-1]
+    assert "Estado: INVALID" in messages[-1]
+    assert "Incidencias: 3" in messages[-1]
     window.close()
     window.deleteLater()
     application.processEvents()

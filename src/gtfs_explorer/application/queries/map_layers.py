@@ -43,7 +43,9 @@ def sanitize_route_color(value: str | None) -> str:
     return f"#{normalized.upper()}"
 
 
-def map_layers_for_trip(geometry: TripShapeGeometry) -> MapLayerPayload:
+def map_layers_for_trip(
+    geometry: TripShapeGeometry, popup_by_stop: dict[str, dict[str, object]] | None = None
+) -> MapLayerPayload:
     """Construye capas sin fabricar una línea cuando el shape está ausente."""
     color = sanitize_route_color(geometry.route_color)
     shape_features: list[dict[str, object]] = []
@@ -53,6 +55,7 @@ def map_layers_for_trip(geometry: TripShapeGeometry) -> MapLayerPayload:
                 "type": "Feature",
                 "properties": {
                     "trip_id": geometry.trip_id,
+                    "route_id": geometry.route_id,
                     "shape_id": geometry.shape_id,
                     "color": color,
                 },
@@ -64,16 +67,29 @@ def map_layers_for_trip(geometry: TripShapeGeometry) -> MapLayerPayload:
                 },
             }
         )
+    valid_stops = tuple(geometry.stops)
     stop_features: list[dict[str, object]] = [
         {
             "type": "Feature",
-            "properties": {"id": stop.stop_id, "name": stop.name or "Sin nombre"},
+            "properties": {
+                "id": stop.stop_id,
+                "name": stop.name or "Sin nombre",
+                "sequence": stop.stop_sequence,
+                "endpoint": (
+                    "origin"
+                    if index == 0
+                    else "destination"
+                    if index == len(valid_stops) - 1
+                    else None
+                ),
+                "popup": (popup_by_stop or {}).get(stop.stop_id, {}),
+            },
             "geometry": {
                 "type": "Point",
                 "coordinates": [stop.coordinate.longitude, stop.coordinate.latitude],
             },
         }
-        for stop in geometry.stops
+        for index, stop in enumerate(valid_stops)
     ]
     return MapLayerPayload(_collection(shape_features), _collection(stop_features))
 

@@ -71,6 +71,26 @@ def test_settings_store_only_relative_project_paths(tmp_path: Path) -> None:
         relative_project_path(workspace, tmp_path / "externo" / "project.json")
 
 
+def test_settings_roundtrip_preserves_explore_splitter_state(tmp_path: Path) -> None:
+    settings_path = tmp_path / "settings.json"
+    state = b"qt-splitter-state"
+
+    save_settings(settings_path, Settings(explore_splitter_state=state))
+
+    assert load_settings(settings_path).explore_splitter_state == state
+
+
+def test_settings_rejects_corrupt_explore_splitter_state(tmp_path: Path) -> None:
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        '{"version": 1, "recent_project_paths": [], "explore_splitter_state": "%%%"}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_settings(settings_path)
+
+
 def test_application_resources_do_not_depend_on_cwd(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(Path.cwd().anchor)
 

@@ -1075,8 +1075,10 @@ class DuckDbGeometryRepository:
     def trip_shape(self, trip_id: str) -> TripShapeGeometry:
         try:
             trip = self._connection.execute(
-                "SELECT t.shape_id, r.route_color FROM gtfs_trips t "
-                "LEFT JOIN LATERAL (SELECT route_color FROM gtfs_routes "
+                "SELECT t.shape_id, r.route_id, r.route_color, r.route_text_color "
+                "FROM gtfs_trips t "
+                "LEFT JOIN LATERAL (SELECT route_id, route_color, route_text_color "
+                "FROM gtfs_routes "
                 "WHERE route_id = t.route_id ORDER BY source_row LIMIT 1) r ON TRUE "
                 "WHERE t.trip_id = ? ORDER BY t.source_row LIMIT 1",
                 [trip_id],
@@ -1095,7 +1097,9 @@ class DuckDbGeometryRepository:
             shape_rows,
             stop_rows,
             map_stops=map_stops,
-            route_color=str(trip[1]) if trip[1] is not None else None,
+            route_color=str(trip[2]) if trip[2] is not None else None,
+            route_text_color=str(trip[3]) if trip[3] is not None else None,
+            route_id=str(trip[1]) if trip[1] is not None else None,
         )
 
     def _shape_rows(self, shape_id: str | None) -> list[tuple[object, object, object]]:
@@ -1116,9 +1120,9 @@ class DuckDbGeometryRepository:
             [trip_id],
         ).fetchall()
 
-    def _map_stops(self, trip_id: str) -> list[tuple[object, object, object, object]]:
+    def _map_stops(self, trip_id: str) -> list[tuple[object, ...]]:
         return self._connection.execute(
-            "SELECT st.stop_id, stop.stop_name, stop.stop_lat, stop.stop_lon "
+            "SELECT st.stop_id, stop.stop_name, stop.stop_lat, stop.stop_lon, st.stop_sequence "
             "FROM gtfs_stop_times st "
             "LEFT JOIN LATERAL (SELECT stop_name, stop_lat, stop_lon FROM gtfs_stops "
             "WHERE stop_id = st.stop_id ORDER BY source_row LIMIT 1) stop ON TRUE "

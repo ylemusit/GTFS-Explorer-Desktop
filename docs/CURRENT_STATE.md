@@ -1,8 +1,409 @@
 # Estado actual del proyecto
 
-Última actualización: 2026-08-29
+## FASE 3 — Freeze + RC2 — LISTA LOCALMENTE PARA ACEPTACIÓN MANUAL
+
+Se preparó la candidata local `0.1.0-rc2` sin modificar `v0.1.0-rc1` ni
+publicar remotamente. El gate final ejecutado antes del build pasó: E2E `11
+passed`, full suite `526 passed`, `tools/check.ps1`, Ruff, mypy y
+`git diff --check`, todos con código 0. El preparador de RC2 requirió un fix
+mínimo para respetar la etiqueta `rc2`; su test focal pasó `2 passed` y la
+verificación de artefactos pasó.
+
+Artefactos finales y hashes:
+
+- Portable: `dist/GTFS-Explorer-Portable-0.1.0-rc2-win-x64.zip`, SHA-256
+  `b99060d6201fe4459292ecd4bf1b0b72a92140500fbacbe4597af71f01ca79bd`.
+- Setup: `dist/GTFS-Explorer-Setup-0.1.0-rc2-win-x64.exe`, SHA-256
+  `314545b35d7c965f2a1e3865c5801d427c6fa1b064f9fd86cc04f823ca60d20f`.
+
+Package smoke, portable runtime smoke, map smoke del build y installed
+upgrade/runtime smoke pasan. CTM fresh sobre los binarios RC2 y la aceptación
+visual nativa de Windows no se han verificado en esta sesión. Mini-GTFS
+round-trip queda acreditado por el E2E de source, no como claim adicional del
+binario empaquetado. Firma de código, lector de pantalla y benchmark LARGE
+siguen diferidos.
+
+`PHASE3_RC2_STATUS = PHASE3-RC2-LOCAL-READY`
+
+`PUBLICATION = NOT_STARTED`
+
+Última actualización: 2026-09-01
+
+## FASE 2 — Cierre formal de release readiness — NO READY FOR FREEZE
+
+La regresión Source del feed CTM autorizado terminó `READY/IMPORTED`, con 0
+incidencias y conteos 79 rutas, 4.306 viajes, 789 paradas, 62.800 stop_times y
+338.845 shapes. El harness `package_smoke.ps1` se corrigió para evaluar rutas
+relativas al root extraído y su regresión pasa. La suite canónica terminó con
+524 tests, Ruff, mypy y `git diff --check` en PASS.
+
+CTM fresco en Portable e Installed P2A, Export Pack y round-trip Mini-GTFS no
+quedan acreditados en esta ejecución; por ello:
+
+`PHASE2_RELEASE_READINESS_STATUS = NOT_READY_FOR_FREEZE`
+
+## FASE 2 — Continuidad Export → Reimport — IMPLEMENTADA
+
+La finalización de exportación muestra nombre, ruta completa, SHA-256 y avisos,
+con acciones para abrir la carpeta y copiar la ruta. La importación identifica
+la opción como «ZIP GTFS / Mini-GTFS» y explica que acepta Mini-GTFS generado
+previamente por GTFS Explorer. No se implementa detección universal de formatos
+derivados: JSON, GeoJSON y CSV conservan explícitamente sus límites y no se
+convierten artificialmente en GTFS.
+
+El E2E focal exporta y reimporta un Mini-GTFS en un proyecto independiente,
+terminando en estado `VALID`, con 1 ruta, 2 servicios, 2 viajes y 4 paradas.
+
+`PHASE2_MINI_GTFS_ROUNDTRIP_STATUS = PHASE2-MINI-GTFS-ROUNDTRIP-PASS`
+
+No se ha creado RC2, tag RC2 ni publicación.
+
+## FASE 2 — Build nativo final de aceptación — COMPLETADO TÉCNICAMENTE
+
+Se generaron los artefactos de aceptación con naming externo corto, sin
+modificar el guard ni la estructura interna: `GTFS-Explorer-Portable-P2A-20260901-win-x64.zip`
+y `GTFS-Explorer-Setup-P2A-20260901-win-x64.exe`. La versión `0.1.0`, el
+build label `P2A-20260901` y la metadata PE permanecen en los manifiestos.
+La raíz interna sigue siendo `GTFS-Explorer`; el máximo interno es `97` y las
+estimaciones son `164` desde Desktop y `166` desde Downloads, ambas bajo `190`.
+Package smoke, runtime smoke, map smoke y upgrade/uninstall smoke pasan. El
+upgrade preservó los datos y verificó registro y accesos. El arranque técnico
+del ejecutable instalado pasó mediante `--runtime-smoke`; la aceptación visual
+manual de Windows no forma parte de este gate.
+
+`PHASE2_FINAL_NATIVE_ACCEPTANCE_BUILD = PHASE2-FINAL-NATIVE-ACCEPTANCE-BUILD-READY`
+
+Última actualización: 2026-09-01
+
+## FASE 2 — Portable Windows — RUTA INTERNA CORREGIDA; RC2 NO GENERADO
+
+El blocker de extracción mediante Windows Explorer se corrigió reduciendo la
+raíz interna del ZIP de `GTFS Explorer Portable` a `GTFS-Explorer`. En la
+auditoría del payload técnico, el máximo pasó de 106 a 97 caracteres y la
+estimación desde `Desktop` de 195 a 157, y desde `Downloads` de 197 a 159.
+Las entradas más largas siguen siendo migraciones DuckDB necesarias; también
+se conservan schemas, WebEngine, mapas, Help, i18n, validación y exportación.
+
+El guard de packaging falla por encima de 190 caracteres estimados desde
+Desktop/Downloads y valida la raíz única. El Portable técnico aislado pasó
+runtime smoke, map runtime smoke y `package_smoke.ps1`. No se ha generado RC2
+ni el build combinado de aceptación.
+
+`PHASE2_PORTABLE_PATH_STATUS = PHASE2-PORTABLE-WINDOWS-PATH-FIX-DONE`
+
+Última actualización: 2026-09-01
+
+## FASE 2 — Layout maximizado Windows — CORREGIDO TÉCNICAMENTE; aceptación física pendiente
+
+Se corrigió la negociación de tamaño del `MainWindow`: las vistas principales
+se muestran de forma exclusiva mediante `QStackedWidget`, mientras que
+Proyecto, Validación y Exportación usan `QScrollArea` redimensionable para que
+su contenido alto no eleve la altura mínima de la ventana. Explorar conserva su
+`QSplitter`, el mapa embebido y los mínimos funcionales existentes.
+
+La regresión cubre la secuencia Proyecto → Explorar → Validación → Exportación
+→ Proyecto → Explorar, maximización nativa, estabilidad del `frameGeometry`
+dentro de `availableGeometry` y las resoluciones lógicas 1366×768, 1600×900 y
+1920×1080. Focales y gate canónico pasan; la comprobación visual física en
+Windows con DPI 125%/150% y barra de tareas real queda pendiente de aceptación
+manual.
+
+`PHASE2_WINDOWS_LAYOUT_STATUS = PHASE2-WINDOWS-MAXIMIZED-LAYOUT-PASS`
+
+Última actualización: 2026-09-01
+
+## FASE 2 — Estabilizar y preparar distribución — PREPARACIÓN TÉCNICA COMPLETA; aceptación pendiente
+
+Se añadió la página final del instalador NSIS con las opciones «Abrir GTFS
+Explorer» y «Ver guía / README». La ejecución canónica del checkout termina con
+`518 passed` en 525,60 s; formato, Ruff, mypy y `git diff --check` pasan. El
+portable package smoke y el upgrade/uninstall smoke de
+`dist/phase2-distribution-20260901/` pasan con preservación de datos, registro
+y accesos verificados.
+
+El spike WebEngine sigue teniendo una observación de temporización exclusiva
+del modo `QT_QPA_PLATFORM=offscreen`: una reproducción aislada fue
+intermitente (`map_loaded=False`), mientras que la ejecución canónica final
+pasó el spike. No se modifica producto por ello. El benchmark LARGE queda como
+`KNOWN PERFORMANCE LIMITATION` diferida a post-0.1.0. CTM Mallorca real,
+regresión completa Source/Portable/Installed y aceptación visual Windows
+siguen `NOT VERIFIED` y requieren sesión manual.
+
+La auditoría y clasificación de `dist/`, junto con el estado de freeze, están
+en `docs/PHASE2_RELEASE_READINESS.md`. No se ha creado RC2, tag RC2 ni
+publicación.
+
+`PHASE2_RELEASE_READINESS_STATUS = NOT_READY_FOR_FREEZE`
+
+Última actualización: 2026-09-01
+
+## FASE 1 — Producto funcional y experiencia global — IMPLEMENTACIÓN DE SOURCE
+
+Se completó la pasada coordinada de workflows fuera del mapa: la selección de
+importación ofrece «Carpeta GTFS», «ZIP GTFS», «CSV/TXT» y «Cancelar», y la
+confirmación identifica el tipo, origen y siguiente paso sin lenguaje técnico
+innecesario. Nuevo/Abrir proyecto parten del contenedor de proyectos resuelto
+por la aplicación (`Documents/GTFS Explorer/Projects` en instalación normal),
+sin heredar el workspace abierto.
+
+Exportación mantiene JSON, CSV, GeoJSON y Mini-GTFS, acepta varias rutas y
+servicios y las presenta como un único export pack autocontenido. El filtro de
+servicios/viajes también se aplica a CSV; naming, salida atómica, cancelación y
+reimportación Mini-GTFS se conservan.
+
+Help incorpora las secciones operativas solicitadas y ejemplos locales; About
+se mantiene separado y muestra Versión/Build/identidad existente. La
+terminología de conectividad conserva AUTO/ONLINE/OFFLINE y explicita cuándo
+se usa el proveedor online o no hay conexión.
+
+Focal de esta implementación: 25 tests pasan; el smoke WebEngine/mapa pasa
+4/4 y el conjunto de mapas focal pasa 52/52. El benchmark de rendimiento pasa
+6/6 (88,73 s en el caso lento) y se reutiliza como evidencia, sin repetirlo.
+El bloqueo previo de `tests/test_p1_24_directories.py` no era funcional ni de
+recursos: los tests 6 y 7 entraban en el `QMessageBox.exec()` real del selector
+de tipo de importación sin que el test seleccionara un botón. Se añadió el
+clic Qt temporizado mínimo al test y se cerró explícitamente el proyecto creado
+por el test 6. El gate funcional terminó con 510 passed en 300,60 s,
+incluyendo P1-24 con 8/8. E2E terminó con 11 passed; el smoke WebEngine/mapa
+con 4/4 y los mapas restantes con 52/52. Ruff, mypy y `git diff --check`
+también pasan. El repositorio no declara ningún `pytest.mark.performance`, por
+lo que la exclusión por archivo sigue siendo la única equivalente disponible
+sin modificar código. No se ha generado ningún build intermedio ni se ha
+tocado la arquitectura del mapa aceptado.
+
+`PHASE1_PRODUCT_STATUS = PHASE1-PRODUCT-SOURCE-COMPLETE`
+
+Última actualización: 2026-09-01
+
+## FASE 1 — Fix de acoplamiento desde el botón «Acoplar mapa» — IMPLEMENTADA
+
+El botón «Acoplar mapa» entra ahora por el mismo cierre que la X de
+`MapWindow`, cuyo callback único repara el mapa real: retira el widget del
+layout de la ventana, lo reparenta al host embebido de Explorar, lo vuelve a
+insertar con stretch, lo muestra y fuerza su geometría. El callback de
+`MainWindow` activa explícitamente la sección Explorar. Se conserva la misma
+instancia de `MapWidget` y de su vista WebEngine durante ciclos repetidos.
+
+Evidencia Fase 1: test focal de click real/X/ciclos/identidad `57 passed`,
+Ruff focal, mypy focal, `git diff --check` y `tools/check.ps1` pasan; la suite
+completa termina con `513 passed`. La aceptación visual Windows del binario y
+la inspección visual final de WebEngine siguen siendo responsabilidad manual.
+
+`PHASE1_MAP_DOCK_FIX_STATUS = PHASE1-MAP-DOCK-BUTTON-FIX-DONE`
+
+Última actualización: 2026-08-31
+
+## FASE D1.1 — Limpieza de navegación y acoplamiento reversible de MapWindow — IMPLEMENTADA
+
+Explorar conserva únicamente «Abrir en ventana» para mostrar y reutilizar la
+única `MapWindow`; las acciones heredadas «Ampliar mapa» y «Restaurar vista»,
+junto con sus handlers y cobertura específica, han sido retiradas.
+`MapWindow` incorpora «Volver a datos», que activa la ventana principal sin
+cerrarse, y «Acoplar mapa», que reparenta el mismo `MapWidget` al host
+embebido de Explorar. Su cierre manual ejecuta el mismo acoplamiento y
+devuelve el foco a la ventana principal. El contexto del explorador se
+conserva durante ciclos repetidos de desacople/acoplamiento.
+
+Se mantiene `QSplitter` y `explore_splitter_state` por compatibilidad. Un host
+embebido estable conserva el mapa dentro de Explorar cuando está acoplado; no
+se escribe una migración de settings. El lifecycle conserva una sola instancia
+de `MapWidget` y `QWebEngineView`, y el cierre de aplicación sigue liberando la
+ventana y el widget cartográfico.
+
+Evidencia D1.1: focal de `MapWindow`, explorador, accesibilidad y settings: 53
+tests pasan; el ciclo de desacople/acoplamiento y la reutilización de la
+ventana se cubren sin duplicar mapa ni WebEngine.
+La aceptación visual Windows y la comprobación manual de acumulación de
+procesos siguen pendientes.
+
+`D1_1_NAVIGATION_CLEANUP_STATUS = D1.1-MAPWINDOW-NAVIGATION-CLEANUP-DONE`
+
+## FASE D1 — Ventana independiente de mapa — IMPLEMENTADA; layout corregido
+
+El fix final de layout hace que `MapWindow`, `MapWidget` y `QWebEngineView`
+usen políticas `Expanding` y que los layouts raíz/interno asignen stretch al
+mapa. La atribución conserva únicamente su altura mínima legítima. La
+cobertura focal verifica crecimiento, redimensionado, maximización y
+restauración sin zona vacía adicional.
+
+La aceptación visual manual Windows sigue siendo recomendable para confirmar
+el aspecto final en la instalación objetivo.
+
+Explorar incorpora la acción accesible «Abrir en ventana». La ventana
+independiente reutiliza el mismo `MapWidget` y el mismo WebEngine/bridge
+existentes, por lo que no se crean mapas duplicados: al abrirse el widget se
+desacopla del host y al cerrarse la ventana se reparenta al host embebido para
+volver a Explorar. La selección
+actual de ruta, servicio, `direction_id`, viaje y paradas continúa llegando a
+ese widget mediante el flujo existente, conservando prioridad de contexto,
+capas y autoencuadre.
+
+`MapWindow` es una ventana Qt normal, de instancia única, con minimizar,
+maximizar, restaurar y movimiento entre monitores mediante comportamiento
+nativo. Su geometría y estado maximizado se guardan en `settings.json`, con
+fallback al monitor visible si la geometría anterior ya no es utilizable. El
+cierre del proyecto limpia las capas sin mostrar datos anteriores; el cierre
+de la aplicación cierra la ventana, el `MapWidget` y el servidor de mapas.
+
+Evidencia D1: focal de settings, Explorar, MainWindow y ciclo de vida `59
+passed`; Ruff, mypy y `git diff --check` pasan. `tools/check.ps1` completó
+formato, Ruff y mypy y obtuvo `510 passed, 1 failed`; el fallo aislado es el
+smoke histórico de WebEngine `test_map_loopback_spike.py` con
+`map_loaded=False`, por lo que `mapError=0`, aceptación visual Windows,
+multimonitor físico y ciclo WebEngine real permanecen `NOT VERIFIED`.
+
+`PHASE_D1_STATUS = PHASE-D1-INDEPENDENT-MAP-WINDOW-IMPLEMENTED`
+
+## FASE C4 — Representación visual de rutas, viajes y paradas — IMPLEMENTADA; aceptación visual pendiente
+
+El overlay de Explorar conserva una única geometría GeoJSON por contexto y la
+presenta con casing de ruta contextual y una línea de viaje actual más visible.
+Las paradas se renderizan individualmente sin clustering, con selección,
+secuencia en el tooltip y diferenciación discreta de origen/destino cuando hay
+coordenadas válidas. `route_color` válido se conserva y los valores ausentes o
+inválidos usan el fallback estable existente; el cambio de ruta/viaje y el
+cierre limpian el contexto mediante el flujo actual.
+
+Evidencia C4: focal de capas, geometría, consultas, explorador, MainWindow y
+bridge `66 passed`; Ruff y mypy focales, sintaxis JavaScript y `git diff
+--check` pasan. No se ejecutó todavía la aceptación visual manual CTM ni la
+regresión completa con `tools/check.ps1`; `CTM_MANUAL_PENDING` y
+`WEBENGINE_VISUAL_PENDING` permanecen abiertos. No se implementaron edición
+GTFS, clustering, routing, KML/KMZ ni funcionalidades P2.
+
+`PHASE_C4_STATUS = PHASE-C4-MAP-ROUTE-STOP-VISUALIZATION-IMPLEMENTED`
+
+## FASE C3 — Autoencuadre geográfico — IMPLEMENTADA; aceptación CTM pendiente
+
+El mapa calcula bounds válidos del feed y de la ruta desde DuckDB, usando
+shapes conjuntos y fallback a paradas. El viaje conserva prioridad y encuadra
+su shape; si no existe, usa sus paradas. El bridge local admite el comando
+mínimo `fitBounds`, con padding, `maxZoom` y protección para coordenadas
+inválidas o bounds degenerados. Pan, zoom y resize no provocan auto-fit por sí
+solos; solo cambian el encuadre las selecciones o la carga de un feed.
+
+Evidencia C3: focal de cobertura, bridge, MapLibre, geometría, explorador y
+MainWindow `69 passed`; Ruff, mypy y `git diff --check` pasan. La suite
+completa se inició, alcanzó el 56% sin fallos y quedó interrumpida por una
+prueba lenta/bloqueada de WebEngine. `tools/check.ps1` y la aceptación manual
+CTM no quedan certificados en esta ejecución. `PHASE_C3_STATUS =
+PHASE-C3-MAP-AUTOFIT-IMPLEMENTED`; `MANUAL_CTM_PENDING`.
+
+## FASE C1 — Workspace redimensionable en Explorar — DONE
+
+Explorar conserva los filtros de Ruta, Servicio, `direction_id` y Viaje en la
+zona superior y ahora agrupa las tablas/datos y el mapa en un `QSplitter`
+vertical. El divisor permite reducir el mapa hasta su mínimo funcional de 240
+px o ampliarlo hasta ocupar prácticamente todo el espacio restante; las tablas
+responden al cambio sin desaparecer y mantienen sus encabezados, scroll,
+selección y accesibilidad. No se añade persistencia del divisor en C1.
+
+MapLibre se inicializa con `trackResize: true`, por lo que el
+`ResizeObserver` sincroniza el canvas al redimensionar el splitter o la
+ventana; la actualización de datos conserva además la llamada explícita a
+`map.resize()`. El bridge, pan, zoom, controles y overlays no se reescriben.
+
+Evidencia C1: focal Explorar + capas MapLibre `15 passed`, regresión
+MainWindow/UI y accesibilidad `50 passed`, suite completa `499 passed`,
+`tools/check.ps1: PASS`, Ruff, mypy y `git diff --check: PASS`. La prueba
+focal del splitter cubre 1366x768, 1600x900 y 1920x1080 mediante geometría Qt,
+incluyendo reducción/aumento de cada zona y resize de la ventana. El smoke
+WebEngine/bridge existente pasa con `map_loaded`, bridge funcional, render y
+sin errores; no se ejecutó una aceptación visual manual de las tres
+resoluciones ni un binario reconstruido en esta subfase.
+
+`PHASE_C1_STATUS = PHASE-C1-RESIZABLE-MAP-WORKSPACE-DONE`
+
+## FASE C2 — Controles y persistencia del workspace de Explorar — DONE
+
+Explorar conserva el estado de su `QSplitter` vertical en el `settings.json`
+existente, mediante la clave `explore_splitter_state` y el estado nativo de Qt
+codificado en base64. Los settings anteriores, sin esa clave, siguen siendo
+compatibles. Un estado ausente, corrupto, incompatible o no funcional usa un
+reparto equilibrado calculado sobre el tamaño actual; el mínimo funcional es
+180 px para datos y 240 px para el mapa, sin zonas colapsables a cero.
+
+Se añadieron las acciones accesibles «Ampliar mapa» y «Restaurar vista». La
+primera deja la mayor parte del espacio al mapa manteniendo visibles los datos;
+la segunda calcula un reparto aproximadamente 1/1. En ambos casos el divisor
+sigue siendo arrastrable y el estado se guarda al moverlo y al cerrar.
+
+La prueba focal cubre persistencia, restauración entre 1366x768, 1600x900 y
+1920x1080, fallback sin estado o inválido, acciones, mínimos y resize posterior
+sin pruebas pixel-perfect. Los focos Map/WebEngine existentes conservan
+`map_loaded`, `bridge_ready` y el resize de MapLibre; no se ha ampliado C2 a
+auto-fit, shapes, rutas/paradas, edición, filtros GTFS o mapas online/offline.
+
+`PHASE_C2_STATUS = PHASE-C2-MAP-WORKSPACE-CONTROLS-DONE`
+
+## FASE B5 — Integración final del icono Windows — IMPLEMENTADA; aceptación manual pendiente
+
+El ICO autorizado `src/gtfs_explorer/resources/gtfs_explorer.ico` se resuelve
+desde source y desde el payload standalone. Qt configura el icono de aplicación
+y `MainWindow` conserva la misma identidad; Nuitka recibe el ICO y NSIS lo usa
+para instalador/desinstalador, manteniendo shortcuts y `DisplayIcon` apuntando
+al EXE. No se establece `AppUserModelID`: no aporta valor claro adicional con
+la identidad estable del EXE y la arquitectura actual.
+
+El build técnico B5 se generó en `dist/b5-technical-20260830/` con Portable y
+Setup desde el mismo payload. Los smokes focales y `package_smoke.ps1` pasan;
+la extracción de icono asociado en ambos EXE devuelve 32x32. La enumeración
+formal de todos los recursos PE y la inspección visual de taskbar, Alt+Tab,
+thumbnail, Explorer, shortcuts, instalador y desinstalador requieren aceptación
+manual adicional. La suite completa tuvo 497/498 por un fallo aislado de
+WebEngine (`map_loaded=False`); el archivo focal repetido pasó 4/4.
+
+## FASE B4 — Barra de estado inferior — DONE
+
+La status bar separa el estado prioritario de la aplicación, el proyecto y el
+workspace. El estado se muestra de forma breve (por ejemplo, «Listo»,
+«Importando…» o «Cancelando…»); el nombre del proyecto conserva menor peso y
+la ruta del workspace se resume con elipsis central. La ruta completa sigue
+disponible mediante tooltip y los cambios de abrir/cerrar proyecto e inicio,
+progreso, cancelación y finalización de importación actualizan los componentes
+independientes sin modificar la lógica de operaciones.
+
+La focal UI pasa `39 passed`, el E2E relevante `11 passed` y la suite completa
+`495 passed`; Ruff, mypy, `tools/check.ps1` y `git diff --check` pasan.
+
+## FASE B3 — Layout responsive y DPI — DONE
+
+Se auditó la interfaz principal para 1366x768, 1600x900 y 1920x1080 en
+geometrías lógicas Qt. Validación distribuye filtros y acciones en dos filas
+para evitar clipping horizontal. Ajustes visuales usa un `QScrollArea`
+redimensionable para conservar acceso a la tabla y sus acciones cuando falta
+altura. No se modificó el mapa rígido de Explorar, ni se introdujeron
+splitters, cambios de navegación o cambios funcionales en importación.
+
+La cobertura B3 comprueba vistas activas, controles esenciales y el scroll de
+Ajustes. Focal UI, E2E, Ruff, mypy, `git diff --check` y la suite completa
+(`493 passed`) pasan. La revisión visual pixel-perfect y el lector de pantalla
+manual siguen fuera de esta subfase.
 
 ## Checkpoint Git local del RC
+
+## FASE A2 — UX de importaciones largas — IMPLEMENTADA
+
+La UI muestra inmediatamente «Importando» y «Preparando importación…» tras la
+confirmación, reutiliza el progreso P1-22 (incluido el modo indeterminado),
+actualiza el tiempo transcurrido cada segundo y mantiene visible la cancelación.
+La acción «Importar feed» queda deshabilitada durante el trabajo y el estado
+visible es «Importación en curso»/«Cancelando…».
+
+Antes de arrancar el worker se clasifica el volumen con metadatos baratos: suma
+de tamaños descomprimidos o de archivos, tamaño de `shapes.txt` y
+`stop_times.txt`, y número de entradas. No se hace una pasada adicional de
+filas ni se calcula ETA; el aviso solo comunica que puede tardar varios
+minutos. El terminal muestra duración, estado (`READY`, `INVALID` o
+`CANCELLED`) e incidencias, conservando la semántica de cancelación y la
+preservación del feed previo.
+
+Pruebas A2: `tests/test_main_window.py` añade feedback inmediato, bloqueo de
+segunda importación, clasificación/aviso de volumen y resumen terminal. Focal
+UI + adaptador: `31 passed`; Ruff, mypy y `git diff --check`: PASS. La
+repetición manual con el ZIP CTM real no se ejecutó porque el artefacto no está
+disponible en `examples/` en este workspace; debe registrarse duración real
+cuando se disponga del feed.
 
 - `P1_COMPLETE=YES`
 - `RC_READY=YES`

@@ -22,6 +22,17 @@ def test_manual_local_has_flows_principales_and_searches_without_network() -> No
     assert [topic.topic_id for topic in catalog.search("superiores 24")] == ["horas-mayores-24"]
     assert catalog.resolve("validation/ANY_PUBLIC_CODE").topic_id == "validation/reglas"
     assert "http" not in " ".join(topic.body for topic in catalog.search("")).casefold()
+    assert {
+        "Primeros pasos",
+        "Trabajar con GTFS",
+        "Importación",
+        "Validación",
+        "Exploración y mapas",
+        "Exportación",
+        "Proyectos y recuperación",
+        "Configuración",
+        "Solución de problemas",
+    } <= {topic.title for topic in catalog.search("")}
 
 
 def test_all_public_schedule_rule_codes_resolve_to_local_help() -> None:

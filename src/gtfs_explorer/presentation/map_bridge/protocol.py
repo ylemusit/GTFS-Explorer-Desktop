@@ -48,6 +48,20 @@ class MapNavigation:
 
 
 @dataclass(frozen=True)
+class MapFitBounds:
+    """Extensión WGS84 que debe encuadrar MapLibre."""
+
+    west: float
+    south: float
+    east: float
+    north: float
+
+    def __post_init__(self) -> None:
+        if not (-180 <= self.west <= self.east <= 180 and -90 <= self.south <= self.north <= 90):
+            raise BridgeProtocolError("Los límites geográficos no son válidos.")
+
+
+@dataclass(frozen=True)
 class MapBridgeEvent:
     """Evento validado emitido por la página local del mapa."""
 
@@ -91,13 +105,13 @@ def parse_event(serialized: str) -> MapBridgeEvent:
     return MapBridgeEvent(event, _integer(raw.get("sequence"), "sequence"), payload)
 
 
-def serialize_navigation(command: MapNavigation) -> str:
+def serialize_navigation(command: MapNavigation | MapFitBounds) -> str:
     """Serializa el único comando v1 permitido hacia la página del mapa."""
     serialized = json.dumps(
         {
             "version": PROTOCOL_VERSION,
             "type": "command",
-            "command": "navigate",
+            "command": "navigate" if isinstance(command, MapNavigation) else "fitBounds",
             "payload": asdict(command),
         },
         separators=(",", ":"),
@@ -118,7 +132,7 @@ class MapBridge(QObject):
         super().__init__()
         self._ready = False
         self._last_sequence = -1
-        self._pending: deque[MapNavigation] = deque(maxlen=MAX_PENDING_COMMANDS)
+        self._pending: deque[MapNavigation | MapFitBounds] = deque(maxlen=MAX_PENDING_COMMANDS)
 
     @property
     def ready(self) -> bool:
@@ -128,7 +142,7 @@ class MapBridge(QObject):
     def pending_count(self) -> int:
         return len(self._pending)
 
-    def navigate(self, command: MapNavigation) -> DispatchStatus:
+    def navigate(self, command: MapNavigation | MapFitBounds) -> DispatchStatus:
         """Encola la navegación hasta recibir `mapReady`, con límite fijo."""
         if self._ready:
             self.command_available.emit(serialize_navigation(command))
