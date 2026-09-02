@@ -4,18 +4,22 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
 
 import duckdb
+import pytest
 
 from gtfs_explorer.application.settings import DirectoryPreferences, Settings, save_settings
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseSettings, ProjectDatabase
 from gtfs_explorer.infrastructure.filesystem.paths import ApplicationPaths
 
 ROOT = Path(__file__).resolve().parents[1]
-TARGET = ROOT / "dist" / "P1-32-packaging-20260828"
+HISTORICAL_FIXTURE = ROOT / "tests" / "fixtures" / "historical" / "p1-32"
+ARTIFACT_STORE_ENV = "GTFS_EXPLORER_ARTIFACT_STORE"
+ARTIFACT_RELEASE = Path("acceptance-builds") / "P1-32-packaging-20260828"
 MIGRATIONS = ROOT / "src" / "gtfs_explorer" / "infrastructure" / "duckdb" / "migrations"
 
 
@@ -67,9 +71,13 @@ def _make_schema_8_project(root: Path) -> None:
         )
 
 
-def test_p1_33_target_artifacts_match_manifest() -> None:
-    manifest_path = TARGET / "release-manifest.json"
+def _expected_p1_32_artifacts(manifest_path: Path) -> dict[str, str]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    actual = {item["file"]: item["sha256"] for item in manifest["artifacts"]}
+    return actual
+
+
+def test_p1_32_historical_manifest_fixture_has_the_recorded_artifact_hashes() -> None:
     expected = {
         (
             "GTFS-Explorer-Setup-0.1.0-P1-32-packaging-20260828-win-x64.exe"
@@ -78,10 +86,19 @@ def test_p1_33_target_artifacts_match_manifest() -> None:
             "GTFS-Explorer-Portable-0.1.0-P1-32-packaging-20260828-win-x64.zip"
         ): "8450d974df386ff6d1b1d852febbf9bb78e031493c5246be5e44e3d46232f050",
     }
-    actual = {item["file"]: item["sha256"] for item in manifest["artifacts"]}
-    assert actual == expected
+    assert _expected_p1_32_artifacts(HISTORICAL_FIXTURE / "release-manifest.json") == expected
+
+
+@pytest.mark.artifact_dependent
+def test_p1_33_target_artifacts_match_manifest() -> None:
+    artifact_store = os.environ.get(ARTIFACT_STORE_ENV)
+    if artifact_store is None:
+        pytest.skip(f"requiere {ARTIFACT_STORE_ENV} con el release histórico P1-32")
+    target = Path(artifact_store) / ARTIFACT_RELEASE
+    expected = _expected_p1_32_artifacts(HISTORICAL_FIXTURE / "release-manifest.json")
+    assert _expected_p1_32_artifacts(target / "release-manifest.json") == expected
     for filename, digest in expected.items():
-        assert _sha256(TARGET / filename) == digest
+        assert _sha256(target / filename) == digest
 
 
 def test_legacy_schema_8_migrates_with_data_and_is_idempotent(tmp_path: Path) -> None:

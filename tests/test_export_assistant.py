@@ -273,18 +273,25 @@ def test_completion_dialog_shows_destination_and_opens_its_folder(
 
 
 def test_completion_dialog_copy_path_action_copies_full_destination(
-    application: QApplication, tmp_path: Path
+    application: QApplication, tmp_path: Path, monkeypatch
 ) -> None:
+    copied: list[str] = []
+
+    class Clipboard:
+        def setText(self, value: str) -> None:  # noqa: N802 - API Qt
+            copied.append(value)
+
     destination = tmp_path / "exports" / "mini.zip"
     destination.parent.mkdir()
     destination.write_bytes(b"zip")
+    monkeypatch.setattr(QApplication, "clipboard", lambda: Clipboard())
     widget = ExportAssistantWidget()
     _click_completion_action(application, "Copiar ruta")
     QTimer.singleShot(20, lambda: _click_completion_action(application, "Aceptar"))
 
     widget._show_export_completed(destination, _result(classification="Mini-GTFS"), "Sin avisos.")
 
-    assert application.clipboard().text() == str(destination.resolve())
+    assert copied == [str(destination.resolve())]
 
 
 def test_export_error_dialog_does_not_show_technical_exception_text(

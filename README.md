@@ -1,5 +1,10 @@
 # GTFS Explorer Desktop
 
+La fuente y el build del producto se mantienen en este repositorio. La evidencia
+histórica y las decisiones de ingeniería se separan respectivamente en los
+repositorios hermanos **GTFS Explorer Artifacts** y **GTFS Explorer Engineering**.
+Consulta `docs/CURRENT_STATE.md` para el estado vigente.
+
 Aplicación Windows x64, portable y offline-first para explorar GTFS Schedule.
 
 ## Estado

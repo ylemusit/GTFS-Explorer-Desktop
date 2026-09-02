@@ -1,5 +1,51 @@
 # Estado actual del proyecto
 
+## POST-RC2 — Gate canónico final — PASS
+
+El gate canónico post-migración queda registrado por la evidencia final
+autorizada como `527 passed`, `0 failed`, `0 skipped`, duración `565.53 s` y
+`tools/check.ps1` con código de salida `0`. No se ha vuelto a ejecutar la
+suite durante este cierre administrativo.
+
+```ini
+RC2_MANUAL_ACCEPTANCE = PASS
+TOOLCHAIN_RECONSTRUCTION_FROM_UV_LOCK = PASS
+ARTIFACT_STORE_RESOLUTION = PASS
+POST_MIGRATION_CANONICAL_GATE = PASS
+```
+
+Las evidencias binarias de stdout, stderr y exitcode se gobiernan en el
+repositorio hermano `GTFS Explorer Engineering`; su disponibilidad e
+integridad se registran allí de forma independiente.
+
+Última actualización: 2026-09-02
+
+## POST-RC2 — Profesionalización — COMPLETADA
+
+La migración post-RC2 se ejecutó en la rama
+`chore/post-rc2-professionalization`, con snapshot previo de 194.573 archivos
+y 193.159.296.390 bytes. El producto conserva fuente, tests, herramientas,
+packaging, schemas, web, licencias y documentación operativa; los runtimes,
+cachés, extracciones y artefactos históricos se custodian en los repositorios
+hermanos `GTFS Explorer Engineering` y `GTFS Explorer Artifacts`, mediante
+manifest y ledger hash/bytes reversibles. No se eliminaron duplicados.
+
+`v0.1.0-rc1` y `v0.1.0-rc2` no se movieron ni modificaron. El conjunto RC1
+canónico es `P1-34C-20260829`. Por confirmación explícita del usuario, la
+aceptación posterior de RC2 queda registrada como
+`MANUAL_ACCEPTANCE_USER_CONFIRMED`: Installed/Portable con CTM fresh,
+round-trip Mini-GTFS, autosuficiencia, reimportación y aceptación nativa
+Windows pasan. Esta anotación documental no reconstruye, publica ni altera
+artefactos o tags.
+
+`PROFESSIONALIZATION_STATUS = BLOCKED_FINAL_GATE_EVIDENCE_MISSING`
+
+El resultado del gate está registrado como PASS, pero el freeze no puede
+declararse completamente verificable hasta preservar y recalcular los hashes
+de los tres objetos originales `stdout`, `stderr` y `exitcode`.
+
+Última actualización: 2026-09-01
+
 ## FASE 3 — Freeze + RC2 — LISTA LOCALMENTE PARA ACEPTACIÓN MANUAL
 
 Se preparó la candidata local `0.1.0-rc2` sin modificar `v0.1.0-rc1` ni

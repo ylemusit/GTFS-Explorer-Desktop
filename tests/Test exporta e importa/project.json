@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "project_id": "7a4ce3c9-65af-4d16-a4cc-6ea81d21b2bb",
+  "name": "Test exporta e importa",
+  "status": "READY",
+  "feed": {
+    "feed_id": "c5e45708-32a4-421e-b3b4-b3a38e08d5a4",
+    "manifest_sha256": "da94d8e75a4acfcc932207c15b678b5e4bcd2ae81fc364c7fb4fcb6b8295ebd6"
+  },
+  "references": {
+    "database": "data.duckdb",
+    "cache": "cache",
+    "reports": "reports"
+  }
+}

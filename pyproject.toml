@@ -57,4 +57,5 @@ markers = [
     "unit: prueba aislada sin servicios ni interfaz gráfica",
     "integration: prueba que integra más de un componente local",
     "e2e: journey de usuario sobre la arquitectura productiva y recursos locales aislados",
+    "artifact_dependent: valida binarios históricos desde GTFS_EXPLORER_ARTIFACT_STORE",
 ]

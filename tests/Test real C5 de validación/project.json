@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "project_id": "b5779e80-8fde-4c37-8ee5-3161bfcdd491",
+  "name": "Test real C5 de validaci\u00f3n",
+  "status": "READY",
+  "feed": {
+    "feed_id": "7b3931c0-fb20-4814-aee8-7e2838f16c21",
+    "manifest_sha256": "a4ed0caf640c3af7a098464fc32fee885c4d52b08c4d83f8d581d3dbeff7f356"
+  },
+  "references": {
+    "database": "data.duckdb",
+    "cache": "cache",
+    "reports": "reports"
+  }
+}

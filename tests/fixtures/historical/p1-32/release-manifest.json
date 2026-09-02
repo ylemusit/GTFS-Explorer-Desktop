@@ -1,0 +1,29 @@
+{
+  "product": "GTFS Explorer Desktop",
+  "version": "0.1.0",
+  "status": "LOCAL_ONLY_NOT_PUBLISHED",
+  "artifacts": [
+    {
+      "file": "GTFS-Explorer-Portable-0.1.0-P1-32-packaging-20260828-win-x64.zip",
+      "bytes": 136071578,
+      "sha256": "8450d974df386ff6d1b1d852febbf9bb78e031493c5246be5e44e3d46232f050",
+      "packaging_type": "portable-zip"
+    },
+    {
+      "file": "GTFS-Explorer-Setup-0.1.0-P1-32-packaging-20260828-win-x64.exe",
+      "bytes": 100625876,
+      "sha256": "54297c2695327697a6e1091bf36b42f2f34ef588bf8b93a8c027eb9ca71735ec",
+      "packaging_type": "nsis-installer"
+    }
+  ],
+  "build_tools": {
+    "python": "3.12",
+    "nuitka": "2.6.9",
+    "nsis": "3.x",
+    "pyside6": "6.8.3",
+    "duckdb": "1.1.3"
+  },
+  "portable_smoke": "passed",
+  "webengine_resources": "passed",
+  "signing": "unsigned"
+}
