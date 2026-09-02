@@ -1,5 +1,21 @@
 # Historial de cambios
 
+## 0.1.0 — 2026-09-02
+
+Primera versión estable local de GTFS Explorer Desktop. Se distribuye como
+aplicación Windows x64 portable y como instalador por usuario. Esta versión no
+añade funcionalidades respecto a RC2.
+
+- Portable e instalador estables con manifiestos, SHA-256, SBOM CycloneDX 1.5
+  y avisos de terceros.
+- Aceptación manual corta completada con éxito sobre los artefactos estables.
+- Firma de código, accesibilidad manual con lector de pantalla y benchmark
+  LARGE quedan diferidos; no se incluyen datos CTM ni cartografía comercial.
+
+Propietario y autor: Yeison Arbey Carrillo Lemus.
+
+Todos los derechos reservados.
+
 ## 0.1.0-rc2 — 2026-09-01
 
 Candidata local para aceptación manual. No está publicada ni autorizada para

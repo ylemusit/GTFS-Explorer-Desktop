@@ -9,10 +9,9 @@ Aplicación Windows x64, portable y offline-first para explorar GTFS Schedule.
 
 ## Estado
 
-Versión candidata local `0.1.0-rc2`: aplicación Windows x64 portable y
-offline-first para importar, explorar, validar, visualizar y exportar GTFS
-Schedule. La candidata está preparada localmente para aceptación manual; no
-está publicada ni autorizada para distribución.
+Versión estable local `0.1.0`: aplicación Windows x64 portable y offline-first
+para importar, explorar, validar, visualizar y exportar GTFS Schedule. El
+release queda preparado localmente; la publicación no está iniciada.
 
 Consulta [el checklist de release](docs/RELEASE_CHECKLIST.md), el
 [historial de cambios](CHANGELOG.md) y la [matriz de smoke](tests/packaging/SMOKE_MATRIX.md).

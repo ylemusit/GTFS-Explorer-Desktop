@@ -1,5 +1,37 @@
 # Estado actual del proyecto
 
+## RELEASE ESTABLE 0.1.0 — READY LOCALMENTE; NO PUBLICADO
+
+La rama `release/0.1.0` prepara el release estable sin cambios funcionales
+respecto a RC2. Los nombres objetivo son
+`GTFS-Explorer-Portable-0.1.0-win-x64.zip` y
+`GTFS-Explorer-Setup-0.1.0-win-x64.exe`. El build, los hashes y la evidencia
+del gate se registrarán en `GTFS Explorer Artifacts/releases/0.1.0/`.
+
+La aceptación manual corta sobre Setup y Portable se completó con éxito. El
+freeze estable queda registrado en el commit y tag anotado locales. Los hashes
+finales confirmados son:
+
+```ini
+SETUP_SHA256 = dbee78348284e1d9a3c767f48256063a93a1c4831ba5d8637cfa9d435a5a3dec
+PORTABLE_SHA256 = 3ec30816ce532c1d97f9530af3c08744b018d26cae9b09b4ed8f25116775984f
+```
+
+Firma de código, accesibilidad manual con lector de pantalla, benchmark LARGE,
+detector universal de ficheros y futuras funcionalidades permanecen fuera de
+este release.
+
+```ini
+SETUP_0.1.0 = PASS
+PORTABLE_0.1.0 = PASS
+MANUAL_ACCEPTANCE_STATUS = PASS
+PUBLICATION_STATUS = READY_NOT_PUBLISHED
+BLOCKERS = NONE
+STABLE_RELEASE_STATUS = GTFS_EXPLORER_0.1.0_STABLE_LOCAL_READY
+```
+
+Última actualización: 2026-09-03
+
 ## POST-RC2 — Gate canónico final — PASS
 
 El gate canónico post-migración queda registrado por la evidencia final
