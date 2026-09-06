@@ -17,9 +17,22 @@ from gtfs_explorer.domain.subset import (
     SubsetSelection,
     close_core_subset,
 )
-from gtfs_explorer.infrastructure.exporting.gtfs_subset import MiniGtfsSubsetExporter, MiniGtfsTable
+from gtfs_explorer.infrastructure.exporting.gtfs_subset import (
+    MiniGtfsSubsetExporter,
+    MiniGtfsTable,
+    _CallbackCancelToken,
+)
 
 SPEC_PATH = Path("schemas/gtfs_schedule/2026-04-27/spec.json")
+
+
+def test_internal_revalidation_observes_export_cancellation_callback() -> None:
+    cancelled = False
+    token = _CallbackCancelToken(lambda: cancelled)
+
+    assert token.is_cancelled() is False
+    cancelled = True
+    assert token.is_cancelled() is True
 
 
 def _expected():

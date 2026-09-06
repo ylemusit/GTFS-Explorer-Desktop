@@ -94,7 +94,8 @@ class RawInspectorWidget(QWidget):
 
     def _build_layout(self) -> None:
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(t("raw.description")))
+        self._description = QLabel(t("raw.description"))
+        layout.addWidget(self._description)
         controls = QHBoxLayout()
         self._files = QComboBox()
         self._files.setAccessibleName(t("raw.file"))
@@ -105,14 +106,17 @@ class RawInspectorWidget(QWidget):
         self._filter.setAccessibleName(t("raw.filter"))
         self._filter.setPlaceholderText(t("raw.filter_placeholder"))
         apply_filter = QPushButton(t("raw.apply"))
+        self._apply_button = apply_filter
         apply_filter.setAccessibleName(t("raw.apply"))
         apply_filter.setToolTip(t("raw.apply"))
         apply_filter.clicked.connect(self._apply_filter)
         copy = QPushButton(t("raw.copy"))
+        self._copy_button = copy
         copy.setAccessibleName(t("raw.copy"))
         copy.setToolTip(t("raw.copy"))
         copy.clicked.connect(self._copy_selection)
         export = QPushButton(t("raw.export"))
+        self._export_button = export
         export.setAccessibleName(t("raw.export"))
         export.setToolTip(t("raw.export"))
         export.clicked.connect(self._export_loaded)
@@ -135,6 +139,23 @@ class RawInspectorWidget(QWidget):
         self.setTabOrder(apply_filter, copy)
         self.setTabOrder(copy, export)
         self.setTabOrder(export, self._table)
+
+    def retranslate_ui(self) -> None:
+        """Actualiza los controles raw sin cambiar la consulta ni sus filas."""
+        self._description.setText(t("raw.description"))
+        self._files.setAccessibleName(t("raw.file"))
+        self._field.setAccessibleName(t("raw.field"))
+        self._filter.setAccessibleName(t("raw.filter"))
+        self._filter.setPlaceholderText(t("raw.filter_placeholder"))
+        for button, key in (
+            (self._apply_button, "raw.apply"),
+            (self._copy_button, "raw.copy"),
+            (self._export_button, "raw.export"),
+        ):
+            button.setText(t(key))
+            button.setAccessibleName(t(key))
+            button.setToolTip(t(key))
+        self._table.setAccessibleName(t("raw.table"))
 
     def _change_file(self) -> None:
         filename = self._files.currentText()

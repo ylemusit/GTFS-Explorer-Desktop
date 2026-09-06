@@ -3,6 +3,8 @@
 import subprocess
 import sys
 
+from gtfs_explorer.product import PRODUCT_VERSION
+
 
 def test_entrypoint_version() -> None:
     result = subprocess.run(
@@ -12,7 +14,7 @@ def test_entrypoint_version() -> None:
         text=True,
     )
     assert result.returncode == 0
-    assert result.stdout.strip() == "0.1.0"
+    assert result.stdout.strip() == PRODUCT_VERSION
 
 
 def test_entrypoint_runtime_smoke() -> None:

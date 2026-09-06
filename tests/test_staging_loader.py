@@ -15,7 +15,10 @@ from gtfs_explorer.domain.spec import FieldSpec, FileSpec, ScheduleSpec
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseSettings, ProjectDatabase
 from gtfs_explorer.infrastructure.duckdb.repositories.base import DuckDbRawInspectorRepository
 from gtfs_explorer.infrastructure.importing.directory_source import DirectorySource
-from gtfs_explorer.infrastructure.importing.staging_loader import StagingLoader
+from gtfs_explorer.infrastructure.importing.staging_loader import (
+    StagingLoader,
+    _insert_values_batch,
+)
 
 
 def _database(tmp_path: Path) -> ProjectDatabase:
@@ -180,3 +183,19 @@ def test_staging_progress_reports_safe_file_and_coalesces_batches(tmp_path: Path
     assert events
     assert events[-1] == ("stops.txt", 3)
     assert len(events) <= 2
+
+
+def test_staging_batch_uses_one_duckdb_statement_instead_of_one_per_row() -> None:
+    calls: list[tuple[str, list[object]]] = []
+
+    class Connection:
+        def execute(self, query: str, parameters: list[object]) -> None:
+            calls.append((query, parameters))
+
+    _insert_values_batch(  # type: ignore[arg-type]
+        Connection(), "stg_stops", [(2, "stops.txt", "S1"), (3, "stops.txt", "S2")]
+    )
+
+    assert len(calls) == 1
+    assert "unnest(?::JSON[])" in calls[0][0]
+    assert calls[0][1] == ['[[2, "stops.txt", "S1"], [3, "stops.txt", "S2"]]']

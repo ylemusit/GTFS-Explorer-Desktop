@@ -1,5 +1,24 @@
 # Reproducibilidad del toolchain
 
+## Acceptance build 0.2.0 — Setup NSIS
+
+Fecha de ejecución: 2026-09-03
+
+```ini
+NSIS_VERSION = 3.12
+MAKENSIS_PATH = C:\Program Files (x86)\NSIS\makensis.exe
+INSTALL_SOURCE = EXISTING_LOCAL_INSTALLATION
+NSIS_PATH_DISCOVERY = where.exe makensis -> unavailable; explicit path -> available
+NSIS_BUILD_EXIT_CODE = 0
+REPRODUCIBILITY_GAP = NONE
+SETUP_SHA256 = 4a9de42a5d921b119090845fe457d197142355f6a3492379a1aa3e761e3ab933
+PORTABLE_SHA256 = 8a75e9c26909ddba6fd7059161658becafa5b7addd24e210793a5d7e3959866a
+```
+
+El proyecto documenta NSIS 3.12 como versión de referencia Unicode. La
+instalación ya existente estaba fuera de `PATH`, por lo que se invocó el
+binario mediante ruta explícita y no se instaló una versión nueva.
+
 ## Cierre canónico post-migración
 
 Registro final autorizado, sin reejecución durante el freeze:

@@ -16,6 +16,7 @@ import duckdb
 
 from gtfs_explorer.domain.project import FeedMetadata, FeedStatus, ProjectMetadata, ProjectStatus
 from gtfs_explorer.infrastructure.duckdb.database import (
+    DatabaseCorruptionError,
     DatabaseSettings,
     ProjectDatabase,
 )
@@ -94,11 +95,14 @@ class RecoveryError(RuntimeError):
     """Error seguro de una operación explícita de recuperación."""
 
 
-class RecoveryCandidateAvailableError(RecoveryError):
+class RecoveryCandidateAvailableError(DatabaseCorruptionError, RecoveryError):
     """La base actual no abre y existe una copia validada para ofrecer al usuario."""
 
     def __init__(self, inspection: RecoveryInspection) -> None:
-        super().__init__("La base actual no puede abrirse. Hay una copia recuperable.")
+        super().__init__(
+            "La base DuckDB del proyecto está corrupta. Hay una copia recuperable "
+            "para ofrecer al usuario."
+        )
         self.inspection = inspection
 
 

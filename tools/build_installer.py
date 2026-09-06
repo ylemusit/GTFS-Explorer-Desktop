@@ -90,7 +90,7 @@ def _run_makensis(*, executable: str, version: str, payload: Path, output: Path)
     command = [
         executable,
         f"/DPRODUCT_VERSION={version}",
-        f"/DPRODUCT_FILE_VERSION={windows_file_version(version)}",
+        f"/DPRODUCT_FILE_VERSION={IDENTITY.windows_file_version}",
         f"/DPRODUCT_NAME={IDENTITY.name}",
         f"/DPRODUCT_PUBLISHER={IDENTITY.author}",
         f"/DPRODUCT_DESCRIPTION={IDENTITY.file_description}",

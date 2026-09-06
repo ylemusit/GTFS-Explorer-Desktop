@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from threading import Event
+from time import monotonic
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QDesktopServices
@@ -29,6 +31,15 @@ def _configure(widget: ExportAssistantWidget, destination: Path) -> None:
     widget._destination.setText(str(destination))
 
 
+def _wait_until(application: QApplication, predicate: object, timeout: float = 2.0) -> None:
+    deadline = monotonic() + timeout
+    while monotonic() < deadline:
+        application.processEvents()
+        if predicate():  # type: ignore[operator]
+            return
+    assert predicate()  # type: ignore[operator]
+
+
 def test_formats_explain_classification_and_disable_incompatible_options(
     application: QApplication, tmp_path: Path
 ) -> None:
@@ -49,6 +60,43 @@ def test_formats_explain_classification_and_disable_incompatible_options(
     assert "rutas" in widget._preview.text()
     widget._format.setCurrentIndex(widget._format.findData(ExportFormat.MINI_GTFS.value))
     assert "no certifica" in widget._format_help.text().casefold()
+
+
+def test_switching_formats_does_not_leak_geospatial_state(
+    application: QApplication, tmp_path: Path
+) -> None:
+    widget = ExportAssistantWidget(executor=lambda request, cancelled: _result())
+    _configure(widget, tmp_path / "out.kmz")
+    widget._format.setCurrentIndex(widget._format.findData(ExportFormat.KMZ.value))
+    widget._profile.setCurrentIndex(2)
+    widget._version.setText("should-not-leak")
+
+    widget._format.setCurrentIndex(widget._format.findData(ExportFormat.COMPLETE_GTFS.value))
+    request = widget.request()
+
+    assert request.format is ExportFormat.COMPLETE_GTFS
+    assert request.kml_profile is None
+    assert request.version_id is None
+    assert not widget._profile.isEnabled()
+    assert not widget._version.isEnabled()
+
+
+def test_auto_generated_destination_tracks_each_format_switch(
+    application: QApplication,
+) -> None:
+    widget = ExportAssistantWidget(executor=lambda request, cancelled: _result())
+    widget._routes.setPlainText("R1")
+
+    for format_, suffix in (
+        (ExportFormat.KMZ, ".kmz"),
+        (ExportFormat.KML, ".kml"),
+        (ExportFormat.CSV, ".csv"),
+        (ExportFormat.COMPLETE_GTFS, ".zip"),
+        (ExportFormat.JSON, ".json"),
+    ):
+        widget._format.setCurrentIndex(widget._format.findData(format_.value))
+        assert widget._destination.text().endswith(suffix)
+        assert widget.request().destination.suffix == suffix
 
 
 def test_multiple_routes_and_services_are_one_explicit_export_pack(
@@ -198,15 +246,18 @@ def test_csv_confirmation_targets_the_file_with_its_visible_mode(
     assert "ya existe" in widget._preview.text().casefold()
 
 
-def test_executor_receives_cooperative_cancellation(
+def test_executor_receives_cooperative_cancellation_from_qt_event_loop(
     application: QApplication, tmp_path: Path, monkeypatch
 ) -> None:
     observed: list[bool] = []
+    entered_work = Event()
     widget = ExportAssistantWidget()
 
     def execute(request: object, cancelled: object) -> ExportResult:
-        widget._request_cancel()
-        observed.append(cancelled())  # type: ignore[operator]
+        entered_work.set()
+        while not cancelled():  # type: ignore[operator]
+            pass
+        observed.append(True)
         return _result()
 
     widget.set_executor(execute)  # type: ignore[arg-type]
@@ -214,8 +265,56 @@ def test_executor_receives_cooperative_cancellation(
     widget._format.setCurrentIndex(widget._format.findData(ExportFormat.GEOJSON.value))
     monkeypatch.setattr(widget, "_show_export_completed", lambda *args: None)
     widget._execute()
+    _wait_until(application, entered_work.is_set)
+    widget._request_cancel()
+    _wait_until(application, lambda: widget._active_export_generation is None)
 
     assert observed == [True]
+    assert widget._export_jobs == {}
+    assert widget._cancel_token is None
+
+
+def test_repeated_async_exports_release_terminal_resources_and_close_cleanly(
+    application: QApplication, tmp_path: Path, monkeypatch
+) -> None:
+    """Cada resultado terminal libera las referencias retenidas por el widget."""
+    terminal_calls: list[str] = []
+    outcomes = iter(("success", "failed", "cancelled"))
+
+    def execute(_request: object, cancelled: object) -> ExportResult:
+        outcome = next(outcomes)
+        if outcome == "failed":
+            raise RuntimeError("synthetic failure")
+        if outcome == "cancelled":
+            while not cancelled():  # type: ignore[operator]
+                pass
+        return _result()
+
+    widget = ExportAssistantWidget(
+        executor=execute,  # type: ignore[arg-type]
+        on_terminal=lambda: terminal_calls.append("terminal"),
+    )
+    _configure(widget, tmp_path / "repeated.json")
+    monkeypatch.setattr(widget, "_show_export_completed", lambda *args: None)
+    monkeypatch.setattr(QMessageBox, "critical", lambda *args: None)
+
+    for outcome in ("success", "failed", "cancelled"):
+        if outcome == "cancelled":
+
+            def cancel_and_close() -> None:
+                widget._request_cancel()
+                widget.close()
+
+            QTimer.singleShot(0, cancel_and_close)
+        widget._execute()
+        _wait_until(application, lambda: widget._active_export_generation is None)
+        assert widget._export_jobs == {}
+        assert widget._cancel_token is None
+
+    application.processEvents()
+
+    assert terminal_calls == ["terminal", "terminal", "terminal"]
+    assert widget._export_jobs == {}
 
 
 def test_result_shows_hash_and_warnings(
@@ -232,6 +331,7 @@ def test_result_shows_hash_and_warnings(
     )
 
     widget._execute()
+    _wait_until(application, lambda: len(dialogs) == 1)
 
     assert len(dialogs) == 1
     message = dialogs[0].text()
@@ -307,8 +407,12 @@ def test_export_error_dialog_does_not_show_technical_exception_text(
     monkeypatch.setattr(QMessageBox, "critical", lambda *args: messages.append(args))
 
     widget._execute()
+    _wait_until(application, lambda: len(messages) == 1)
 
     assert len(messages) == 1
+    assert widget._last_failure is not None
+    assert widget._last_failure.exception_type == "RuntimeError"
+    assert "José Muñoz" in widget._last_failure.message
     assert "José Muñoz" not in str(messages[0])
     assert "No se ha podido exportar la salida local." in str(messages[0])
     assert messages[0][-1] is QMessageBox.StandardButton.Ok

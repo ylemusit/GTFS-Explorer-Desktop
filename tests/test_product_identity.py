@@ -40,8 +40,8 @@ def test_product_identity_has_complete_and_consistent_metadata() -> None:
         "gtfs_explorer.product.PRODUCT_VERSION"
     )
     assert IDENTITY.version == PRODUCT_VERSION == __version__ == json_exporter.__version__
-    assert IDENTITY.windows_file_version == "0.1.0.0"
-    assert IDENTITY.windows_product_version == "0.1.0"
+    assert IDENTITY.windows_file_version == "0.2.0.0"
+    assert IDENTITY.windows_product_version == "0.2.0"
 
 
 def test_identity_catalog_renders_all_product_metadata() -> None:

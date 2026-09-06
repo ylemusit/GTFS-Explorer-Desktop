@@ -3,13 +3,14 @@
 La fuente y el build del producto se mantienen en este repositorio. La evidencia
 histórica y las decisiones de ingeniería se separan respectivamente en los
 repositorios hermanos **GTFS Explorer Artifacts** y **GTFS Explorer Engineering**.
-Consulta `docs/CURRENT_STATE.md` para el estado vigente.
+Consulta `docs/SESSION_CONTEXT.md` y `docs/CURRENT_STATE.md` para retomar una
+tarea con el contexto operativo mínimo.
 
 Aplicación Windows x64, portable y offline-first para explorar GTFS Schedule.
 
 ## Estado
 
-Versión estable local `0.1.0`: aplicación Windows x64 portable y offline-first
+Versión `0.2.0`: aplicación Windows x64 portable y offline-first
 para importar, explorar, validar, visualizar y exportar GTFS Schedule. El
 release queda preparado localmente; la publicación no está iniciada.
 
@@ -21,8 +22,8 @@ La documentación técnica relacionada está en [rendimiento](docs/PERFORMANCE.m
 [E2E](docs/E2E.md), [accesibilidad](docs/ACCESSIBILITY_CHECKLIST.md) y
 [mapas offline](docs/MAPS_OFFLINE.md).
 
-Para continuar el proyecto con otro GPT, consulta el
-[contexto y línea de trabajo](docs/CONTEXTO_Y_LINEA_DE_TRABAJO_GPT.md).
+Para continuar el proyecto, usa el [contexto de sesión](docs/SESSION_CONTEXT.md),
+el descriptor de tarea y solo la documentación WARM relacionada.
 
 ## Desarrollo local
 

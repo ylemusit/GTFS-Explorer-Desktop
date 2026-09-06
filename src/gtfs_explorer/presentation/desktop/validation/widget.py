@@ -98,6 +98,7 @@ class ValidationWidget(QWidget):
         self._offset = 0
         self._total = 0
         self._sort_column: int | None = None
+        self._has_loaded = False
         self._navigate_to_raw = navigate_to_raw
         self._show_help_callback = show_help
         self._export_report = export_report
@@ -113,6 +114,7 @@ class ValidationWidget(QWidget):
         self._load()
 
     def clear(self) -> None:
+        self._has_loaded = False
         self._issues = ()
         self._issue_index.clear()
         self._known_files.clear()
@@ -134,13 +136,14 @@ class ValidationWidget(QWidget):
         self._table.clearSelection()
         self._table.setCurrentCell(-1, -1)
         self._detail.clear()
-        self._summary.setText("Sin corrida de validación cargada.")
-        self._count.setText("Sin incidencias cargadas.")
+        self._summary.setText(t("validation.no_run"))
+        self._count.setText(t("validation.no_issues"))
         self._update_actions()
 
     def _build_layout(self) -> None:
         layout = QVBoxLayout(self)
         intro = QLabel(t("validation.introduction"))
+        self._intro = intro
         intro.setObjectName("validationIntro")
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -148,12 +151,12 @@ class ValidationWidget(QWidget):
         controls = QGridLayout()
         self._severity = QComboBox()
         self._severity.setAccessibleName(t("validation.severity"))
-        self._severity.addItem("Todas las severidades", None)
+        self._severity.addItem(t("validation.all_severities"), None)
         for value in ValidationSeverity:
             self._severity.addItem(value.value, value)
         self._category = QComboBox()
         self._category.setAccessibleName(t("validation.category"))
-        self._category.addItem("Todas las categorías", None)
+        self._category.addItem(t("validation.all_categories"), None)
         for category_value in ValidationCategory:
             self._category.addItem(category_value.value, category_value)
         self._file_filter = QComboBox()
@@ -164,6 +167,7 @@ class ValidationWidget(QWidget):
         self._search.setPlaceholderText(t("validation.search_placeholder"))
         self._search.returnPressed.connect(self.refresh)
         apply = QPushButton(t("validation.apply"))
+        self._apply = apply
         apply.setObjectName("validationApply")
         apply.setAccessibleName(t("validation.apply"))
         apply.setAccessibleDescription(t("validation.apply_description"))
@@ -209,26 +213,26 @@ class ValidationWidget(QWidget):
             controls.addWidget(widget, 1, column)
         layout.addLayout(controls)
 
-        self._summary = QLabel("Sin corrida de validación cargada.")
+        self._summary = QLabel(t("validation.no_run"))
         self._summary.setObjectName("validationRunSummary")
         self._summary.setWordWrap(True)
         layout.addWidget(self._summary)
-        self._count = QLabel("Sin incidencias cargadas.")
+        self._count = QLabel(t("validation.no_issues"))
         self._count.setObjectName("validationResultCount")
         layout.addWidget(self._count)
 
         self._table = QTableWidget(0, 9)
         self._table.setHorizontalHeaderLabels(
             (
-                "Severidad",
-                "Categoría",
-                "Origen",
-                "Regla",
-                "Archivo",
-                "Fila fuente",
-                "Campo",
-                "Entidad",
-                "Mensaje",
+                t("validation.severity_header"),
+                t("validation.category_header"),
+                t("validation.origin_header"),
+                t("validation.rule_header"),
+                t("validation.file_header"),
+                t("validation.source_row_header"),
+                t("validation.field_header"),
+                t("validation.entity_header"),
+                t("validation.message_header"),
             )
         )
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -278,6 +282,7 @@ class ValidationWidget(QWidget):
         )
 
     def _load(self) -> None:
+        self._has_loaded = True
         self._clear_result()
         self._refresh_file_filter()
         self._load_summary()
@@ -287,7 +292,7 @@ class ValidationWidget(QWidget):
                 PageRequest(offset=self._offset, limit=VALIDATION_PAGE_SIZE),
             )
         except Exception:
-            self._count.setText("No se han podido cargar las incidencias de validación.")
+            self._count.setText(t("validation.load_error"))
             self._update_actions()
             return
         self._issues, self._total = page.items, page.total
@@ -296,9 +301,9 @@ class ValidationWidget(QWidget):
         if self._total:
             first = self._offset + 1
             last = self._offset + len(self._issues)
-            self._count.setText(f"Mostrando {first}–{last} de {self._total} incidencias.")
+            self._count.setText(t("validation.showing", first=first, last=last, total=self._total))
         else:
-            self._count.setText("No hay incidencias para los filtros actuales.")
+            self._count.setText(t("validation.no_filtered_issues"))
         self._previous.setEnabled(self._offset > 0)
         self._next.setEnabled(self._offset + len(self._issues) < self._total)
         self._update_actions()
@@ -314,21 +319,70 @@ class ValidationWidget(QWidget):
 
     def _load_summary(self) -> None:
         if self._query_summary is None:
-            self._summary.setText("Resumen de corrida no disponible en esta vista.")
+            self._summary.setText(t("validation.summary_unavailable_view"))
             return
         try:
             summary = self._query_summary()
         except Exception:
-            self._summary.setText("Resumen de corrida no disponible.")
+            self._summary.setText(t("validation.summary_unavailable"))
             return
         if summary is None or summary.run_count == 0:
-            self._summary.setText("Sin corrida de validación para el feed actual.")
+            self._summary.setText(t("validation.no_run_feed"))
             return
-        statuses = ", ".join(summary.statuses) or "Sin estado"
+        statuses = ", ".join(summary.statuses) or t("validation.no_status")
         self._summary.setText(
-            f"Estado: {statuses} · {summary.run_count} ejecución(es) · "
-            f"{summary.total_issue_count} incidencias registradas."
+            t(
+                "validation.summary_format",
+                statuses=statuses,
+                runs=summary.run_count,
+                issues=summary.total_issue_count,
+            )
         )
+
+    def retranslate_ui(self) -> None:
+        """Actualiza la superficie de validación y conserva filtros y selección."""
+        self._intro.setText(t("validation.introduction"))
+        self._severity.setAccessibleName(t("validation.severity"))
+        self._severity.setItemText(0, t("validation.all_severities"))
+        self._category.setAccessibleName(t("validation.category"))
+        self._category.setItemText(0, t("validation.all_categories"))
+        self._file_filter.setAccessibleName(t("validation.file"))
+        if self._file_filter.count():
+            self._file_filter.setItemText(0, t("validation.all_files"))
+        self._search.setAccessibleName(t("validation.search"))
+        self._search.setPlaceholderText(t("validation.search_placeholder"))
+        for button, key in (
+            (self._apply, "validation.apply"),
+            (self._previous, "validation.previous"),
+            (self._next, "validation.next"),
+            (self._go_to_raw, "validation.raw"),
+            (self._help, "validation.help"),
+            (self._export, "validation.export"),
+        ):
+            button.setText(t(key))
+            button.setAccessibleName(t(key))
+            button.setToolTip(t(key))
+        self._apply.setAccessibleDescription(t("validation.apply_description"))
+        self._table.setHorizontalHeaderLabels(
+            (
+                t("validation.severity_header"),
+                t("validation.category_header"),
+                t("validation.origin_header"),
+                t("validation.rule_header"),
+                t("validation.file_header"),
+                t("validation.source_row_header"),
+                t("validation.field_header"),
+                t("validation.entity_header"),
+                t("validation.message_header"),
+            )
+        )
+        self._table.setAccessibleName(t("validation.table"))
+        self._detail.setAccessibleName(t("validation.detail"))
+        if self._has_loaded:
+            self._load()
+        else:
+            self._summary.setText(t("validation.no_run"))
+            self._count.setText(t("validation.no_issues"))
 
     def _refresh_file_filter(self) -> None:
         files = tuple(self._known_files)
@@ -345,7 +399,7 @@ class ValidationWidget(QWidget):
             return
         selected = self._file_filter.currentData()
         self._file_filter.clear()
-        self._file_filter.addItem("Todos los archivos", None)
+        self._file_filter.addItem(t("validation.all_files"), None)
         for filename in sorted(set(files), key=str.casefold):
             self._file_filter.addItem(_safe_filename(filename), filename)
         if isinstance(selected, str):
@@ -373,9 +427,15 @@ class ValidationWidget(QWidget):
                 issue.category.value,
                 _origin_label(issue.rule_origin),
                 issue.rule_code,
-                _safe_filename(issue.file_name) if issue.file_name else "Alcance global",
-                str(issue.row_number) if issue.row_number is not None else "Sin fila física",
-                issue.field_name or "—",
+                (
+                    _safe_filename(issue.file_name)
+                    if issue.file_name
+                    else t("validation.global_scope")
+                ),
+                str(issue.row_number)
+                if issue.row_number is not None
+                else t("validation.no_physical_row"),
+                issue.field_name or t("validation.not_available"),
                 _entity_label(issue),
                 _message_label(issue.message_key),
             )
@@ -395,13 +455,17 @@ class ValidationWidget(QWidget):
                 issue.category.value,
                 issue.rule_origin,
                 issue.rule_code,
-                _safe_filename(issue.file_name) if issue.file_name else "Alcance global",
+                (
+                    _safe_filename(issue.file_name)
+                    if issue.file_name
+                    else t("validation.global_scope")
+                ),
                 (
                     str(issue.row_number)
                     if issue.row_number is not None
-                    else "Sin fila física aplicable"
+                    else t("validation.no_physical_row_applicable")
                 ),
-                issue.field_name or "Sin campo GTFS asociado",
+                issue.field_name or t("validation.no_gtfs_field"),
                 _entity_label(issue),
                 issue.message_key,
             )
@@ -437,35 +501,43 @@ class ValidationWidget(QWidget):
             self._update_actions()
             return
         fields = [
-            ("Severidad", issue.severity.value),
-            ("Categoría", issue.category.value),
-            ("Origen de regla", issue.rule_origin),
-            ("Regla", issue.rule_code),
-            ("Mensaje", issue.message_key),
-            ("Archivo", _safe_filename(issue.file_name) if issue.file_name else "Alcance global"),
+            (t("validation.severity_header"), issue.severity.value),
+            (t("validation.category_header"), issue.category.value),
+            (t("validation.rule_origin"), issue.rule_origin),
+            (t("validation.rule_header"), issue.rule_code),
+            (t("validation.message_header"), issue.message_key),
             (
-                "Fila fuente",
+                t("validation.file_header"),
+                _safe_filename(issue.file_name)
+                if issue.file_name
+                else t("validation.global_scope"),
+            ),
+            (
+                t("validation.source_row_header"),
                 (
                     str(issue.row_number)
                     if issue.row_number is not None
-                    else "Sin fila física aplicable"
+                    else t("validation.no_physical_row_applicable")
                 ),
             ),
-            ("Campo", issue.field_name or "Sin campo GTFS asociado"),
+            (t("validation.field_header"), issue.field_name or t("validation.no_gtfs_field")),
         ]
         if issue.entity:
-            fields.append(("Entidad", _entity_label(issue)))
+            fields.append((t("validation.entity_header"), _entity_label(issue)))
         fields.extend(
             (
-                ("Ayuda local", issue.help_id),
-                ("Repeticiones", str(issue.occurrence_count)),
+                (t("validation.local_help"), issue.help_id),
+                (t("validation.occurrences"), str(issue.occurrence_count)),
             )
         )
         text = "\n".join(f"{label}: {value}" for label, value in fields)
         parameters = _safe_parameters(issue.message_parameters)
         if parameters:
-            text += "\nParámetros: " + ", ".join(
-                f"{key}={value}" for key, value in sorted(parameters.items())
+            text += (
+                "\n"
+                + t("validation.parameters")
+                + " "
+                + ", ".join(f"{key}={value}" for key, value in sorted(parameters.items()))
             )
         self._detail.setPlainText(text)
         self._update_actions()
@@ -513,15 +585,15 @@ def _issue_key(issue: ValidationIssueSummary) -> str:
 def _safe_filename(value: str | None) -> str:
     if not value:
         return ""
-    return Path(value).name or "[nombre de archivo no disponible]"
+    return Path(value).name or t("validation.filename_unavailable")
 
 
 def _safe_context_value(key: str, value: object) -> str:
     if key.casefold() in _PRIVATE_PARAMETER_KEYS:
-        return "[dato local omitido]"
+        return t("validation.local_data_omitted")
     text = "" if value is None else str(value)
     if _ABSOLUTE_PATH.search(text):
-        return "[ubicación local omitida]"
+        return t("validation.local_location_omitted")
     return " ".join(text.replace("\r", " ").replace("\n", " ").split())
 
 
@@ -538,8 +610,8 @@ def _safe_parameters(parameters: object) -> dict[str, str]:
 def _origin_label(origin: str) -> str:
     return {
         "mobilitydata": "MobilityData",
-        "internal": "Interno",
-        "gtfs-explorer": "Interno",
+        "internal": t("validation.internal_origin"),
+        "gtfs-explorer": t("validation.internal_origin"),
     }.get(origin, origin)
 
 
@@ -567,7 +639,7 @@ def _selected_category(value: object) -> ValidationCategory | None:
 
 def _entity_label(issue: ValidationIssueSummary) -> str:
     if issue.entity is None:
-        return "—"
+        return t("validation.not_available")
     entity_id = _safe_context_value("entity_id", issue.entity.entity_id)
     return f"{issue.entity.entity_type} / {entity_id}"
 

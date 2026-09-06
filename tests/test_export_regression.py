@@ -14,6 +14,7 @@ from zipfile import ZipFile
 import pytest
 
 from gtfs_explorer.application.commands.import_feed import ImportFeed
+from gtfs_explorer.application.editor_session import EditorSession
 from gtfs_explorer.application.exporting import FeedExportLifecycle
 from gtfs_explorer.domain.exporting import ExportDestinationError, ExportError
 from gtfs_explorer.domain.operations import (
@@ -65,6 +66,7 @@ class _ProductiveExportHarness:
 
     _export_feed = MainWindow._export_feed
     _write_feed_export = MainWindow._write_feed_export
+    _write_revision_export = MainWindow._write_revision_export
     _mini_gtfs_tables = staticmethod(MainWindow._mini_gtfs_tables)
 
     def __init__(self, prepared: PreparedContractFeed) -> None:
@@ -481,6 +483,39 @@ def test_all_productive_formats_follow_lifecycle_manifest_history_privacy_and_se
         _assert_ledger_has_no_local_leaks(prepared)
         assert "/" not in item.artifact_name and "\\" not in item.artifact_name
     assert len(running_observed) == len(EXPORT_CAPABILITIES)
+
+
+@pytest.mark.integration
+def test_original_working_copy_exports_through_the_editor_route(
+    tmp_path: Path,
+) -> None:
+    """Abrir el editor no puede bloquear las exportaciones del feed original."""
+    prepared = prepare_contract_feed(tmp_path)
+    session = EditorSession.open(DuckDbUnitOfWork(prepared.database))
+    harness = _ProductiveExportHarness(prepared)
+    harness._editor_session = session  # type: ignore[attr-defined]
+    try:
+        assert session.working_revision_id == "original"
+        requests = (
+            ExportRequest(
+                ExportFormat.JSON, tmp_path / "original.json", route_ids=frozenset({"A"})
+            ),
+            ExportRequest(ExportFormat.CSV, tmp_path / "original.csv", route_ids=frozenset({"A"})),
+            ExportRequest(ExportFormat.COMPLETE_GTFS, tmp_path / "original.zip"),
+            ExportRequest(ExportFormat.KML, tmp_path / "original.kml", route_ids=frozenset({"A"})),
+            ExportRequest(ExportFormat.KMZ, tmp_path / "original.kmz", route_ids=frozenset({"A"})),
+        )
+        for request in requests:
+            result = harness._export_feed(request, lambda: False)
+            assert request.destination.is_file()
+            assert request.destination.with_name(
+                f"{request.destination.name}.manifest.json"
+            ).is_file()
+            assert result.manifest.artifact_name == request.destination.name
+            history = _history_item(prepared, request.destination.name)
+            assert history.status is OperationStatus.COMPLETED
+    finally:
+        session.close()
 
 
 @pytest.mark.integration

@@ -16,7 +16,8 @@ GTFS ya verificadas ni alterar sus contratos públicos.
 Este documento define trabajo futuro. A000, A001 y A010 constan como cerradas
 en sus evidencias y en `docs/CURRENT_STATE.md`; las demás tareas `Axxx` no se
 consideran implementadas, probadas ni aprobadas. El resumen operativo para
-traspaso está en `docs/CONTEXTO_Y_LINEA_DE_TRABAJO_GPT.md`.
+traspaso operativo está en `docs/SESSION_CONTEXT.md`; el documento histórico
+equivalente está preservado en GTFS Explorer Engineering.
 
 El backlog priorizado de la sección 9 es la fuente operativa para continuar la
 mejora del producto. Las tareas `Axxx` conservan el marco de actualización,

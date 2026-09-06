@@ -630,7 +630,8 @@ class DuckDbRouteExplorerRepository:
     def routes(self, page: PageRequest) -> PagedResult[RouteSummary]:
         total, rows = self._page(
             "SELECT count(*) FROM gtfs_routes",
-            "SELECT route_id, agency_id, route_short_name, route_long_name, route_type "
+            "SELECT route_id, agency_id, route_short_name, route_long_name, route_type, "
+            "route_color "
             "FROM gtfs_routes "
             "ORDER BY agency_id NULLS LAST, route_sort_order NULLS LAST, route_id, source_row "
             "LIMIT ? OFFSET ?",
@@ -646,6 +647,7 @@ class DuckDbRouteExplorerRepository:
                     short_name=str(row[2]) if row[2] is not None else None,
                     long_name=str(row[3]) if row[3] is not None else None,
                     route_type=_optional_int(row[4]),
+                    route_color=str(row[5]) if row[5] is not None else None,
                 )
                 for row in rows
             ),
@@ -818,7 +820,7 @@ class DuckDbStopInspectorRepository:
             f"WHERE st.stop_id IN ({self._scope_sql()}) GROUP BY r.route_id"
             ")",
             "SELECT r.route_id, any_value(r.agency_id), any_value(r.route_short_name), "
-            "any_value(r.route_long_name), any_value(r.route_type) "
+            "any_value(r.route_long_name), any_value(r.route_type), any_value(r.route_color) "
             "FROM gtfs_stop_times st JOIN gtfs_trips t ON t.trip_id = st.trip_id "
             "JOIN gtfs_routes r ON r.route_id = t.route_id "
             f"WHERE st.stop_id IN ({self._scope_sql()}) GROUP BY r.route_id "
@@ -836,6 +838,7 @@ class DuckDbStopInspectorRepository:
                     str(row[2]) if row[2] is not None else None,
                     str(row[3]) if row[3] is not None else None,
                     _optional_int(row[4]),
+                    str(row[5]) if row[5] is not None else None,
                 )
                 for row in rows
             ),
@@ -877,7 +880,8 @@ class DuckDbStopInspectorRepository:
             + where,
             prefix
             + "SELECT t.trip_id, r.route_id, r.agency_id, r.route_short_name, r.route_long_name, "
-            "r.route_type, t.service_id, st.stop_id, own_stop.stop_name, st.stop_sequence, "
+            "r.route_type, r.route_color, t.service_id, st.stop_id, own_stop.stop_name, "
+            "st.stop_sequence, "
             "st.arrival_time_lexeme, st.arrival_service_seconds, st.departure_time_lexeme, "
             "st.departure_service_seconds FROM gtfs_stop_times st "
             "JOIN gtfs_trips t ON t.trip_id = st.trip_id "
@@ -901,15 +905,16 @@ class DuckDbStopInspectorRepository:
                         str(row[3]) if row[3] is not None else None,
                         str(row[4]) if row[4] is not None else None,
                         _optional_int(row[5]),
+                        str(row[6]) if row[6] is not None else None,
                     ),
-                    service_id=str(row[6]),
-                    stop_id=str(row[7]),
-                    stop_name=str(row[8]) if row[8] is not None else None,
-                    stop_sequence=_optional_int(row[9]),
-                    arrival_time=str(row[10]) if row[10] is not None else None,
-                    arrival_service_seconds=_optional_int(row[11]),
-                    departure_time=str(row[12]) if row[12] is not None else None,
-                    departure_service_seconds=_optional_int(row[13]),
+                    service_id=str(row[7]),
+                    stop_id=str(row[8]),
+                    stop_name=str(row[9]) if row[9] is not None else None,
+                    stop_sequence=_optional_int(row[10]),
+                    arrival_time=str(row[11]) if row[11] is not None else None,
+                    arrival_service_seconds=_optional_int(row[12]),
+                    departure_time=str(row[13]) if row[13] is not None else None,
+                    departure_service_seconds=_optional_int(row[14]),
                 )
                 for row in rows
             ),
@@ -1423,6 +1428,11 @@ class DuckDbUnitOfWork:
         self.core_subset = DuckDbCoreSubsetRepository(self._connection)
         self._finished = False
 
+    @property
+    def connection(self) -> DatabaseConnection:
+        """Conexión de la unidad para repositorios especializados."""
+        return self._connection
+
     def __enter__(self) -> "DuckDbUnitOfWork":
         return self
 
@@ -1438,6 +1448,20 @@ class DuckDbUnitOfWork:
 
     def rollback(self) -> None:
         self._finish("ROLLBACK")
+
+    def checkpoint(self) -> None:
+        """Hace durable el trabajo actual y abre una transacción nueva.
+
+        Un checkpoint no publica una revisión: únicamente delimita el
+        borrador recuperable frente a un rollback posterior.
+        """
+        if self._finished:
+            raise RepositoryError("La unidad de trabajo ya está cerrada.")
+        try:
+            self._connection.execute("COMMIT")
+            self._connection.execute("BEGIN TRANSACTION")
+        except DatabaseError as error:
+            raise RepositoryError("No se ha podido guardar el checkpoint del borrador.") from error
 
     def _finish(self, statement: str) -> None:
         if self._finished:

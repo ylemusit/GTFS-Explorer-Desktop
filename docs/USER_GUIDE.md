@@ -95,11 +95,22 @@ descarga masiva de teselas interactivas.
 
 ## 13. Exportaciones
 
-El asistente ofrece JSON, CSV, GeoJSON y Mini-GTFS. JSON es un bundle derivado;
-GeoJSON contiene geometrías y paradas con coordenadas válidas; CSV ofrece la
-salida tabular de la selección. El modo `faithful` conserva los valores de
-origen y `spreadsheet-safe` neutraliza fórmulas para hojas de cálculo; no son
-equivalentes byte a byte. KML y KMZ no son formatos disponibles.
+El asistente ofrece JSON, CSV, GeoJSON, Mini-GTFS, GTFS completo modificado,
+nueva versión GTFS y KML/KMZ. JSON es un bundle derivado; GeoJSON contiene
+geometrías y paradas con coordenadas válidas; CSV ofrece la salida tabular de la
+selección. El modo `faithful` conserva los valores de origen y
+`spreadsheet-safe` neutraliza fórmulas para hojas de cálculo; no son
+equivalentes byte a byte. KML y KMZ no son formatos disponibles en la línea
+estable anterior; en 0.2.0 son salidas geoespaciales locales con perfiles para Google
+Earth y Google My Maps.
+
+Las salidas GTFS 0.2.0 parten únicamente de una WorkingRevision confirmada.
+El editor visual conserva `ORIGINAL_GTFS` inmutable, registra comandos
+reversibles y obliga a resolver dependencias antes de borrar o reasignar datos.
+La edición de paradas, shapes, horarios, servicios, agencias y atribuciones se
+mantiene en un borrador que puede guardar, reabrir, deshacer, rehacer,
+confirmar o descartar. Importar KML/KMZ solo propone geometría existente y
+rechaza recursos externos, entidades XML y contenedores inseguros.
 
 Mini-GTFS es un subconjunto autocontenido con las dependencias necesarias,
 reimportable y validado localmente antes de publicarse. Conserva IDs, horas
@@ -171,8 +182,9 @@ offline sin cobertura usa fondo neutro; un PMTiles sin estilo no se selecciona;
 un mapa online no disponible deja el overlay local; y un recovery requiere
 seguir la opción validada que ofrezca la aplicación.
 
-Las funciones de edición GTFS, drafts, undo/redo, colecciones y otros formatos
-no forman parte de la capacidad actual.
+La revisión visual con lectores de pantalla nativos y la aceptación visual
+manual de Windows siguen siendo gates separados del smoke técnico; no se
+declaran certificados por este manual.
 
 ## Ayuda local y distribución
 

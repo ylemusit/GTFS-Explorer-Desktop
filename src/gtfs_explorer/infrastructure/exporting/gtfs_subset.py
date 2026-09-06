@@ -13,6 +13,7 @@ from uuid import uuid4
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from gtfs_explorer.application.commands.import_feed import ImportFeed
+from gtfs_explorer.application.jobs.import_job import CancelToken
 from gtfs_explorer.domain.exporting import ExportError, ExportManifest
 from gtfs_explorer.domain.project import JobState, ProjectMetadata, ProjectStatus
 from gtfs_explorer.domain.source import InputSource, InputSourceKind
@@ -87,6 +88,7 @@ class MiniGtfsSubsetExporter:
         expected: CoreSubset,
         overwrite: bool = False,
         is_cancelled: CancellationCheck = lambda: False,
+        manifest_metadata: dict[str, str | bool] | None = None,
     ) -> ExportManifest:
         """Serializa, reimporta y solo entonces publica ZIP y manifiesto lateral.
 
@@ -114,6 +116,7 @@ class MiniGtfsSubsetExporter:
                     "format": "gtfs_schedule_zip",
                     "internal_revalidation": "passed",
                     "formal_validation": formal.status.value,
+                    **(manifest_metadata or {}),
                 },
             )
         finally:
@@ -133,7 +136,8 @@ class MiniGtfsSubsetExporter:
                 self._specification,
                 job_id="mini-gtfs-revalidation",
                 feed_id="mini-gtfs-revalidation",
-            ).execute()
+            ).execute(_CallbackCancelToken(is_cancelled))
+            _raise_if_cancelled(is_cancelled)
             if result.state is not JobState.READY or result.issue_count:
                 raise ExportError(
                     "La reimportación interna Mini-GTFS no ha superado la validación."
@@ -167,6 +171,17 @@ def _database_for_revalidation(workspace: Path) -> ProjectDatabase:
         workspace / "temporary",
         settings=DatabaseSettings(memory_limit="128MB", max_temp_directory_size="128MB", threads=1),
     )
+
+
+class _CallbackCancelToken(CancelToken):
+    """Adapta la cancelación del exportador al trabajo interno de importación."""
+
+    def __init__(self, callback: CancellationCheck) -> None:
+        super().__init__()
+        self._callback = callback
+
+    def is_cancelled(self) -> bool:
+        return self._callback() or super().is_cancelled()
 
 
 def _validate_tables(

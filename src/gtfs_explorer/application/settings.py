@@ -24,8 +24,16 @@ _DIRECTORY_FIELDS: dict[DirectoryKind, str] = {
 _LAYOUT_FIELD = "explore_splitter_state"
 _MAP_GEOMETRY_FIELD = "map_window_geometry"
 _MAP_MAXIMIZED_FIELD = "map_window_maximized"
+_LANGUAGE_FIELD = "language"
+_SUPPORTED_LANGUAGES = frozenset({"es-ES", "en", "de-DE", "ja-JP", "zh-CN"})
 _OPTIONAL_SETTINGS_FIELDS = frozenset(
-    (*_DIRECTORY_FIELDS.values(), _LAYOUT_FIELD, _MAP_GEOMETRY_FIELD, _MAP_MAXIMIZED_FIELD)
+    (
+        *_DIRECTORY_FIELDS.values(),
+        _LAYOUT_FIELD,
+        _MAP_GEOMETRY_FIELD,
+        _MAP_MAXIMIZED_FIELD,
+        _LANGUAGE_FIELD,
+    )
 )
 
 
@@ -40,6 +48,7 @@ class Settings:
     explore_splitter_state: bytes | None = None
     map_window_geometry: bytes | None = None
     map_window_maximized: bool = False
+    language: str = "es-ES"
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -53,6 +62,7 @@ class Settings:
             _LAYOUT_FIELD: _serialise_splitter_state(self.explore_splitter_state),
             _MAP_GEOMETRY_FIELD: _serialise_splitter_state(self.map_window_geometry),
             _MAP_MAXIMIZED_FIELD: self.map_window_maximized,
+            _LANGUAGE_FIELD: _normalise_language(self.language),
         }
 
 
@@ -215,6 +225,19 @@ class DirectoryPreferences:
             return False
         return True
 
+    def remember_language(self, language: str) -> bool:
+        """Persiste el idioma de interfaz sin depender del idioma de Windows."""
+
+        selected = _normalise_language(language)
+        self._settings = replace(self._settings, language=selected)
+        if not self._persist:
+            return True
+        try:
+            save_settings(self._paths.settings_path, self._settings)
+        except (OSError, UnicodeError, ValueError):
+            return False
+        return True
+
 
 def _settings_from_payload(payload: Any) -> Settings:
     required = {"version", "recent_project_paths"}
@@ -239,6 +262,7 @@ def _settings_from_payload(payload: Any) -> Settings:
         explore_splitter_state=_optional_splitter_state(payload),
         map_window_geometry=_optional_splitter_state(payload, _MAP_GEOMETRY_FIELD),
         map_window_maximized=_optional_bool(payload, _MAP_MAXIMIZED_FIELD),
+        language=_normalise_language(payload.get(_LANGUAGE_FIELD, "es-ES")),
     )
 
 
@@ -278,6 +302,15 @@ def _optional_bool(payload: dict[str, object], field_name: str) -> bool:
     if not isinstance(value, bool):
         raise ValueError(f"{field_name} debe ser booleano.")
     return value
+
+
+def _normalise_language(value: object) -> str:
+    if not isinstance(value, str):
+        return "es-ES"
+    candidate = value.strip().replace("_", "-")
+    aliases = {"es": "es-ES", "de": "de-DE", "ja": "ja-JP", "zh": "zh-CN"}
+    candidate = aliases.get(candidate.casefold(), candidate)
+    return candidate if candidate in _SUPPORTED_LANGUAGES else "en"
 
 
 def _directory_kind(kind: DirectoryKind | str) -> DirectoryKind:

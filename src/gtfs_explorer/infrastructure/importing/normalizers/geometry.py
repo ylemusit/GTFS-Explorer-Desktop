@@ -67,6 +67,7 @@ class GeometryNormalizer:
         fields = specification.files[_FILENAME].fields
         columns = _staging_columns(connection, _FILENAME)
         rows = connection.execute("SELECT * FROM stg_shapes").fetchall()
+        pending: list[list[object]] = []
         for index, row in enumerate(rows):
             if index % 128 == 0 and is_cancelled():
                 raise ImportCancelled("La normalización se ha cancelado.")
@@ -75,11 +76,7 @@ class GeometryNormalizer:
             source_filename = str(raw.pop("source_filename"))
             raw.pop("extra_columns")
             values = _typed_values(source_row, raw, fields, specification, issues)
-            connection.execute(
-                "INSERT INTO gtfs_shapes "
-                "(source_filename, source_row, raw_values, shape_id, shape_pt_lat, "
-                "shape_pt_lon, shape_pt_sequence, shape_dist_traveled) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            pending.append(
                 [
                     source_filename,
                     source_row,
@@ -89,9 +86,31 @@ class GeometryNormalizer:
                     values["shape_pt_lon"],
                     values["shape_pt_sequence"],
                     values["shape_dist_traveled"],
-                ],
+                ]
             )
+            if len(pending) == 1_000:
+                _insert_shape_batch(connection, pending)
+                pending.clear()
+        if pending:
+            _insert_shape_batch(connection, pending)
         return len(rows)
+
+
+def _insert_shape_batch(connection: DatabaseConnection, rows: list[list[object]]) -> None:
+    connection.execute(
+        "INSERT INTO gtfs_shapes "
+        "(source_filename, source_row, raw_values, shape_id, shape_pt_lat, "
+        "shape_pt_lon, shape_pt_sequence, shape_dist_traveled) "
+        "SELECT json_extract_string(value, '$[0]'), "
+        "CAST(json_extract(value, '$[1]') AS BIGINT), "
+        "json_extract_string(value, '$[2]'), json_extract_string(value, '$[3]'), "
+        "CAST(json_extract(value, '$[4]') AS DOUBLE), "
+        "CAST(json_extract(value, '$[5]') AS DOUBLE), "
+        "CAST(json_extract(value, '$[6]') AS BIGINT), "
+        "CAST(json_extract(value, '$[7]') AS DOUBLE) "
+        "FROM (SELECT unnest(?::JSON[]) AS value)",
+        [json.dumps(rows, ensure_ascii=False)],
+    )
 
 
 def _present_files(connection: DatabaseConnection) -> set[str]:

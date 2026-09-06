@@ -1,10 +1,15 @@
 # Arquitectura del proyecto
 
-Última actualización: 2026-08-27
+Última actualización: 2026-09-03
 
 ## Resumen
 
 Aplicación Windows x64 local y offline-first construida en Python/PySide6. DuckDB persiste un staging fiel, un modelo GTFS tipado y resultados derivados. La presentación Qt consume casos de uso; nunca ejecuta SQL. MapLibre se incrusta con Qt WebEngine, se comunica por contratos QWebChannel y mantiene separado el overlay GTFS local del basemap, que puede ser PMTiles mediante un servidor efímero de loopback o teselas online de un proveedor allowlisted.
+
+La arquitectura de implementación del editor visual 0.2.0 está especificada
+en `docs/0.2.0_PRODUCT_ARCHITECTURE.md`. Añade revisiones originales,
+working copies y borradores mediante ChangeSets, sin modificar la fuente GTFS
+ni introducir un segundo mapa, servidor o backend.
 
 ```text
 Qt Widgets -> aplicación -> dominio/puertos -> DuckDB/import/validación/export
@@ -66,6 +71,10 @@ Dominio no depende de capas externas. Presentación no contiene SQL. JavaScript 
 - `drv_*`: derivados regenerables.
 - `v_*`: vistas de consulta.
 - Una base DuckDB por proyecto, con migraciones y escritor único.
+- El editor 0.2.0 usa `original` como revisión 0 implícita, `editor_deltas`
+  para el borrador y `editor_revision_deltas` para cambios inmutables por
+  entidad; las revisiones se reconstruyen sobre `gtfs_*` sin snapshots
+  monolíticos del feed.
 
 IDs se conservan como texto. Horas GTFS usan segundos desde el día de servicio y lexema original para admitir valores superiores a 24 horas.
 

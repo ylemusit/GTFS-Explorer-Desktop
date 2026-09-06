@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QPushButton, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLineEdit, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
 from gtfs_explorer.presentation.desktop.map.window import MapWindow
 
@@ -101,3 +101,42 @@ def test_map_window_map_widget_expands_to_available_client_area(application) -> 
     assert map_widget.geometry().bottom() == window.contentsRect().bottom()
     window.shutdown()
     application.processEvents()
+
+
+def test_map_window_exposes_separate_confirm_and_cancel_callbacks(application) -> None:
+    events: list[str] = []
+    window = MapWindow(
+        QWidget(),
+        on_confirm=lambda: events.append("confirm"),
+        on_cancel=lambda: events.append("cancel"),
+    )
+
+    window.findChild(QPushButton, "mapWindowConfirm").click()  # type: ignore[union-attr]
+    window.findChild(QPushButton, "mapWindowCancel").click()  # type: ignore[union-attr]
+    application.processEvents()
+
+    assert events == ["confirm", "cancel"]
+    window.shutdown()
+
+
+def test_map_window_shortcuts_keep_text_undo_local(application) -> None:
+    events: list[str] = []
+    window = MapWindow(
+        QWidget(),
+        on_undo=lambda: events.append("undo"),
+        on_redo=lambda: events.append("redo"),
+    )
+    line_edit = QLineEdit(window)
+    window.show()
+    line_edit.show()
+    line_edit.setFocus()
+    application.processEvents()
+
+    assert window._undo_action.shortcut().toString() == "Ctrl+Z"
+    assert window._redo_action.shortcut().toString() == "Ctrl+Y"
+    assert window._redo_shift_action.shortcut().toString() == "Ctrl+Shift+Z"
+    window._invoke_undo()
+    window._invoke_redo()
+
+    assert events == []
+    window.shutdown()

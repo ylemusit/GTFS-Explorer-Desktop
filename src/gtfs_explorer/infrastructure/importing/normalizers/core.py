@@ -133,6 +133,8 @@ class CoreNormalizer:
             ).fetchall()
         ]
         count = 0
+        pending: list[list[object]] = []
+        insert_columns: list[str] | None = None
         for row in rows:
             if count % 128 == 0:
                 _raise_if_cancelled(is_cancelled)
@@ -141,16 +143,21 @@ class CoreNormalizer:
             source_filename = str(raw.pop("source_filename"))
             raw.pop("extra_columns")
             values = self._typed_values(filename, source_row, raw, fields, specification, issues)
-            insert_columns, insert_values = _insert_row(
+            row_columns, insert_values = _insert_row(
                 filename, source_filename, source_row, raw, values
             )
-            placeholders = ", ".join("?" for _ in insert_values)
-            statement = (
-                f"INSERT INTO {_TABLES[filename]} "
-                f"({', '.join(insert_columns)}) VALUES ({placeholders})"
-            )
-            connection.execute(statement, insert_values)
+            if insert_columns is None:
+                insert_columns = row_columns
+            elif insert_columns != row_columns:
+                raise RuntimeError("Las columnas normalizadas no son estables dentro del archivo.")
+            pending.append(insert_values)
+            if len(pending) == 1_000:
+                _insert_normalized_batch(connection, _TABLES[filename], insert_columns, pending)
+                pending.clear()
             count += 1
+        if pending:
+            assert insert_columns is not None
+            _insert_normalized_batch(connection, _TABLES[filename], insert_columns, pending)
         return count
 
     @staticmethod
@@ -204,6 +211,22 @@ class CoreNormalizer:
                     )
                 )
         return values
+
+
+def _insert_normalized_batch(
+    connection: DatabaseConnection,
+    table_name: str,
+    columns: list[str],
+    rows: list[list[object]],
+) -> None:
+    selections = ", ".join(
+        f"json_extract_string(value, '$[{index}]')" for index in range(len(rows[0]))
+    )
+    connection.execute(
+        f"INSERT INTO {table_name} ({', '.join(columns)}) "
+        f"SELECT {selections} FROM (SELECT unnest(?::JSON[]) AS value)",
+        [json.dumps(rows, ensure_ascii=False, default=lambda value: value.isoformat())],
+    )
 
 
 def _raise_if_cancelled(is_cancelled: Callable[[], bool]) -> None:

@@ -17,6 +17,9 @@ from gtfs_explorer.presentation.desktop.exporter import (
         (ExportFormat.GEOJSON, "-geojson.geojson"),
         (ExportFormat.CSV, "-csv-faithful.csv"),
         (ExportFormat.MINI_GTFS, "-mini-gtfs.zip"),
+        (ExportFormat.COMPLETE_GTFS, "-complete-gtfs.zip"),
+        (ExportFormat.KML, "-kml.kml"),
+        (ExportFormat.KMZ, "-kmz.kmz"),
     ),
 )
 def test_suggested_filename_is_safe_contextual_and_format_specific(
@@ -80,6 +83,9 @@ def test_long_ids_are_bounded_without_random_suffixes() -> None:
         (ExportFormat.CSV, "rutas-faithful.csv.csv", "rutas-faithful.csv", False),
         (ExportFormat.CSV, "rutas.csv", "rutas-spreadsheet-safe.csv", True),
         (ExportFormat.MINI_GTFS, "subconjunto.zip.zip", "subconjunto.zip", False),
+        (ExportFormat.KMZ, "foo.kmz.kmz", "foo.kmz", False),
+        (ExportFormat.COMPLETE_GTFS, "foo.zip", "foo.zip", False),
+        (ExportFormat.KML, "foo.kml", "foo.kml", False),
     ),
 )
 def test_destination_normalization_keeps_one_safe_extension(

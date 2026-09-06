@@ -28,9 +28,11 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QListWidget,
     QMainWindow,
     QMessageBox,
+    QPlainTextEdit,
     QProgressBar,
     QPushButton,
     QScrollArea,
@@ -39,6 +41,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
+    QTextEdit,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -48,16 +51,28 @@ from gtfs_explorer.application.commands.create_project import CreateProject
 from gtfs_explorer.application.commands.import_feed import ImportFeed, ImportFeedResult
 from gtfs_explorer.application.commands.open_project import OpenedProject, OpenProject
 from gtfs_explorer.application.commands.recover_workspace import RestoreWorkspace
+from gtfs_explorer.application.editor_session import EditorSession
 from gtfs_explorer.application.exporting import FeedExportLifecycle
 from gtfs_explorer.application.jobs.import_job import (
     ImportPhase,
     ImportProgress,
     ProgressMode,
 )
+from gtfs_explorer.application.map_editing import (
+    MapEditController,
+    MapEditError,
+    MapEditProposal,
+)
 from gtfs_explorer.application.map_policy import MapMode, normalize_map_mode
 from gtfs_explorer.application.queries.feed_overview import FeedOverviewQueries
 from gtfs_explorer.application.queries.geometry import GeometryQueries
-from gtfs_explorer.application.queries.map_layers import MapLayerPayload, map_layers_for_trip
+from gtfs_explorer.application.queries.map_layers import (
+    MapLayerPayload,
+    map_layers_for_trip,
+    map_layers_for_working_copy,
+    map_layers_for_working_copy_routes,
+    stop_popup_data_for_working_copy,
+)
 from gtfs_explorer.application.queries.project_map_coverage import (
     project_map_coverage,
     route_map_coverage,
@@ -70,6 +85,8 @@ from gtfs_explorer.application.queries.timetable import TimetableMatrix, Timetab
 from gtfs_explorer.application.queries.validation import ValidationQueries
 from gtfs_explorer.application.settings import DirectoryPreferences
 from gtfs_explorer.application.ui_state import UiAction, UiMode, UiState
+from gtfs_explorer.domain.changesets import WorkingCopy
+from gtfs_explorer.domain.exporting import ExportError
 from gtfs_explorer.domain.operations import Operation, OperationStatus, OperationType
 from gtfs_explorer.domain.overview import ValidationOverview
 from gtfs_explorer.domain.ports import PagedResult, PageRequest
@@ -89,6 +106,7 @@ from gtfs_explorer.domain.subset import CoreSubset, SubsetSelection
 from gtfs_explorer.domain.validation import ValidationIssueFilter, ValidationIssueSummary
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseConnection
 from gtfs_explorer.infrastructure.duckdb.repositories import DuckDbUnitOfWork
+from gtfs_explorer.infrastructure.duckdb.repositories.editor import DuckDbEditorRepository
 from gtfs_explorer.infrastructure.exporting.csv_exporter import (
     CsvExporter,
     CsvExportMode,
@@ -106,11 +124,22 @@ from gtfs_explorer.infrastructure.exporting.json_exporter import (
     JsonBundleExporter,
     JsonExportSelection,
 )
+from gtfs_explorer.infrastructure.exporting.kml import (
+    KmlClassification,
+    KmlGeometryImporter,
+    KmlImportMapping,
+    KmlProfile,
+    KmlSecurityError,
+    SafeKmlReader,
+    WorkingCopyKmlExporter,
+)
+from gtfs_explorer.infrastructure.exporting.revision import RevisionGtfsExporter
 from gtfs_explorer.infrastructure.exporting.validation_report import (
     ReportFormat,
     ValidationReportExporter,
     ValidationReportFilter,
 )
+from gtfs_explorer.infrastructure.exporting.working_copy import WorkingCopyExporters
 from gtfs_explorer.infrastructure.filesystem.paths import (
     ApplicationPaths,
     DirectoryKind,
@@ -132,6 +161,7 @@ from gtfs_explorer.infrastructure.logging import (
 )
 from gtfs_explorer.infrastructure.maps.offline_library import OfflineMapLibrary, resolve_best_map
 from gtfs_explorer.presentation.desktop.about import AboutDialog
+from gtfs_explorer.presentation.desktop.editor.widget import EditorWidget
 from gtfs_explorer.presentation.desktop.exporter import (
     ExportAssistantWidget,
     ExportFormat,
@@ -141,7 +171,7 @@ from gtfs_explorer.presentation.desktop.exporter import (
     ExportServiceOption,
 )
 from gtfs_explorer.presentation.desktop.help import HelpCatalog, HelpDialog
-from gtfs_explorer.presentation.desktop.i18n import t
+from gtfs_explorer.presentation.desktop.i18n import locale_label, set_locale, supported_locales, t
 from gtfs_explorer.presentation.desktop.icon import configure_application_icon
 from gtfs_explorer.presentation.desktop.import_adapter import ImportJobAdapter
 from gtfs_explorer.presentation.desktop.overview.history import OperationHistoryWidget
@@ -150,6 +180,7 @@ from gtfs_explorer.presentation.desktop.raw.widget import RawInspectorWidget
 from gtfs_explorer.presentation.desktop.routes.widget import RouteExplorerWidget
 from gtfs_explorer.presentation.desktop.startup_intro import StartupIntroDialog
 from gtfs_explorer.presentation.desktop.validation.widget import ValidationWidget
+from gtfs_explorer.presentation.map_bridge import MapEditGesture
 from gtfs_explorer.product import IDENTITY, runtime_architecture, runtime_build_id
 
 _SPECIFICATION_PATH = application_resource_path(
@@ -218,6 +249,7 @@ class MainWindow(QMainWindow):
             self._application_paths,
             persist=self._has_persistent_paths,
         )
+        set_locale(self._directory_preferences.settings.language)
         self._offline_map_library = (
             OfflineMapLibrary(self._application_paths.maps_directory)
             if self._has_persistent_paths
@@ -226,6 +258,7 @@ class MainWindow(QMainWindow):
         self._state = UiState()
         self._cancel_active_job = cancel_active_job
         self._opened_project: OpenedProject | None = None
+        self._editor_session: EditorSession | None = None
         self._import_command_factory = import_command_factory
         self._logger = logger or logging.getLogger("gtfs_explorer")
         self._logs_directory = logs_directory or (
@@ -298,7 +331,10 @@ class MainWindow(QMainWindow):
             return
         self._explorer.save_layout_state()
         self._explorer.close_map_window()
-        self._close_project()
+        self._editor.close_map_window()
+        if not self._close_project():
+            event.ignore()
+            return
         event.accept()
 
     def _show_main_window(self) -> None:
@@ -325,6 +361,10 @@ class MainWindow(QMainWindow):
         url = event.mimeData().urls()[0]
         path = Path(url.toLocalFile())
         try:
+            if path.suffix.casefold() in {".kml", ".kmz"}:
+                self._import_kml_geometry(path)
+                event.acceptProposedAction()
+                return
             self._request_import(self._source_from_path(path))
         except ValueError as error:
             self._show_error(str(error), operation="import_source", exception=error)
@@ -387,6 +427,9 @@ class MainWindow(QMainWindow):
             save_map_window_geometry=self._directory_preferences.remember_map_window_geometry,
             on_return_to_data=self._show_main_window,
             on_dock_to_explore=self._show_explore,
+            on_edit_gesture=self._handle_map_edit_gesture,
+            on_stop_action=self._handle_stop_action,
+            can_edit_stop=self._can_edit_stop_from_context,
         )
         self._raw_inspector = RawInspectorWidget(
             self._query_raw,
@@ -412,6 +455,7 @@ class MainWindow(QMainWindow):
                 DirectoryKind.EXPORTS
             ),
             prepare_default_directory=lambda: self._prepare_directory(DirectoryKind.EXPORTS),
+            on_terminal=self._refresh_operation_history,
             on_destination_directory_used=lambda directory: self._remember_directory(
                 DirectoryKind.EXPORTS, directory
             ),
@@ -420,6 +464,20 @@ class MainWindow(QMainWindow):
         self._explore_tabs.setObjectName("explorerTabs")
         self._explore_tabs.addTab(self._explorer, t("explore.routes"))
         self._explore_tabs.addTab(self._raw_inspector, t("explore.raw"))
+        self._editor = EditorWidget(
+            self._get_editor_session,
+            map_widget=self._explorer.map_widget,
+            map_layers_for_routes=self._query_map_layers_for_routes,
+            on_finish_editing=self._finish_editing_session,
+        )
+        self._pending_map_edit: tuple[MapEditController, MapEditProposal] | None = None
+        self._editor.set_map_operation_callbacks(
+            on_confirm=self._confirm_pending_map_edit,
+            on_cancel=self._cancel_pending_map_edit,
+        )
+        self._editor.history_state_changed.connect(self._sync_history_actions)
+        self._explore_tabs.addTab(self._editor, t("explore.editor"))
+        self._explore_tabs.currentChanged.connect(self._explore_tab_changed)
         self._explore_tabs.setAccessibleName(t("navigation.explore"))
         self._page_stack = QStackedWidget()
         self._page_stack.setObjectName("mainPageStack")
@@ -439,7 +497,27 @@ class MainWindow(QMainWindow):
         settings.setObjectName("settingsDock")
         settings_content = QWidget()
         settings_layout = QVBoxLayout(settings_content)
+        language_label = QLabel(t("settings.language_label"), settings_content)
+        self._language_label = language_label
+        self._language_combo = QComboBox(settings_content)
+        self._language_combo.setObjectName("languageSelector")
+        self._language_combo.setAccessibleName(t("settings.language_label"))
+        for language in supported_locales():
+            self._language_combo.addItem(locale_label(language), language)
+        language_index = self._language_combo.findData(
+            self._directory_preferences.settings.language
+        )
+        if language_index >= 0:
+            self._language_combo.setCurrentIndex(language_index)
+        language_label.setBuddy(self._language_combo)
+        settings_layout.addWidget(language_label)
+        settings_layout.addWidget(self._language_combo)
+        self._language_notice = QLabel(t("settings.language_restart_notice"), settings_content)
+        self._language_notice.setWordWrap(True)
+        self._language_notice.setObjectName("languageRestartNotice")
+        settings_layout.addWidget(self._language_notice)
         map_mode_label = QLabel(t("settings.map_mode_label"), settings_content)
+        self._map_mode_label = map_mode_label
         self._map_mode_combo = QComboBox(settings_content)
         self._map_mode_combo.setObjectName("mapModeSelector")
         self._map_mode_combo.setAccessibleName(t("settings.map_mode_label"))
@@ -454,8 +532,10 @@ class MainWindow(QMainWindow):
         self._map_policy_status.setWordWrap(True)
         settings_layout.addWidget(self._map_policy_status)
         map_label = QLabel(t("settings.map_label"), settings_content)
+        self._map_label = map_label
         settings_layout.addWidget(map_label)
         choose_map = QPushButton(t("settings.choose_map"), settings_content)
+        self._choose_map_button = choose_map
         choose_map.setAccessibleDescription(t("settings.choose_map_description"))
         choose_map.setObjectName("selectMapPackage")
         choose_map.setAccessibleName(t("settings.choose_map"))
@@ -463,6 +543,7 @@ class MainWindow(QMainWindow):
         choose_map.clicked.connect(self._select_map_package)
         settings_layout.addWidget(choose_map)
         import_pmtiles = QPushButton(t("settings.import_pmtiles"), settings_content)
+        self._import_pmtiles_button = import_pmtiles
         import_pmtiles.setObjectName("importPmtiles")
         import_pmtiles.setAccessibleName(t("settings.import_pmtiles"))
         import_pmtiles.setToolTip(t("settings.import_pmtiles"))
@@ -472,6 +553,7 @@ class MainWindow(QMainWindow):
         self._map_package_status.setWordWrap(True)
         settings_layout.addWidget(self._map_package_status)
         offline_maps_label = QLabel(t("settings.offline_maps"), settings_content)
+        self._offline_maps_label = offline_maps_label
         settings_layout.addWidget(offline_maps_label)
         self._offline_maps = QTableWidget(0, 6, settings_content)
         self._offline_maps.setObjectName("offlineMapsTable")
@@ -490,6 +572,7 @@ class MainWindow(QMainWindow):
         self._offline_maps.setAccessibleName(t("settings.offline_maps"))
         settings_layout.addWidget(self._offline_maps)
         remove_map = QPushButton(t("settings.remove_map"), settings_content)
+        self._remove_map_button = remove_map
         remove_map.setObjectName("removeOfflineMap")
         remove_map.setAccessibleName(t("settings.remove_map"))
         remove_map.setToolTip(t("settings.remove_map"))
@@ -498,6 +581,7 @@ class MainWindow(QMainWindow):
         self._refresh_offline_maps()
         settings_layout.addStretch()
         self._map_mode_combo.currentIndexChanged.connect(self._set_map_mode)
+        self._language_combo.currentIndexChanged.connect(self._set_language)
         settings_scroll = QScrollArea(settings)
         settings_scroll.setObjectName("settingsScrollArea")
         settings_scroll.setWidgetResizable(True)
@@ -520,7 +604,7 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self._project_identity_label)
         self._workspace_status_label = QLabel()
         self._workspace_status_label.setObjectName("workspaceStatus")
-        self._workspace_status_label.setAccessibleName("Workspace del proyecto")
+        self._workspace_status_label.setAccessibleName(t("accessibility.project_workspace"))
         self._workspace_status_label.setMinimumWidth(120)
         self._workspace_status_label.setMaximumWidth(300)
         self.statusBar().addPermanentWidget(self._workspace_status_label)
@@ -552,6 +636,24 @@ class MainWindow(QMainWindow):
         }
         self._help_action = QAction(t("action.help"), self)
         self._about_action = QAction(t("action.about"), self)
+        self._undo_action = QAction(t("editor.undo"), self)
+        self._undo_action.setObjectName("globalUndo")
+        self._undo_action.setShortcut(QKeySequence("Ctrl+Z"))
+        self._undo_action.setShortcutContext(Qt.ShortcutContext.WindowShortcut)
+        self._undo_action.triggered.connect(self._global_undo)
+        self._redo_action = QAction(t("editor.redo"), self)
+        self._redo_action.setObjectName("globalRedo")
+        self._redo_action.setShortcut(QKeySequence("Ctrl+Y"))
+        self._redo_action.setShortcutContext(Qt.ShortcutContext.WindowShortcut)
+        self._redo_action.triggered.connect(self._global_redo)
+        self._redo_shift_action = QAction(t("editor.redo"), self)
+        self._redo_shift_action.setObjectName("globalRedoShift")
+        self._redo_shift_action.setShortcut(QKeySequence("Ctrl+Shift+Z"))
+        self._redo_shift_action.setShortcutContext(Qt.ShortcutContext.WindowShortcut)
+        self._redo_shift_action.triggered.connect(self._global_redo)
+        self.addAction(self._undo_action)
+        self.addAction(self._redo_action)
+        self.addAction(self._redo_shift_action)
         self._actions[UiAction.NEW_PROJECT].setShortcut(QKeySequence.StandardKey.New)
         self._actions[UiAction.OPEN_PROJECT].setShortcut(QKeySequence.StandardKey.Open)
         self._actions[UiAction.CLOSE_PROJECT].setShortcut(QKeySequence.StandardKey.Close)
@@ -568,12 +670,36 @@ class MainWindow(QMainWindow):
         self._help_action.triggered.connect(self._show_help)
         self._about_action.triggered.connect(self._show_about)
         toolbar = QToolBar(t("toolbar.title"), self)
+        self._toolbar = toolbar
         toolbar.setAccessibleName(t("toolbar.title"))
         self.addToolBar(toolbar)
         for toolbar_action in self._actions.values():
             toolbar.addAction(toolbar_action)
         toolbar.addAction(self._help_action)
         toolbar.addAction(self._about_action)
+        toolbar.addAction(self._undo_action)
+        toolbar.addAction(self._redo_action)
+        self._sync_history_actions(False, False)
+
+    def _focused_text_editor(self) -> bool:
+        focused = QApplication.focusWidget()
+        return isinstance(focused, (QLineEdit, QTextEdit, QPlainTextEdit))
+
+    def _global_undo(self) -> None:
+        if self._focused_text_editor():
+            return
+        self._editor._undo()
+
+    def _global_redo(self) -> None:
+        if self._focused_text_editor():
+            return
+        self._editor._redo()
+
+    def _sync_history_actions(self, undo_available: bool, redo_available: bool) -> None:
+        if hasattr(self, "_undo_action"):
+            self._undo_action.setEnabled(undo_available)
+            self._redo_action.setEnabled(redo_available)
+            self._redo_shift_action.setEnabled(redo_available)
 
     def _request_cancellation(self) -> None:
         if not self._state.allows(UiAction.CANCEL_JOB):
@@ -607,6 +733,94 @@ class MainWindow(QMainWindow):
     def _remember_file_directory(self, kind: DirectoryKind, file_path: Path) -> None:
         self._directory_preferences.remember_file(kind, file_path)
 
+    def _set_language(self, _index: int) -> None:
+        language = self._language_combo.currentData()
+        if not isinstance(language, str):
+            return
+        selected = set_locale(language)
+        self._directory_preferences.remember_language(selected)
+        self._retranslate_ui()
+        self.statusBar().showMessage(
+            t("settings.language_saved", language=locale_label(selected)), 4000
+        )
+
+    def _retranslate_ui(self) -> None:
+        """Retraduce controles existentes sin reconstruir la Working Copy."""
+        for action, key in (
+            (UiAction.NEW_PROJECT, "action.new_project"),
+            (UiAction.OPEN_PROJECT, "action.open_project"),
+            (UiAction.CLOSE_PROJECT, "action.close_project"),
+            (UiAction.IMPORT_FEED, "action.import_feed"),
+            (UiAction.CANCEL_JOB, "action.cancel_job"),
+            (UiAction.SHOW_SETTINGS, "action.settings"),
+        ):
+            self._actions[action].setText(t(key))
+        self._help_action.setText(t("action.help"))
+        self._about_action.setText(t("action.about"))
+        self._toolbar.setWindowTitle(t("toolbar.title"))
+        self._toolbar.setAccessibleName(t("toolbar.title"))
+        self.setWindowTitle(
+            t("identity.main_window_title", product_name=IDENTITY.name, version=IDENTITY.version)
+        )
+        self._navigation.setAccessibleName(t("navigation.title"))
+        for row, key in enumerate(
+            (
+                "navigation.project",
+                "navigation.explore",
+                "navigation.validation",
+                "navigation.export",
+            )
+        ):
+            item = self._navigation.item(row)
+            if item is not None:
+                item.setText(t(key))
+        self._settings_dock.setWindowTitle(t("action.settings"))
+        self._language_label.setText(t("settings.language_label"))
+        self._language_notice.setText(t("settings.language_restart_notice"))
+        self._language_combo.blockSignals(True)
+        for index, language in enumerate(supported_locales()):
+            if index < self._language_combo.count():
+                self._language_combo.setItemText(index, locale_label(language))
+        self._language_combo.blockSignals(False)
+        self._explore_tabs.setTabText(0, t("explore.routes"))
+        self._explore_tabs.setTabText(1, t("explore.raw"))
+        self._explore_tabs.setTabText(2, t("explore.editor"))
+        self._map_mode_label.setText(t("settings.map_mode_label"))
+        for index, key in enumerate(
+            (
+                "settings.map_mode_auto",
+                "settings.map_mode_offline",
+                "settings.map_mode_online",
+            )
+        ):
+            if index < self._map_mode_combo.count():
+                self._map_mode_combo.setItemText(index, t(key))
+        self._map_label.setText(t("settings.map_label"))
+        self._choose_map_button.setText(t("settings.choose_map"))
+        self._choose_map_button.setAccessibleName(t("settings.choose_map"))
+        self._choose_map_button.setToolTip(t("settings.choose_map_description"))
+        self._import_pmtiles_button.setText(t("settings.import_pmtiles"))
+        self._import_pmtiles_button.setAccessibleName(t("settings.import_pmtiles"))
+        self._import_pmtiles_button.setToolTip(t("settings.import_pmtiles"))
+        self._offline_maps_label.setText(t("settings.offline_maps"))
+        self._remove_map_button.setText(t("settings.remove_map"))
+        self._remove_map_button.setAccessibleName(t("settings.remove_map"))
+        self._remove_map_button.setToolTip(t("settings.remove_map"))
+        self._map_policy_status.setText(self._explorer.map_status)
+        self._workspace_status_label.setAccessibleName(t("accessibility.project_workspace"))
+        self._overview.retranslate_ui()
+        self._operation_history.retranslate_ui()
+        self._validation.retranslate_ui()
+        self._raw_inspector.retranslate_ui()
+        self._exporter.retranslate_ui()
+        self._explorer.retranslate_ui()
+        self._editor.retranslate_ui()
+        self._undo_action.setText(t("editor.undo"))
+        self._redo_action.setText(t("editor.redo"))
+        self._redo_shift_action.setText(t("editor.redo"))
+        self._apply_state()
+        self._show_section(self._page_stack.currentIndex())
+
     def _choose_project(self) -> None:
         # Abrir proyecto siempre parte del contenedor de proyectos del usuario;
         # no debe heredar el workspace actualmente abierto ni una subcarpeta
@@ -618,7 +832,8 @@ class MainWindow(QMainWindow):
         if not directory:
             return
         try:
-            self._close_project()
+            if not self._close_project():
+                return
             opened = OpenProject(Path(directory)).execute()
         except RecoveryCandidateAvailableError as error:
             candidate = self._choose_recovery_candidate(error)
@@ -693,7 +908,8 @@ class MainWindow(QMainWindow):
         if not directory:
             return
         try:
-            self._close_project()
+            if not self._close_project():
+                return
             opened = CreateProject(Path(directory)).execute()
         except Exception as error:
             self._show_error(str(error), operation="create_project", exception=error)
@@ -704,14 +920,51 @@ class MainWindow(QMainWindow):
         self._refresh_overview()
         self._resolve_global_map()
 
-    def _close_project(self) -> None:
+    def _close_project(self) -> bool:
+        self._cancel_pending_map_edit()
         opened_project = self._opened_project
-        # Desacopla primero los widgets y el estado global. Algunos widgets
-        # reciben señales durante su reset y no deben conservar el proyecto
-        # que se está cerrando como contexto consultable.
-        self._opened_project = None
-        self._clear_import_context()
-        self._reset_project_ui_context()
+        editor_session = self._editor_session
+        editing = getattr(editor_session, "editing_session", None) if editor_session else None
+        has_draft_changes = (
+            bool(getattr(editor_session, "editing_dirty", False))
+            if editing is not None
+            else bool(editor_session.dirty)
+            if editor_session is not None
+            else False
+        )
+        discard_draft = False
+        if editor_session is not None and has_draft_changes:
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle(t("editor.close_draft_title"))
+            dialog.setText(t("editor.close_draft_message"))
+            dialog.setInformativeText(t("editor.close_draft_question"))
+            dialog.addButton(t("editor.close_preserve_draft"), QMessageBox.ButtonRole.AcceptRole)
+            discard = dialog.addButton(
+                t("editor.close_discard_changes"), QMessageBox.ButtonRole.DestructiveRole
+            )
+            cancel = dialog.addButton(t("editor.cancel_finish"), QMessageBox.ButtonRole.RejectRole)
+            dialog.exec()
+            clicked = dialog.clickedButton()
+            if clicked is None or clicked is cancel:
+                return False
+            if clicked is discard:
+                discard_draft = True
+        if editor_session is not None and editing is not None:
+            # El contexto activo es temporal; se restaura antes de cerrar el
+            # proyecto para no persistir flags de sesión como si fueran datos.
+            editor_session.finish_editing()
+        if editor_session is not None and discard_draft:
+            editor_session.discard()
+        if editor_session is not None:
+            try:
+                editor_session.close()
+            except Exception as error:
+                self._show_error(
+                    f"No se pudo guardar el borrador al cerrar: {error}",
+                    operation="close_editor_session",
+                    exception=error,
+                )
+                return False
         if opened_project is not None:
             try:
                 opened_project.close()
@@ -721,8 +974,15 @@ class MainWindow(QMainWindow):
                     operation="close_project",
                     exception=error,
                 )
+                return False
+        # Solo se descarta el contexto visible tras persistir y cerrar con éxito.
+        self._editor_session = None
+        self._opened_project = None
+        self._clear_import_context()
+        self._reset_project_ui_context()
         if self._state.mode not in {UiMode.NO_PROJECT, UiMode.JOB_RUNNING, UiMode.JOB_CANCELLING}:
             self.project_closed()
+        return True
 
     def _reset_project_ui_context(self) -> None:
         """Deja toda la UI transitoria sin identidad ni datos de proyecto."""
@@ -732,12 +992,170 @@ class MainWindow(QMainWindow):
         self._explorer.clear()
         self._validation.clear()
         self._exporter.clear()
+        self._editor.clear()
         self._exporter.set_executor(None)
         self._explore_tabs.setCurrentWidget(self._explorer)
         self._navigation.blockSignals(True)
         self._navigation.setCurrentRow(0)
         self._navigation.blockSignals(False)
         self._show_section(0)
+
+    def _get_editor_session(self) -> EditorSession | None:
+        if self._opened_project is None:
+            return None
+        if self._editor_session is None:
+            self._editor_session = EditorSession.open(
+                DuckDbUnitOfWork(self._opened_project.database)
+            )
+        return self._editor_session
+
+    def _handle_map_edit_gesture(self, gesture: MapEditGesture) -> None:
+        """Convierte un gesto v2 en una propuesta pendiente, sin aplicarla."""
+        if gesture.action == "select" and self._editor.handle_map_gesture(gesture):
+            return
+        if gesture.action in {"drag_start", "drag_preview"}:
+            # El mapa puede emitir estos eventos durante un arrastre continuo;
+            # solo el soltar (`drag_end`) representa una operación confirmable.
+            return
+        if self._pending_map_edit is not None:
+            # Una operación pendiente conserva su preview local: no se puede
+            # encadenar otro gesto antes de Confirmar o Cancelar.
+            self._editor.refresh()
+            return
+        session = self._get_editor_session()
+        if session is None:
+            return
+        map_widget = self._explorer.map_widget
+        mode = getattr(map_widget, "edit_mode", None)
+        controller = MapEditController(session, mode=mode)
+        try:
+            proposal = controller.propose(gesture)
+        except MapEditError as error:
+            QMessageBox.warning(self, t("editor.map_not_applied_title"), str(error))
+            return
+        if proposal.impact.requires_resolution:
+            QMessageBox.information(
+                self,
+                t("editor.impact_preview_title"),
+                t(
+                    "editor.impact_requires_resolution",
+                    summary=self._map_impact_summary(proposal),
+                    required_count=len(proposal.impact.affected_entities),
+                    options=", ".join(proposal.impact.resolution_options)
+                    or t("editor.impact_none"),
+                ),
+            )
+            self._editor.refresh()
+            return
+        # MapLibre ya muestra el desplazamiento en su fuente local. La Working
+        # Copy no cambia hasta que el botón Confirmar consume esta propuesta.
+        self._pending_map_edit = (controller, proposal)
+        self.statusBar().showMessage(self._map_impact_summary(proposal), 5000)
+
+    @staticmethod
+    def _map_impact_summary(proposal: MapEditProposal) -> str:
+        impact = proposal.impact
+        return t(
+            "editor.map_impact_summary",
+            entity=f"{proposal.command.entity_key[0]}/{proposal.command.entity_key[1]}",
+            dependency_count=max(0, len(impact.affected_entities) - 1),
+            tables=", ".join(impact.affected_tables) or t("editor.impact_none"),
+            relationships=", ".join(impact.relationships) or t("editor.impact_no_dependencies"),
+        )
+
+    def _confirm_pending_map_edit(self) -> None:
+        pending = self._pending_map_edit
+        if pending is None:
+            return
+        controller, proposal = pending
+        try:
+            controller.apply(proposal)
+        except (MapEditError, ValueError) as error:
+            QMessageBox.warning(self, t("editor.map_not_applied_title"), str(error))
+            return
+        self._pending_map_edit = None
+        self._editor.refresh()
+        self.statusBar().showMessage(t("editor.map_gesture_saved"), 5000)
+
+    def _cancel_pending_map_edit(self) -> None:
+        """Descarta la propuesta visual; el posterior render restaura el borrador."""
+        self._pending_map_edit = None
+
+    def _explore_tab_changed(self, _index: int) -> None:
+        if self._explore_tabs.currentWidget() is self._editor:
+            self._explorer.move_map_to(self._editor.map_host)
+            self._editor.refresh()
+        else:
+            self._explorer.restore_map_to_explore()
+            self._explorer.restore_map_view()
+
+    def _handle_stop_action(self, stop_id: str, action: str) -> None:
+        """Navega desde la misma Stop Card a su destino operativo."""
+        if action == "center":
+            map_widget = self._explorer.map_widget
+            center_stop = getattr(map_widget, "center_stop", None)
+            if callable(center_stop):
+                center_stop(stop_id)
+            return
+        if action == "edit":
+            self._navigation.setCurrentRow(1)
+            self._explore_tabs.setCurrentWidget(self._editor)
+            self._editor.focus_stop(stop_id)
+            return
+        if action == "details":
+            self._navigation.setCurrentRow(1)
+            self._explore_tabs.setCurrentWidget(self._explorer)
+            self._explorer.show_stop_details(stop_id)
+
+    def _can_edit_stop_from_context(self, stop_id: str) -> bool:
+        """Solo expone edición cuando la parada pertenece a una ruta editable."""
+        session = self._editor_session
+        if session is None:
+            return False
+        index = session.working_copy.entity_index
+        for _key, stop_time in index.stop_times_by_stop.get(stop_id, ()):
+            trip = index.trips_by_id.get(str(stop_time.get("trip_id")))
+            if trip is not None and session.can_edit_route(str(trip.get("route_id"))):
+                return True
+        return False
+
+    def _finish_editing_session(self) -> None:
+        """Cierra solo el contexto de edición, no el proyecto abierto."""
+        self._cancel_pending_map_edit()
+        session = self._editor_session
+        editing = getattr(session, "editing_session", None) if session is not None else None
+        if session is None or editing is None:
+            return
+        if getattr(session, "editing_dirty", False):
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle(t("editor.finish_changes_title"))
+            dialog.setText(t("editor.finish_changes_message"))
+            preserve = dialog.addButton(
+                t("editor.preserve_draft"), QMessageBox.ButtonRole.AcceptRole
+            )
+            discard = dialog.addButton(
+                t("editor.discard_session_changes"), QMessageBox.ButtonRole.DestructiveRole
+            )
+            cancel = dialog.addButton(t("editor.cancel_finish"), QMessageBox.ButtonRole.RejectRole)
+            dialog.exec()
+            clicked = dialog.clickedButton()
+            if clicked is None or clicked is cancel:
+                return
+            if clicked is preserve:
+                try:
+                    session.save_draft()
+                except (OSError, RuntimeError, ValueError) as error:
+                    self._show_error(str(error), operation="save_editing_draft", exception=error)
+                    return
+            session.finish_editing(discard_session_changes=clicked is discard)
+        else:
+            session.finish_editing()
+        self._editor.dock_map_window()
+        self._explorer.restore_map_to_explore()
+        self._explorer.restore_map_view()
+        self._explore_tabs.setCurrentWidget(self._explorer)
+        self.statusBar().showMessage(t("editor.finish_editing"), 3000)
+        self._editor.refresh()
 
     def _choose_import_source(self) -> None:
         dialog = QMessageBox(self)
@@ -751,6 +1169,9 @@ class MainWindow(QMainWindow):
         archive_button.setToolTip(t("dialog.import_zip_tooltip"))
         csv_button = dialog.addButton(
             t("dialog.import_csv_action"), QMessageBox.ButtonRole.AcceptRole
+        )
+        kml_button = dialog.addButton(
+            t("dialog.import_kml_action"), QMessageBox.ButtonRole.ActionRole
         )
         cancel_button = dialog.addButton(QMessageBox.StandardButton.Cancel)
         cancel_button.setText(t("dialog.cancel"))
@@ -777,9 +1198,20 @@ class MainWindow(QMainWindow):
                 str(start_directory),
                 filter=t("dialog.import_csv_filter"),
             )
+        elif choice is kml_button:
+            start_directory = self._dialog_directory(DirectoryKind.IMPORTS)
+            selected, _ = QFileDialog.getOpenFileName(
+                self,
+                t("dialog.import_kml_title"),
+                str(start_directory),
+                filter=t("dialog.import_kml_filter"),
+            )
         else:
             return
         if not selected:
+            return
+        if choice is kml_button:
+            self._import_kml_geometry(Path(selected))
             return
         try:
             selected_path = Path(selected)
@@ -791,7 +1223,7 @@ class MainWindow(QMainWindow):
 
     def _request_import(self, source: InputSource) -> None:
         if not self._state.allows(UiAction.IMPORT_FEED):
-            raise ValueError("Abra un proyecto listo antes de importar un feed.")
+            raise ValueError(t("dialog.project_required_import"))
         confirm = QMessageBox.question(
             self,
             t("dialog.confirm_import_title"),
@@ -809,10 +1241,125 @@ class MainWindow(QMainWindow):
             return
         self.start_import(source)
 
+    def _import_kml_geometry(self, path: Path) -> None:
+        """Clasifica y aplica solo geometría KML explícitamente mapeada."""
+        session = self._get_editor_session()
+        if session is None:
+            self._show_error(t("dialog.kml_project_required"), operation="import_kml")
+            return
+        try:
+            reader = KmlGeometryImporter()
+            preview = SafeKmlReader().inspect(path)
+            mapping = self._kml_import_mapping(preview.classification, session)
+            if (
+                mapping is None
+                and preview.classification is not KmlClassification.GTFS_EXPLORER_KML
+            ):
+                return
+            proposal = reader.propose(path, session.working_copy, mapping=mapping)
+        except KmlSecurityError as error:
+            self._show_error(str(error), operation="import_kml_security", exception=error)
+            return
+        summary = t(
+            "dialog.kml_summary",
+            classification=proposal.preview.classification.value,
+            placemarks=proposal.preview.placemark_count,
+            points=proposal.preview.point_count,
+            lines=proposal.preview.line_string_count,
+        )
+        if proposal.unresolved:
+            QMessageBox.warning(
+                self,
+                t("dialog.kml_mapping_title"),
+                summary + "\n".join(proposal.unresolved),
+            )
+            return
+        if not proposal.commands:
+            QMessageBox.information(
+                self,
+                t("dialog.kml_no_changes_title"),
+                summary + t("dialog.kml_no_changes_message"),
+            )
+            return
+        confirmation = QMessageBox.question(
+            self,
+            t("dialog.kml_confirm_title"),
+            summary + t("dialog.kml_confirm_message"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirmation != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            KmlGeometryImporter().apply(session, proposal)
+        except (KmlSecurityError, TypeError, ValueError) as error:
+            self._show_error(
+                t("dialog.kml_apply_error", error=error),
+                operation="import_kml_apply",
+                exception=error,
+            )
+            return
+        self._editor.refresh()
+        self.statusBar().showMessage(
+            t("dialog.kml_applied", count=len(proposal.commands)),
+            7000,
+        )
+
+    def _kml_import_mapping(
+        self, classification: KmlClassification, session: EditorSession
+    ) -> KmlImportMapping | None:
+        if classification is KmlClassification.GTFS_EXPLORER_KML:
+            return None
+        entities = session.working_copy.entities
+        routes = sorted(
+            str(payload.get("route_id"))
+            for key, payload in entities.items()
+            if key[0] == "gtfs_routes" and payload.get("route_id") is not None
+        )
+        if not routes:
+            QMessageBox.warning(
+                self,
+                t("dialog.kml_mapping_title"),
+                t("dialog.kml_no_target_routes"),
+            )
+            return None
+        route_id, accepted = QInputDialog.getItem(
+            self,
+            t("dialog.kml_route_mapping_title"),
+            t("dialog.kml_route_mapping_prompt"),
+            routes,
+            0,
+            False,
+        )
+        if not accepted:
+            return None
+        shapes = sorted(
+            {
+                str(payload.get("shape_id"))
+                for key, payload in entities.items()
+                if key[0] == "gtfs_shapes" and payload.get("shape_id") is not None
+            }
+        )
+        shape_id: str | None = None
+        if shapes:
+            shape_id, accepted = QInputDialog.getItem(
+                self,
+                t("dialog.kml_shape_mapping_title"),
+                t("dialog.kml_shape_mapping_prompt"),
+                [t("dialog.kml_without_shape"), *shapes],
+                0,
+                False,
+            )
+            if not accepted:
+                return None
+            if shape_id == t("dialog.kml_without_shape"):
+                shape_id = None
+        return KmlImportMapping(route_id=route_id, shape_id=shape_id)
+
     def start_import(self, source: InputSource) -> None:
         """Inicia el trabajo desde una interacción ya confirmada de la UI."""
         if not self._state.allows(UiAction.IMPORT_FEED):
-            raise RuntimeError("No se puede importar en el estado actual.")
+            raise RuntimeError(t("dialog.import_unavailable_state"))
         self.job_started()
         self._begin_import_context(source)
         self._progress_bar.setValue(0)
@@ -821,10 +1368,8 @@ class MainWindow(QMainWindow):
         if self._is_high_volume_source(source):
             QMessageBox.warning(
                 self,
-                "Volumen elevado",
-                "Este feed contiene un volumen elevado de datos.\n\n"
-                "La importación puede tardar varios minutos.\n"
-                "Podrás seguir el progreso y cancelarla en cualquier momento.",
+                t("dialog.high_volume_title"),
+                t("dialog.high_volume_message"),
                 QMessageBox.StandardButton.Ok,
             )
         self._import_adapter.start(
@@ -947,14 +1492,14 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _import_phase_text(phase: ImportPhase | None) -> str:
         if phase is None:
-            return "Preparación"
+            return t("status.import_phase_preparation")
         return {
-            ImportPhase.PREFLIGHT: "Preparación",
-            ImportPhase.STAGING: "Carga",
-            ImportPhase.NORMALIZING: "Normalización",
-            ImportPhase.VALIDATING: "Validación",
-            ImportPhase.COMMITTING: "Finalización",
-            ImportPhase.CLEANUP: "Limpieza",
+            ImportPhase.PREFLIGHT: t("status.import_phase_preparation"),
+            ImportPhase.STAGING: t("status.import_phase_loading"),
+            ImportPhase.NORMALIZING: t("status.import_phase_normalizing"),
+            ImportPhase.VALIDATING: t("status.import_phase_validating"),
+            ImportPhase.COMMITTING: t("status.import_phase_finalizing"),
+            ImportPhase.CLEANUP: t("status.import_phase_cleanup"),
         }[phase]
 
     def _render_import_context(self) -> None:
@@ -962,32 +1507,52 @@ class MainWindow(QMainWindow):
             return
         cancellation = self._state.mode is UiMode.JOB_CANCELLING
         prefix = (
-            "Cancelando…"
+            t("status.import_prefix_cancelling")
             if cancellation
-            else ("Importando" if self._import_phase is None else "Importación activa")
+            else (
+                t("status.import_prefix_importing")
+                if self._import_phase is None
+                else t("status.import_prefix_active")
+            )
         )
         phase = self._import_phase_text(self._import_phase)
         elapsed = self._elapsed_text()
         if self._import_progress_mode is ProgressMode.DETERMINATE:
-            progress_text = f"Progreso: {self._import_progress} %"
-            compact_progress = f"{self._import_progress} %"
+            progress_text = t("status.import_progress", progress=self._import_progress)
+            compact_progress = t("status.import_progress_short", progress=self._import_progress)
         elif self._import_completed is not None:
-            unit = self._import_unit or "unidades"
-            progress_text = f"Actividad: {self._import_completed:,} {unit}".replace(",", ".")
-            compact_progress = f"{self._import_completed:,} {unit}".replace(",", ".")
+            unit = self._import_unit or t("status.import_units")
+            completed = f"{self._import_completed:,}".replace(",", ".")
+            progress_text = t("status.import_activity", completed=completed, unit=unit)
+            compact_progress = t("status.import_activity_short", completed=completed, unit=unit)
         else:
-            progress_text = "Actividad en curso"
-            compact_progress = "en curso"
-        detail = f"\nDetalle: {self._import_detail}" if self._import_detail else ""
-        preparing = "\nPreparando importación…" if self._import_phase is None else ""
-        self._import_context_label.setText(
-            f"{prefix}\nFeed: {self._import_feed_name}{preparing}\nFase: {phase}\n"
-            f"{progress_text}{detail}\nTiempo transcurrido: {elapsed}"
+            progress_text = t("status.import_activity_in_progress")
+            compact_progress = t("status.import_in_progress_short")
+        detail = (
+            t("status.import_detail", detail=self._import_detail) if self._import_detail else ""
         )
-        self._status_label.setText("Cancelando…" if cancellation else "Importando…")
+        preparing = t("status.import_preparing") if self._import_phase is None else ""
+        self._import_context_label.setText(
+            f"{prefix}\n{t('status.import_feed', feed=self._import_feed_name)}{preparing}\n"
+            f"{t('status.import_phase', phase=phase)}\n{progress_text}{detail}\n"
+            f"{t('status.import_elapsed', elapsed=elapsed)}"
+        )
+        self._status_label.setText(
+            t("status.cancelling") if cancellation else t("status.importing")
+        )
         self._status_label.setToolTip(
-            f"{'Cancelando' if cancellation else 'Importando'}: {self._import_feed_name} · "
-            f"{phase} · {compact_progress} · {elapsed}"
+            t(
+                "status.import_tooltip",
+                prefix=(
+                    t("status.import_tooltip_cancelling")
+                    if cancellation
+                    else t("status.import_tooltip_importing")
+                ),
+                feed=self._import_feed_name,
+                phase=phase,
+                progress=compact_progress,
+                elapsed=elapsed,
+            )
         )
 
     def _clear_import_context(self) -> None:
@@ -1045,8 +1610,11 @@ class MainWindow(QMainWindow):
             )
         else:
             self._show_error(
-                "La importación no se ha completado. "
-                f"Estado: {result.state.value}; incidencias: {result.issue_count}.",
+                t(
+                    "dialog.import_incomplete_message",
+                    state=result.state.value,
+                    issue_count=result.issue_count,
+                ),
                 operation="import_feed",
                 exception=RuntimeError(
                     f"Estado {result.state.value}; incidencias: {result.issue_count}."
@@ -1059,7 +1627,7 @@ class MainWindow(QMainWindow):
         self.job_finished()
         self._refresh_operation_history()
         self._show_error(
-            f"No se pudo iniciar la importación: {message}",
+            t("dialog.import_start_error", message=message),
             operation="import_feed",
             exception=RuntimeError(message),
         )
@@ -1173,21 +1741,21 @@ class MainWindow(QMainWindow):
             widget_action.setEnabled(self._state.allows(action))
         self._status_label.setText(
             {
-                UiMode.NO_PROJECT: "Sin proyecto",
-                UiMode.PROJECT_READY: "Listo",
-                UiMode.RECOVERY_REQUIRED: "Recuperación necesaria",
-                UiMode.JOB_RUNNING: "Trabajo en curso…",
-                UiMode.JOB_CANCELLING: "Cancelando…",
+                UiMode.NO_PROJECT: t("status.no_project_short"),
+                UiMode.PROJECT_READY: t("status.ready"),
+                UiMode.RECOVERY_REQUIRED: t("status.recovery_short"),
+                UiMode.JOB_RUNNING: t("status.in_progress"),
+                UiMode.JOB_CANCELLING: t("status.cancelling"),
             }[self._state.mode]
         )
-        self._status_label.setToolTip(self._state.status_message)
-        self._content_label.setText(self._state.status_message)
+        self._status_label.setToolTip(_ui_state_message(self._state.mode))
+        self._content_label.setText(_ui_state_message(self._state.mode))
         self._navigation.setEnabled(self._state.mode is not UiMode.NO_PROJECT)
         self._refresh_project_identity()
 
     def _refresh_project_identity(self) -> None:
         if self._opened_project is None:
-            self._project_identity_label.setText("Sin proyecto abierto")
+            self._project_identity_label.setText(t("project.no_open"))
             self._project_identity_label.setToolTip("")
             self._workspace_status_label.setText("")
             self._workspace_status_label.setToolTip("")
@@ -1197,13 +1765,13 @@ class MainWindow(QMainWindow):
         workspace = str(self._opened_project.directory)
         self._project_identity_label.setText(
             QFontMetrics(self._project_identity_label.font()).elidedText(
-                f"Proyecto: {name}", Qt.TextElideMode.ElideRight, 280
+                t("project.name", name=name), Qt.TextElideMode.ElideRight, 280
             )
         )
         self._project_identity_label.setToolTip(name)
         self._workspace_status_label.setText(
             QFontMetrics(self._workspace_status_label.font()).elidedText(
-                f"Workspace: {workspace}", Qt.TextElideMode.ElideMiddle, 300
+                t("project.workspace", workspace=workspace), Qt.TextElideMode.ElideMiddle, 300
             )
         )
         self._workspace_status_label.setToolTip(workspace)
@@ -1303,10 +1871,43 @@ class MainWindow(QMainWindow):
     def _query_map_layers(self, trip_id: str) -> MapLayerPayload:
         if self._opened_project is None:
             raise RuntimeError("Abra un proyecto antes de consultar el mapa.")
+        if self._editor_session is not None:
+            popup_by_stop = _map_stop_popup_data_from_working_copy(
+                self._editor_session.working_copy, trip_id
+            )
+            return map_layers_for_working_copy(
+                self._editor_session.working_copy, trip_id, popup_by_stop
+            )
         with DuckDbUnitOfWork(self._opened_project.database) as unit_of_work:
             geometry = GeometryQueries(unit_of_work.geometry).trip_shape(trip_id)
             popup_by_stop = self._map_stop_popup_data(unit_of_work._connection, trip_id)
         return map_layers_for_trip(geometry, popup_by_stop)
+
+    def _query_map_layers_for_routes(
+        self,
+        route_ids: frozenset[str],
+        *,
+        include_shape_points: bool = False,
+        segment: tuple[str, str] | None = None,
+        preview_route_id: str | None = None,
+        session_route_ids: frozenset[str] | None = None,
+    ) -> MapLayerPayload:
+        """Consulta el overlay simultáneo de Editar sobre el mismo borrador."""
+        session = self._get_editor_session()
+        if session is None:
+            return MapLayerPayload(
+                {"type": "FeatureCollection", "features": []},
+                {"type": "FeatureCollection", "features": []},
+                {"type": "FeatureCollection", "features": []},
+            )
+        return map_layers_for_working_copy_routes(
+            session.working_copy,
+            route_ids,
+            include_shape_points=include_shape_points,
+            segment=segment,
+            preview_route_id=preview_route_id,
+            session_route_ids=session_route_ids,
+        )
 
     @staticmethod
     def _map_stop_popup_data(
@@ -1318,30 +1919,73 @@ class MainWindow(QMainWindow):
             "(SELECT CASE WHEN count(*) = 1 THEN max(agency_id) END FROM gtfs_agency)) "
         )
         selected_rows = connection.execute(
-            "SELECT st.stop_id, r.route_id, r.route_short_name, r.route_long_name, "
-            "t.trip_headsign, "
+            "SELECT st.stop_id, own_stop.stop_name, r.route_id, r.route_short_name, "
+            "r.route_long_name, t.trip_headsign, t.service_id, r.route_color, "
             "a.agency_name, st.arrival_time_lexeme, st.departure_time_lexeme, "
-            "coalesce(st.departure_service_seconds, st.arrival_service_seconds) "
+            "st.stop_sequence, st.arrival_service_seconds, st.departure_service_seconds "
             "FROM gtfs_stop_times st JOIN gtfs_trips t ON t.trip_id = st.trip_id "
             "JOIN gtfs_routes r ON r.route_id = t.route_id "
+            "LEFT JOIN gtfs_stops own_stop ON own_stop.stop_id = st.stop_id "
             + agency
             + "WHERE st.trip_id = ? ORDER BY st.stop_sequence NULLS LAST, st.source_row",
             [trip_id],
         ).fetchall()
         result: dict[str, dict[str, object]] = {}
         references: dict[str, int | None] = {}
-        for row in selected_rows:
+        for position, row in enumerate(selected_rows):
             stop_id = str(row[0])
             result[stop_id] = {
-                "selected_route_id": str(row[1]),
-                "route": " · ".join(str(value) for value in row[2:4] if value),
-                "headsign": str(row[4]) if row[4] is not None else "",
-                "agency": str(row[5]) if row[5] is not None else "",
-                "arrival": str(row[6]) if row[6] is not None else "",
-                "departure": str(row[7]) if row[7] is not None else "",
+                "stop_id": stop_id,
+                "name": str(row[1]) if row[1] is not None else "",
+                "selected_route_id": str(row[2]),
+                "route_id": str(row[2]),
+                "route_short_name": str(row[3]) if row[3] is not None else "",
+                "route_long_name": str(row[4]) if row[4] is not None else "",
+                "route": " · ".join(str(value) for value in row[3:5] if value),
+                "headsign": str(row[5]) if row[5] is not None else "",
+                "service_id": str(row[6]) if row[6] is not None else "",
+                "route_color": str(row[7]) if row[7] is not None else "",
+                "agency": str(row[8]) if row[8] is not None else "",
+                "arrival": str(row[9]) if row[9] is not None else "",
+                "departure": str(row[10]) if row[10] is not None else "",
+                "arrival_time": str(row[9]) if row[9] is not None else "",
+                "departure_time": str(row[10]) if row[10] is not None else "",
+                "sequence": int(row[11]) if isinstance(row[11], int) else None,
+                "endpoint": (
+                    "origin"
+                    if position == 0
+                    else "destination"
+                    if position == len(selected_rows) - 1
+                    else "intermediate"
+                ),
+                "trip_id": trip_id,
+                "dwell_seconds": (
+                    int(row[13]) - int(row[12])
+                    if isinstance(row[12], int) and isinstance(row[13], int)
+                    else None
+                ),
+                "previous_stop": (str(selected_rows[position - 1][0]) if position else ""),
+                "previous_stop_name": (
+                    str(selected_rows[position - 1][1])
+                    if position and selected_rows[position - 1][1] is not None
+                    else ""
+                ),
+                "next_stop": (
+                    str(selected_rows[position + 1][0]) if position + 1 < len(selected_rows) else ""
+                ),
+                "next_stop_name": (
+                    str(selected_rows[position + 1][1])
+                    if position + 1 < len(selected_rows)
+                    and selected_rows[position + 1][1] is not None
+                    else ""
+                ),
                 "other_routes": [],
             }
-            references[stop_id] = int(row[8]) if isinstance(row[8], int) else None
+            references[stop_id] = (
+                int(row[13])
+                if isinstance(row[13], int)
+                else (int(row[12]) if isinstance(row[12], int) else None)
+            )
         if not references:
             return result
         placeholders = ", ".join("?" for _ in references)
@@ -1516,14 +2160,12 @@ class MainWindow(QMainWindow):
         validation_visible = index == 2
         export_visible = index == 3
         if explorer_visible:
-            self._content_label.setText("Explore rutas, viajes, paradas y horarios programados.")
+            self._content_label.setText(t("content.explore"))
         elif validation_visible:
-            self._content_label.setText("Revise incidencias sin puntuaciones agregadas.")
+            self._content_label.setText(t("content.validation"))
             self._validation.refresh()
         elif export_visible:
-            self._content_label.setText(
-                "Exporte una salida local con alcance y formato explícitos."
-            )
+            self._content_label.setText(t("content.export"))
 
     def _export_feed(
         self, request: ExportRequest, is_cancelled: Callable[[], bool]
@@ -1531,6 +2173,11 @@ class MainWindow(QMainWindow):
         """Registra y ejecuta una exportación real de feed."""
         if self._opened_project is None:
             raise RuntimeError("Abra un proyecto antes de exportar.")
+        editor_session = getattr(self, "_editor_session", None)
+        if editor_session is not None and editor_session.data_draft_dirty:
+            raise ExportError(
+                "El borrador tiene cambios sin confirmar; confirme o descarte antes de exportar."
+            )
         database = self._opened_project.database
         project_id = getattr(getattr(self._opened_project, "descriptor", None), "project_id", None)
         if project_id is None:
@@ -1544,20 +2191,16 @@ class MainWindow(QMainWindow):
             if feed is None:
                 raise RuntimeError("El proyecto no contiene un feed importado.")
             feed_id = feed.feed_id
-        try:
-            result = cast(
-                ExportResult,
-                FeedExportLifecycle().execute(
-                    database,
-                    project_id,
-                    feed_id,
-                    request.format.value,
-                    lambda _operation_id: self._write_feed_export(request, feed_id, is_cancelled),
-                ),
-            )
-        finally:
-            self._refresh_operation_history()
-        return result
+        return cast(
+            ExportResult,
+            FeedExportLifecycle().execute(
+                database,
+                project_id,
+                feed_id,
+                request.format.value,
+                lambda _operation_id: self._write_feed_export(request, feed_id, is_cancelled),
+            ),
+        )
 
     def _export_feed_from_ui(
         self, request: ExportRequest, is_cancelled: Callable[[], bool]
@@ -1565,7 +2208,6 @@ class MainWindow(QMainWindow):
         """Prepara el destino sugerido antes de delegar en el compositor real."""
         prepared_request = self._prepare_export_request(request)
         result = self._export_feed(prepared_request, is_cancelled)
-        self._remember_directory(DirectoryKind.EXPORTS, prepared_request.destination.parent)
         return result
 
     def _prepare_export_request(self, request: ExportRequest) -> ExportRequest:
@@ -1588,6 +2230,34 @@ class MainWindow(QMainWindow):
         if self._opened_project is None:
             raise RuntimeError("Abra un proyecto antes de exportar.")
         database = self._opened_project.database
+        editor_session = getattr(self, "_editor_session", None)
+        revision_formats = {
+            ExportFormat.JSON,
+            ExportFormat.GEOJSON,
+            ExportFormat.CSV,
+            ExportFormat.MINI_GTFS,
+            ExportFormat.COMPLETE_GTFS,
+            ExportFormat.NEW_GTFS_VERSION,
+            ExportFormat.KML,
+            ExportFormat.KMZ,
+        }
+        if request.format in revision_formats and (
+            editor_session is not None
+            or request.format
+            in {
+                ExportFormat.COMPLETE_GTFS,
+                ExportFormat.NEW_GTFS_VERSION,
+                ExportFormat.KML,
+                ExportFormat.KMZ,
+            }
+        ):
+            if editor_session is not None:
+                return self._write_revision_export(
+                    request, editor_session.working_copy, feed_id, is_cancelled
+                )
+            with DuckDbUnitOfWork(database) as unit_of_work:
+                working_copy = DuckDbEditorRepository(unit_of_work.connection).create_or_recover()
+                return self._write_revision_export(request, working_copy, feed_id, is_cancelled)
         selection = SubsetSelection(
             request.route_ids,
             request.trip_ids or None,
@@ -1670,6 +2340,109 @@ class MainWindow(QMainWindow):
                 ("Los opcionales no soportados o sin registros relevantes se han omitido.",),
                 "GTFS Schedule validado localmente",
             )
+
+    def _write_revision_export(
+        self,
+        request: ExportRequest,
+        working_copy: WorkingCopy,
+        feed_id: str,
+        is_cancelled: Callable[[], bool],
+    ) -> ExportResult:
+        """Publica cualquier salida 0.2.0 desde la WorkingRevision confirmada."""
+        if working_copy.dirty:
+            raise ExportError(
+                "El borrador tiene cambios sin confirmar; confirme o descarte antes de exportar."
+            )
+        revision_id = working_copy.base_revision_id
+        specification = load_schedule_spec(_SPECIFICATION_PATH)
+        selection = None
+        if request.format not in {
+            ExportFormat.COMPLETE_GTFS,
+            ExportFormat.NEW_GTFS_VERSION,
+        }:
+            selection = SubsetSelection(
+                request.route_ids,
+                request.trip_ids or None,
+                request.service_ids or None,
+            )
+        if request.format in {ExportFormat.COMPLETE_GTFS, ExportFormat.NEW_GTFS_VERSION}:
+            if request.format is ExportFormat.NEW_GTFS_VERSION and not request.version_id:
+                raise ExportError("La nueva versión GTFS necesita un identificador explícito.")
+            manifest = RevisionGtfsExporter(specification).write(
+                request.destination,
+                working_copy,
+                revision_id=revision_id,
+                confirmed=True,
+                version_id=request.version_id,
+                overwrite=request.overwrite,
+                is_cancelled=is_cancelled,
+            )
+            return ExportResult(manifest, classification="GTFS Schedule validado localmente")
+        if request.format in {ExportFormat.KML, ExportFormat.KMZ}:
+            try:
+                profile = KmlProfile(request.kml_profile or KmlProfile.STANDARD_KML)
+            except ValueError as error:
+                raise ExportError("El perfil KML/KMZ no es válido.") from error
+            manifest = WorkingCopyKmlExporter().write(
+                request.destination,
+                working_copy,
+                revision_id=revision_id,
+                confirmed=True,
+                route_ids=request.route_ids,
+                profile=profile,
+                overwrite=request.overwrite,
+                is_cancelled=is_cancelled,
+            )
+            return ExportResult(manifest, classification="interoperable geoespacial local")
+        assert selection is not None
+        exporters = WorkingCopyExporters(specification)
+        if request.format is ExportFormat.JSON:
+            manifest = exporters.write_json(
+                request.destination,
+                working_copy,
+                revision_id=revision_id,
+                selection=selection,
+                source={"feed_id": feed_id},
+                overwrite=request.overwrite,
+                is_cancelled=is_cancelled,
+            )
+            return ExportResult(manifest, classification="derivada de la WorkingRevision")
+        if request.format is ExportFormat.GEOJSON:
+            manifest = exporters.write_geojson(
+                request.destination,
+                working_copy,
+                revision_id=revision_id,
+                selection=selection,
+                include_bbox=request.include_bbox,
+                overwrite=request.overwrite,
+                is_cancelled=is_cancelled,
+            )
+            return ExportResult(manifest, classification="compatible geoespacial local")
+        if request.format is ExportFormat.CSV:
+            manifest = exporters.write_csv(
+                request.destination,
+                working_copy,
+                revision_id=revision_id,
+                selection=selection,
+                spreadsheet_safe=request.spreadsheet_safe,
+                overwrite=request.overwrite,
+                is_cancelled=is_cancelled,
+            )
+            return ExportResult(manifest, classification="vista CSV de la WorkingRevision")
+        manifest = RevisionGtfsExporter(specification).write(
+            request.destination,
+            working_copy,
+            revision_id=revision_id,
+            confirmed=True,
+            selection=selection,
+            overwrite=request.overwrite,
+            is_cancelled=is_cancelled,
+        )
+        return ExportResult(
+            manifest,
+            ("Los opcionales se han cerrado y revalidado desde la WorkingRevision.",),
+            "GTFS Schedule validado localmente",
+        )
 
     @staticmethod
     def _mini_gtfs_tables(
@@ -1856,7 +2629,7 @@ class MainWindow(QMainWindow):
             self._operation_history.refresh()
         except Exception as error:
             self._show_error(
-                "No se pudo actualizar el historial de operaciones.",
+                t("history.refresh_error"),
                 operation="refresh_operations_history",
                 exception=error,
             )
@@ -1871,7 +2644,7 @@ class MainWindow(QMainWindow):
         except (RuntimeError, ValueError) as error:
             self._map_policy_status.setText(self._explorer.map_status)
             self._show_error(
-                f"No se pudo cambiar el modo de mapa: {error}",
+                t("settings.map_mode_error", error=error),
                 operation="set_map_mode",
                 exception=error,
             )
@@ -1889,17 +2662,21 @@ class MainWindow(QMainWindow):
             package = self._offline_map_library.import_package(Path(directory))
             self._explorer.set_managed_map(self._offline_map_library, package)
         except (OSError, ValueError, RuntimeError) as error:
-            self._map_package_status.setText("Paquete rechazado: se mantiene el fondo neutro.")
+            self._map_package_status.setText(t("settings.map_package_rejected"))
             self._map_policy_status.setText(self._explorer.map_status)
             self._show_error(
-                f"No se pudo abrir el paquete de mapa: {error}",
+                t("settings.map_package_open_error", error=error),
                 operation="select_map_package",
                 exception=error,
             )
             return
         status = self._explorer.map_status
         self._map_package_status.setText(
-            f"Paquete local instalado. {status} · Atribución: {package.attribution or '—'}"
+            t(
+                "settings.map_package_installed",
+                status=status,
+                attribution=package.attribution or t("stop.not_available"),
+            )
         )
         self._remember_directory(DirectoryKind.PMTILES_IMPORT, Path(directory))
         self._refresh_offline_maps()
@@ -1918,12 +2695,12 @@ class MainWindow(QMainWindow):
         try:
             source_path = Path(source)
             package = self._offline_map_library.import_file(source_path)
-            result = (
-                "Mapa importado"
+            result_key = (
+                "settings.map_package_imported"
                 if package.is_renderable
-                else "PMTiles válido · estilo compatible no disponible"
+                else "settings.map_package_imported_unrenderable"
             )
-            self._map_package_status.setText(f"{result}: {package.name}")
+            self._map_package_status.setText(t(result_key, name=package.name))
             self._remember_file_directory(DirectoryKind.PMTILES_IMPORT, source_path)
             self._refresh_offline_maps()
             self._resolve_global_map()
@@ -1941,12 +2718,10 @@ class MainWindow(QMainWindow):
             package = resolve_best_map(coverage, library.installed_maps())
             if package is None:
                 if coverage.bounds is not None:
-                    self._map_package_status.setText(
-                        "No hay mapa offline para la zona de este proyecto."
-                    )
+                    self._map_package_status.setText(t("settings.map_package_no_coverage"))
                 return
             self._explorer.set_managed_map(library, package)
-            self._map_package_status.setText(f"Mapa global seleccionado: {package.name}")
+            self._map_package_status.setText(t("settings.map_package_selected", name=package.name))
             self._map_policy_status.setText(self._explorer.map_status)
         except Exception as error:
             logging.getLogger(__name__).warning("No se pudo resolver el mapa global: %s", error)
@@ -1964,7 +2739,9 @@ class MainWindow(QMainWindow):
             if self._opened_project is not None:
                 try:
                     with self._opened_project.database.connection() as connection:
-                        coverage = project_map_coverage(connection).source or "Disponible"
+                        coverage = project_map_coverage(connection).source or t(
+                            "settings.map_available"
+                        )
                 except Exception:
                     coverage = "—"
             values = (
@@ -1972,8 +2749,10 @@ class MainWindow(QMainWindow):
                 item.tile_type.value,
                 coverage,
                 f"{item.size / (1024 * 1024):.1f} MB",
-                "Listo" if item.is_renderable else "Sin estilo compatible",
-                " · ".join(x for x in (item.source, item.version) if x) or "—",
+                t("settings.map_ready")
+                if item.is_renderable
+                else t("settings.map_style_unavailable"),
+                " · ".join(x for x in (item.source, item.version) if x) or t("stop.not_available"),
             )
             for column, value in enumerate(values):
                 cell = QTableWidgetItem(value)
@@ -2004,7 +2783,7 @@ class MainWindow(QMainWindow):
             self._explorer.clear_managed_map()
             self._refresh_offline_maps()
             self._resolve_global_map()
-            self._map_package_status.setText("Mapa offline eliminado.")
+            self._map_package_status.setText(t("settings.map_package_removed"))
             self._map_policy_status.setText(self._explorer.map_status)
         except (OSError, ValueError) as error:
             self._show_error(str(error), operation="remove_offline_map", exception=error)
@@ -2079,6 +2858,40 @@ class MainWindow(QMainWindow):
             t("dialog.report_exported_message", filename=path.name),
             QMessageBox.StandardButton.Ok,
         )
+
+
+def _map_stop_popup_data_from_working_copy(
+    working_copy: WorkingCopy, trip_id: str
+) -> dict[str, dict[str, object]]:
+    return stop_popup_data_for_working_copy(working_copy, trip_id)
+
+
+def _ui_state_message(mode: UiMode) -> str:
+    return {
+        UiMode.NO_PROJECT: t("status.no_project"),
+        UiMode.PROJECT_READY: t("status.project_ready"),
+        UiMode.RECOVERY_REQUIRED: t("status.recovery_required"),
+        UiMode.JOB_RUNNING: t("status.job_running"),
+        UiMode.JOB_CANCELLING: t("status.job_cancelling"),
+    }[mode]
+
+
+def _text_value(value: object) -> str | None:
+    return None if value is None else str(value)
+
+
+def _map_sequence(value: object) -> tuple[int, int | str]:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return (0, value)
+    return (1, "" if value is None else str(value))
+
+
+def _map_time_value(payload: dict[str, object]) -> int | None:
+    value = payload.get("departure_service_seconds")
+    if isinstance(value, int):
+        return value
+    value = payload.get("arrival_service_seconds")
+    return value if isinstance(value, int) else None
 
 
 def run_window(

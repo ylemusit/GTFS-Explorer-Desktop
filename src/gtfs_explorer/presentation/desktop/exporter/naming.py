@@ -24,7 +24,7 @@ _RESERVED_WINDOWS_NAMES: Final = frozenset(
         *(f"lpt{index}" for index in range(1, 10)),
     }
 )
-_EXPORT_EXTENSIONS: Final = (".geojson", ".json", ".csv", ".zip")
+_EXPORT_EXTENSIONS: Final = (".geojson", ".json", ".csv", ".kml", ".kmz", ".zip")
 _CSV_MODE_SUFFIXES: Final = ("-spreadsheet-safe.csv", "-faithful.csv")
 
 
@@ -94,6 +94,14 @@ def _format_parts(format_: str | Enum, spreadsheet_safe: bool) -> tuple[str, str
         return f"csv-{mode}", ".csv"
     if key == "mini_gtfs":
         return "mini-gtfs", ".zip"
+    if key in {"complete_gtfs", "full_gtfs"}:
+        return "complete-gtfs", ".zip"
+    if key == "new_gtfs_version":
+        return "new-gtfs-version", ".zip"
+    if key == "kml":
+        return "kml", ".kml"
+    if key == "kmz":
+        return "kmz", ".kmz"
     raise ValueError(f"Formato de exportación no soportado: {value}")
 
 

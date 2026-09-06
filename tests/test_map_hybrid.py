@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,19 @@ from gtfs_explorer.application.map_policy import (
 from gtfs_explorer.application.queries.map_layers import MapLayerPayload, map_layer_bounds
 
 # Los stubs JavaScript se mantienen legibles como bloques ejecutables.
+
+
+def _run_node_harness(harness: str) -> subprocess.CompletedProcess[str]:
+    """Ejecuta payloads grandes sin exponerlos al límite de argv de Windows."""
+    with tempfile.TemporaryDirectory(prefix="gtfs-node-harness-") as temporary_dir:
+        script_path = Path(temporary_dir) / "harness.cjs"
+        script_path.write_text(harness, encoding="utf-8")
+        return subprocess.run(
+            ["node", str(script_path)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
 
 
 def _payload() -> MapLayerPayload:
@@ -217,12 +231,7 @@ onlineChange
     errors,
   }})));
 """
-    result = subprocess.run(
-        ["node", "--input-type=commonjs", "--eval", harness],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    result = _run_node_harness(harness)
     evidence = json.loads(result.stdout)
 
     assert evidence["before"]["camera"] == evidence["camera"]
@@ -269,14 +278,15 @@ window.GTFSExplorerLayers.setOnlineBasemap("https://tile.openstreetmap.org/{{z}}
 testMap.emit("error", {{error: {{message: "secret-url-with-trip_id-{failure}"}}}});
 testMap.emit("error", {{}});
 console.log(JSON.stringify(errors));\n"""
-    result = subprocess.run(
-        ["node", "--input-type=commonjs", "--eval", harness],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    result = _run_node_harness(harness)
     errors = json.loads(result.stdout)
 
     assert len(errors) == 1
     assert errors[0] == {"source": "online", "kind": "map", "request": 9}
     assert "secret-url" not in json.dumps(errors)
+
+
+def test_node_harness_accepts_payload_larger_than_windows_command_line_limit() -> None:
+    result = _run_node_harness("console.log(JSON.stringify({size: " + str(300_000) + "}));\n")
+
+    assert json.loads(result.stdout) == {"size": 300000}

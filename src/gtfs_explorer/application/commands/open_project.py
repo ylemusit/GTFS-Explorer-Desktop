@@ -18,6 +18,7 @@ from gtfs_explorer.infrastructure.duckdb.database import (
     DatabaseSettings,
     ProjectDatabase,
 )
+from gtfs_explorer.infrastructure.duckdb.editor_migration import migrate_editor_database
 from gtfs_explorer.infrastructure.duckdb.repositories import DuckDbUnitOfWork
 from gtfs_explorer.infrastructure.filesystem.cache import CacheStore
 from gtfs_explorer.infrastructure.filesystem.project_descriptor import (
@@ -327,6 +328,7 @@ class OpenProject:
                 _ = snapshot
             with DuckDbUnitOfWork(database) as unit_of_work:
                 descriptor = reconcile_project_descriptor(self._project_directory, unit_of_work)
+            migrate_editor_database(database)
             recovery = RecoverWorkspace(database).execute()
             if recovery.retry_job_ids:
                 with DuckDbUnitOfWork(database) as unit_of_work:

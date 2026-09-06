@@ -78,10 +78,14 @@ class AtomicOutputWriter:
             )
             self._write_temporary(manifest_temporary, (payload,), final_path.parent, is_cancelled)
             self._raise_if_cancelled(is_cancelled)
-            self._publish(artifact_temporary_path, final_path, overwrite)
-            artifact_temporary = None
-            self._publish(manifest_temporary, manifest_path, overwrite)
-            manifest_temporary = None
+            self._publish_pair(
+                artifact_temporary_path,
+                final_path,
+                manifest_temporary,
+                manifest_path,
+                overwrite,
+            )
+            artifact_temporary = manifest_temporary = None
             return manifest
         except OSError as error:
             raise ExportError("No se ha podido escribir la salida de exportación.") from error
@@ -150,6 +154,40 @@ class AtomicOutputWriter:
                 "El destino apareció durante la exportación; no se ha sobrescrito."
             )
         os.replace(temporary_path, final_path)
+
+    def _publish_pair(
+        self,
+        artifact_temporary: Path,
+        artifact_path: Path,
+        manifest_temporary: Path,
+        manifest_path: Path,
+        overwrite: bool,
+    ) -> None:
+        """Publica el par o restaura el par previo si falla el segundo replace."""
+        backups: list[tuple[Path, Path | None]] = []
+        try:
+            for final_path in (artifact_path, manifest_path):
+                backup = None
+                if final_path.exists():
+                    backup = self._new_temporary_path(
+                        final_path.parent, f"{final_path.name}.backup"
+                    )
+                    shutil.copy2(final_path, backup)
+                backups.append((final_path, backup))
+            self._publish(artifact_temporary, artifact_path, overwrite)
+            self._publish(manifest_temporary, manifest_path, overwrite)
+        except OSError:
+            # No se puede reemplazar atómicamente dos nombres. Restauramos el
+            # par anterior (o retiramos el nuevo sin pareja) antes de propagar.
+            for final_path, backup in backups:
+                if backup is None:
+                    _remove_if_present(final_path)
+                else:
+                    os.replace(backup, final_path)
+            raise
+        finally:
+            for _final_path, backup in backups:
+                _remove_if_present(backup)
 
     @staticmethod
     def _raise_if_cancelled(is_cancelled: CancellationCheck) -> None:

@@ -12,6 +12,7 @@ class RouteSummary:
     short_name: str | None
     long_name: str | None
     route_type: int | None
+    route_color: str | None = None
 
 
 @dataclass(frozen=True)

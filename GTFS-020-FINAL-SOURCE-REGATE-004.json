@@ -1,0 +1,73 @@
+{
+  "task_id": "GTFS-020-FINAL-SOURCE-REGATE-004",
+  "final_source_regate": "PARTIAL",
+  "result": "BLOCKED_BY_QUALITY_GATE",
+  "branch": "feature/0.2.0-visual-editor",
+  "head": "7bc0a5d103e445f540e22101fee8b447719e8383",
+  "worktree": {
+    "pre_gate_status": "already_dirty",
+    "status_lines_observed": 106,
+    "git_diff_check": "PASS",
+    "changes_preserved": true
+  },
+  "full_pytest": {
+    "collected": 614,
+    "passed": 613,
+    "failed": 0,
+    "skipped": 1,
+    "duration_seconds": 638.56,
+    "result": "PASS",
+    "skipped_test": "tests/test_p1_33_upgrade.py::test_p1_33_target_artifacts_match_manifest",
+    "skip_reason": "requires GTFS_EXPLORER_ARTIFACT_STORE with historical P1-32 release",
+    "skip_release_blocker": "NO"
+  },
+  "quality_gates": {
+    "ruff_format": "FAIL",
+    "ruff_format_scope": "src, tools, top-level tests/*.py",
+    "ruff_format_files": [
+      "src/gtfs_explorer/infrastructure/exporting/kml.py",
+      "src/gtfs_explorer/infrastructure/exporting/revision.py",
+      "tests/test_export_regression.py"
+    ],
+    "ruff_check": "PASS",
+    "mypy": "PASS",
+    "compileall": "PASS",
+    "node_check": "PASS",
+    "node_files": 20,
+    "js_resource_sync": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "native_blocker_regression": "COVERED_BY_FULL_PYTEST_PASS",
+  "format_coverage": "COVERED_BY_FULL_PYTEST_PASS",
+  "async_lifecycle": "COVERED_BY_FULL_PYTEST_PASS",
+  "audit_fixes": "COVERED_BY_FULL_PYTEST_PASS",
+  "real_feed_smoke": {
+    "status": "NOT_RUN",
+    "reason": "stopped after real source quality-gate failure",
+    "temp_copy_created": false,
+    "original_project_mutated": "NO_CHANGE_BY_THIS_GATE",
+    "temp_copy_deleted": "NOT_APPLICABLE"
+  },
+  "integrity": {
+    "rc1_mutated": "NO",
+    "rc2_mutated": "NO",
+    "rc1_final_release_eligible": "NO",
+    "rc2_final_release_eligible": "NO",
+    "original_acceptance_project_mutated": "NO_CHANGE_BY_THIS_GATE",
+    "original_gtfs_mutated": "NO_CHANGE_BY_THIS_GATE"
+  },
+  "new_blockers": [
+    "Ruff format check fails on three current source/test files"
+  ],
+  "build_run": "NO",
+  "defender_run": "NO",
+  "manual_acceptance_run": "NO",
+  "ready_for_release_candidate_003": "NO",
+  "next_recommended_task": "format the three reported files, then rerun this final source gate",
+  "telemetry": {
+    "task_start": "PASS",
+    "task_end": "PENDING",
+    "model": "gpt-5.6-luna",
+    "reasoning": "medium"
+  }
+}

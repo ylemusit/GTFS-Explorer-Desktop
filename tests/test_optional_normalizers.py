@@ -12,11 +12,31 @@ from gtfs_explorer.domain.source import InputSource, InputSourceKind
 from gtfs_explorer.domain.spec import load_schedule_spec
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseSettings, ProjectDatabase
 from gtfs_explorer.infrastructure.importing.directory_source import DirectorySource
-from gtfs_explorer.infrastructure.importing.normalizers.geometry import GeometryNormalizer
+from gtfs_explorer.infrastructure.importing.normalizers.geometry import (
+    GeometryNormalizer,
+    _insert_shape_batch,
+)
 from gtfs_explorer.infrastructure.importing.normalizers.optional import OptionalNormalizer
 from gtfs_explorer.infrastructure.importing.staging_loader import StagingLoader
 
 SPEC_PATH = Path("schemas/gtfs_schedule/2026-04-27/spec.json")
+
+
+def test_geometry_batch_uses_one_duckdb_statement_instead_of_one_per_point() -> None:
+    calls: list[tuple[str, list[object]]] = []
+
+    class Connection:
+        def execute(self, query: str, parameters: list[object]) -> None:
+            calls.append((query, parameters))
+
+    rows = [
+        ["shapes.txt", 2, "{}", "SH1", 43.1, -5.8, 1, None],
+        ["shapes.txt", 3, "{}", "SH1", 43.2, -5.9, 2, 10.0],
+    ]
+    _insert_shape_batch(Connection(), rows)  # type: ignore[arg-type]
+
+    assert len(calls) == 1
+    assert "unnest(?::JSON[])" in calls[0][0]
 
 
 def _database(tmp_path: Path) -> ProjectDatabase:

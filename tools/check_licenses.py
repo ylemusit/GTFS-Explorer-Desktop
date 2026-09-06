@@ -25,7 +25,7 @@ COMPONENTS = (
         "CPython",
         "3.12",
         "PSF-2.0",
-        ("_*.pyd", "select.pyd", "unicodedata.pyd", "python*.dll"),
+        ("_*.pyd", "pyexpat.pyd", "select.pyd", "unicodedata.pyd", "python*.dll"),
     ),
     ("duckdb", "DuckDB", "1.1.3", "MIT", ("duckdb/*",)),
     ("shapely", "Shapely", "2.1.2", "BSD-3-Clause", ("shapely/*",)),

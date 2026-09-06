@@ -174,6 +174,10 @@
     "export.format_geojson": "GeoJSON (compatible)",
     "export.format_csv": "CSV (compatible)",
     "export.format_mini_gtfs": "Mini-GTFS (GTFS Schedule validado localmente)",
+    "export.format_complete_gtfs": "GTFS completo modificado",
+    "export.format_new_gtfs": "Nueva versión GTFS",
+    "export.format_kml": "KML (interoperabilidad geoespacial)",
+    "export.format_kmz": "KMZ (interoperabilidad geoespacial)",
     "export.format_label": "Formato:",
     "export.routes": "IDs de rutas, uno por línea",
     "export.trips": "IDs de viajes opcionales, uno por línea",
@@ -201,6 +205,10 @@
     "export.help_geojson": "Salida compatible GeoJSON RFC 7946 con paradas de coordenadas válidas y geometrías de shapes seleccionadas cuando tienen puntos válidos.",
     "export.help_csv": "Salida compatible CSV de las rutas seleccionadas con route_id, route_short_name, route_long_name y route_type; no es un feed GTFS completo. Modo: {mode}.",
     "export.help_mini_gtfs": "Salida Mini-GTFS validada localmente: crea un subconjunto GTFS autocontenido de la selección, preservando sus dependencias necesarias. Se reimporta y valida localmente antes de publicar; no certifica que sea la publicación oficial del proveedor.",
+    "export.help_complete_gtfs": "ZIP GTFS completo de la última WorkingRevision confirmada; incluye las modificaciones integradas y conserva el ORIGINAL_GTFS sin tocar.",
+    "export.help_new_gtfs": "ZIP GTFS completo con un nuevo identificador feed_version elegido explícitamente; solo se publica desde una revisión confirmada.",
+    "export.help_kml": "KML local para Google Earth y otras herramientas: exporta shapes y paradas con ExtendedData; no sustituye un feed GTFS.",
+    "export.help_kmz": "KMZ local con un KML seguro y autocontenido para Google Earth/My Maps; no descarga recursos externos.",
     "export.mode_spreadsheet_safe": "seguro para hoja de cálculo",
     "export.mode_faithful": "fiel",
     "export.selection_routes": "rutas: {values}",
@@ -227,9 +235,574 @@
     ,"history.type_label": "Tipo:"
     ,"history.status_label": "Estado:"
     ,"history.all_operations": "Todas las operaciones"
+    ,"history.import": "Importación"
     ,"history.imports": "Importaciones"
     ,"history.validations": "Validaciones"
     ,"history.exports": "Exportaciones"
-    ,"history.all_statuses": "Todos los estados"
+    ,"history.all_statuses": "Todos los estados",
+    "settings.language_label": "Idioma de la interfaz:",
+    "settings.language_restart_notice": "El idioma se aplicará al instante. Algunos diálogos ya abiertos pueden necesitar reiniciarse.",
+    "settings.language_saved": "Idioma guardado: {language}.",
+    "editor.title": "Editor visual 0.2.0",
+    "editor.no_project": "Sin proyecto abierto.",
+    "editor.draft_status": "Borrador: {state} · {count} entidades · {issues} incidencias recientes",
+    "editor.draft_dirty": "CAMBIOS SIN CONFIRMAR",
+    "editor.draft_clean": "SIN CAMBIOS PENDIENTES",
+    "editor.route_workspace": "Espacio de trabajo por rutas",
+    "editor.routes_panel": "Rutas del proyecto",
+    "editor.routes_hint": "Selecciona una o varias rutas para compararlas en el mapa. La ruta activa es la única que puede modificarse.",
+    "editor.route_search": "Buscar rutas",
+    "editor.route_search_placeholder": "Buscar por nombre, operador o route_id…",
+    "editor.start_editing": "Iniciar edición",
+    "editor.start_editing_tooltip": "Selecciona una ruta editable y hasta dos rutas de referencia.",
+    "editor.finish_editing": "Finalizar edición",
+    "editor.open_cartographic_editor": "Abrir editor cartográfico",
+    "editor.select_routes_title": "SELECCIONAR RUTAS PARA EDITAR",
+    "editor.select_routes_explanation": "Puedes cargar hasta tres rutas como contexto. Solo una ruta puede modificarse a la vez.",
+    "editor.select_routes_count": "{count} de {maximum} rutas seleccionadas",
+    "editor.select_routes_minimum": "Selecciona al menos una ruta.",
+    "editor.select_routes_maximum": "Puedes seleccionar como máximo {maximum} rutas.",
+    "editor.editing_routes": "Rutas cargadas en esta sesión",
+    "editor.editing_route_header": "Editando: {short_name} · {long_name} · {ordinal} / {total}",
+    "editor.editing": "EDITANDO",
+    "editor.reference": "REFERENCIA",
+    "editor.make_active": "Hacer activa",
+    "editor.active_route": "Ruta activa",
+    "editor.active_route_selector": "Ruta activa/editable:",
+    "editor.route_context": "Contexto de ruta",
+    "editor.route_actions": "Acciones de la ruta activa",
+    "editor.routes_map": "Mapa de rutas seleccionadas",
+    "editor.map_legend": "Activa editable · referencia visible · bloqueada · atenuada",
+    "editor.route_selected": "{count} ruta(s) seleccionada(s) · {visible} visible(s) en el mapa.",
+    "editor.no_route_selected": "Sin ruta seleccionada.",
+    "editor.select_route_properties": "Selecciona una ruta para cargar sus propiedades.",
+    "editor.route_locked": "Bloqueada · la ruta está protegida y no admite cambios.",
+    "editor.route_editable": "Activa y editable · los cambios se registran en el borrador.",
+    "editor.route_active_not_editable": "Activa · habilita la edición para modificarla.",
+    "editor.route_reference": "Referencia · usa «Hacer activa» para editar esta ruta.",
+    "editor.properties": "Propiedades",
+    "editor.properties_description": "Información humana de la ruta activa; los identificadores técnicos quedan en segundo plano.",
+    "editor.properties_user_fields": "Información de la ruta",
+    "editor.properties_technical": "Identificadores técnicos",
+    "editor.workspace_routes_description": "Selecciona rutas, permisos y contexto cartográfico.",
+    "editor.workspace_properties_description": "Consulta y edita primero la información humana de la ruta activa.",
+    "editor.workspace_shape": "Recorrido",
+    "editor.workspace_shape_description": "Herramientas geométricas de la ruta activa.",
+    "editor.workspace_stops": "Paradas",
+    "editor.workspace_stops_description": "Secuencia, origen/destino, edición y contexto del viaje.",
+    "editor.workspace_schedule": "Horarios",
+    "editor.workspace_schedule_description": "Matriz del viaje seleccionado; la propagación queda preparada para una fase posterior.",
+    "editor.workspace_services": "Servicios y operador",
+    "editor.workspace_services_description": "Calendario, agencia, operador y atribuciones del contexto seleccionado.",
+    "editor.workspace_history": "Cambios e historial",
+    "editor.workspace_history_description": "Revisa, deshaz, valida, descarta o confirma la revisión.",
+    "editor.workspace_advanced": "Avanzado",
+    "editor.workspace_advanced_description": "Edición técnica de tablas y campos para casos que no cubra el flujo guiado.",
+    "editor.reference_locked": "Las rutas de referencia están bloqueadas; inicia la edición para cambiar de ruta activa.",
+    "editor.fourth_route_blocked": "No puedes cargar una cuarta ruta. Quita una ruta de referencia antes de continuar.",
+    "editor.finish_no_changes": "No hay cambios en esta sesión. La edición se cerrará y el mapa volverá a su estado anterior.",
+    "editor.finish_changes_title": "Finalizar edición",
+    "editor.finish_changes_message": "Hay cambios sin confirmar en el borrador. ¿Qué quieres hacer con ellos?",
+    "editor.preserve_draft": "Conservar borrador",
+    "editor.discard_session_changes": "Descartar cambios de esta sesión",
+    "editor.cancel_finish": "Cancelar",
+    "editor.close_draft_title": "Borrador sin guardar",
+    "editor.close_draft_message": "El proyecto tiene cambios del editor sin guardar.",
+    "editor.close_draft_question": "Elige si quieres conservar el borrador, descartarlo o cancelar el cierre.",
+    "editor.close_preserve_draft": "Guardar borrador",
+    "editor.close_discard_changes": "Descartar cambios",
+    "editor.undo": "Deshacer",
+    "editor.redo": "Rehacer",
+    "editor.undo_tooltip": "Deshacer el último cambio del borrador (Ctrl+Z).",
+    "editor.redo_tooltip": "Rehacer el último cambio del borrador (Ctrl+Y o Ctrl+Mayús+Z).",
+    "editor.status_map_updated": "Mapa actualizado.",
+    "editor.status_map_refreshing": "Actualizando mapa…",
+    "editor.status_map_fitted": "Mapa ajustado a las rutas visibles.",
+    "editor.status_language_restart": "El idioma se ha cambiado. Reinicia la aplicación para actualizar diálogos ya abiertos.",
+    "map.title": "Mapa",
+    "map.active_context": "Editando: {label} · {ordinal} / {total}\nRuta activa: {route_id} · Modo: {mode}",
+    "map.route_context": "Seleccionada: {selected_label}\nEditando: {active_label} · {ordinal} / {total}\nRuta activa: {active_route_id} · Modo: {mode}",
+    "map.undo": "Deshacer",
+    "map.redo": "Rehacer",
+    "map.finish": "Finalizar edición",
+    "map.fit": "Ajustar a rutas",
+    "map.mode_normal": "Modo NORMAL · navegar y consultar; no hay vértices editables.",
+    "map.mode_edit_route": "Modo EDIT_ROUTE · edición explícita de ruta; selecciona y arrastra un manejador.",
+    "map.mode_select_segment": "Modo SELECT_SEGMENT · selecciona el inicio y el final del tramo.",
+    "map.mode_redraw_segment": "Modo REDRAW_SEGMENT · solo el tramo seleccionado es editable.",
+    "stop.name_unknown": "Parada sin nombre",
+    "stop.route_chip": "Ruta {short_name}",
+    "stop.origin": "Origen",
+    "stop.intermediate": "Intermedia",
+    "stop.destination": "Destino",
+    "stop.operations": "Operación",
+    "stop.scheduled_time": "Horario programado",
+    "stop.arrival": "Llegada",
+    "stop.departure": "Salida",
+    "stop.sequence": "Secuencia",
+    "stop.previous": "Anterior",
+    "stop.next": "Siguiente",
+    "stop.dwell": "Permanencia",
+    "stop.context": "Contexto",
+    "stop.agency": "Agencia",
+    "stop.trip": "Viaje",
+    "stop.service": "Servicio",
+    "stop.technical": "Datos técnicos",
+    "stop.stop_id": "stop_id",
+    "stop.trip_id": "trip_id",
+    "stop.actions": "Acciones",
+    "stop.center": "Centrar",
+    "stop.edit": "Editar parada",
+    "stop.details": "Más detalles",
+    "stop.no_events": "No hay eventos programados para esta parada.",
+    "stop.card_description": "Ficha de la parada seleccionada",
+    "stop.dwell_minutes": "{minutes} min",
+    "stop.not_available": "—",
+    "routes.edit_stops": "Editar paradas",
+    "routes.edit_schedule": "Editar horarios",
+    "routes.edit_services": "Editar servicios",
+    "routes.edit_operator": "Editar operador",
+    "routes.edit_shape": "Editar recorrido",
+    "routes.redraw_segment": "Redibujar segmento",
+    "routes.reorder_stops": "Reordenar paradas",
+    "routes.open_properties": "Propiedades",
+    "routes.visible": "Visible",
+    "routes.active": "Activa",
+    "routes.editable": "Editable",
+    "routes.locked": "Bloqueada",
+    "routes.dimmed": "Atenuada",
+    "routes.status": "Estado",
+    "routes.hidden": "Oculta",
+    "editor.workspace_routes": "Rutas y mapa",
+    "map.mode_label": "Modo:",
+    "map.mode_normal_label": "NORMAL",
+    "map.mode_edit_route_label": "EDIT_ROUTE",
+    "map.mode_select_segment_label": "SELECT_SEGMENT",
+    "map.mode_redraw_segment_label": "REDRAW_SEGMENT",
+    "map.window_accessible": "Ventana independiente del mapa",
+    "map.context_accessible": "Contexto del editor cartográfico",
+    "map.mode_accessible": "Modo de edición cartográfica",
+    "map.return_to_data_accessible": "Volver a datos",
+    "map.return_to_data_tooltip": "Muestra la ventana principal con los datos de Explorar.",
+    "map.dock_accessible": "Acoplar mapa",
+    "map.dock_tooltip": "Devuelve el mapa a la pantalla Explorar.",
+    "map.status_online_unavailable": "Mapa · Online no disponible",
+    "map.status_unavailable": "Mapa · No disponible",
+    "map.status_offline": "Mapa · Offline · PMTiles",
+    "map.status_online": "Mapa · Online · {provider}",
+    "map.status_outside_coverage": "Mapa · Sin cobertura offline",
+    "map.status_no_map": "Mapa: no disponible",
+    "map.edit_shape": "Editar recorrido",
+    "map.select_segment": "Seleccionar tramo",
+    "map.add_vertex": "Añadir vértice",
+    "map.move_vertex": "Mover vértice",
+    "map.confirm": "Confirmar",
+    "map.cancel": "Cancelar",
+    "map.return_to_data": "Volver a datos",
+    "map.dock": "Acoplar mapa",
+    "map.delete_vertex": "Eliminar vértice",
+    "explore.editor": "Editar borrador",
+    "editor.bulk_states": "Estados masivos (todas las rutas):",
+    "editor.bulk_visible": "✓ Visible / ninguna",
+    "editor.bulk_visible_tooltip": "Activa Visible para todas las rutas o la desactiva para todas.",
+    "editor.bulk_locked": "✓ Bloqueada / ninguna",
+    "editor.bulk_locked_tooltip": "Bloquea todas las rutas o quita el bloqueo a todas.",
+    "editor.bulk_dimmed": "✓ Atenuada / ninguna",
+    "editor.bulk_dimmed_tooltip": "Atenúa todas las rutas o elimina la atenuación de todas.",
+    "editor.route_list_accessible": "Rutas disponibles para editar",
+    "editor.route_name_header": "Nombre corto / nombre largo",
+    "editor.route_id_header": "route_id",
+    "editor.agency_operator_header": "Agencia / operador",
+    "editor.role_header": "Rol",
+    "editor.route_properties_placeholder": "Selecciona una ruta para cargar sus propiedades.",
+    "editor.route_actions_group": "Acciones de la ruta activa",
+    "editor.map_group": "Mapa de rutas seleccionadas",
+    "editor.map_cancel": "Cancelar edición cartográfica",
+    "editor.advanced_draft": "Borrador de trabajo",
+    "editor.table": "Tabla:",
+    "editor.entity": "Entidad:",
+    "editor.field": "Campo:",
+    "editor.value": "Valor:",
+    "editor.advanced_toggle": "Edición avanzada / técnica",
+    "editor.table_accessible": "Tabla GTFS a editar",
+    "editor.entity_accessible": "Entidad GTFS a editar",
+    "editor.field_accessible": "Campo GTFS a editar",
+    "editor.value_accessible": "Valor del campo GTFS",
+    "editor.schedule_matrix": "Matriz visual de horarios",
+    "editor.schedule_trip": "Viaje:",
+    "editor.schedule_trip_accessible": "Viaje de la matriz de horarios",
+    "editor.interpolation_field": "Campo de interpolación",
+    "editor.interpolation_preview": "Ver interpolación",
+    "editor.schedule_scope_single": "Solo esta parada",
+    "editor.schedule_scope_following": "Esta parada y posteriores",
+    "editor.schedule_scope_trip": "Todo el viaje",
+    "editor.schedule_scope_selected": "Viajes seleccionados",
+    "editor.schedule_scope_tooltip": "Alcance preparado para la siguiente fase de propagación.",
+    "editor.reschedule_following": "Reajustar posteriores",
+    "editor.recalculate_schedule": "Recalcular horario",
+    "editor.schedule_matrix_accessible": "Matriz editable de horarios GTFS",
+    "editor.workspace_state": "Estado multirruta",
+    "editor.save_route_state": "Guardar estado de ruta",
+    "editor.apply": "Proponer y aplicar",
+    "editor.apply_tooltip": "Previsualiza el impacto y aplica un único comando confirmado.",
+    "editor.refresh": "Actualizar",
+    "editor.discard": "Descartar borrador",
+    "editor.validate": "Validar borrador",
+    "editor.delete_entity": "Eliminar entidad",
+    "editor.delete_entity_tooltip": "Previsualiza el impacto y elimina solo la entidad seleccionada.",
+    "editor.add_stop": "Añadir parada",
+    "editor.add_stop_tooltip": "Añade la parada al viaje seleccionado y genera su identificador de borrador.",
+    "editor.reorder_shape": "Reordenar vértice",
+    "editor.reorder_shape_tooltip": "Cambia la posición del vértice y renumera solo su shape.",
+    "editor.confirm_revision": "Confirmar revisión",
+    "editor.confirm_revision_tooltip": "Valida el borrador y lo publica como revisión de trabajo inmutable.",
+    "editor.history_headers": "Acción|Comando|Secuencia|Entidades",
+    "editor.history_accessible": "Historial del borrador",
+    "editor.workspaces_accessible": "Áreas de trabajo del editor de borrador",
+    "editor.geometry_hint": "La ruta activa debe ser editable y no estar bloqueada.",
+    "editor.services_hint": "Las propiedades resumidas están disponibles en Propiedades.",
+    "editor.workspace_splitter_accessible": "Área redimensionable del editor visual",
+    "editor.stop_selected": "Parada seleccionada: {stop_id}",
+    "editor.map_fitted": "Mapa ajustado a las rutas visibles.",
+    "editor.start_vertex_status": "Añadir vértice preparado: selecciona el tramo y confirma.",
+    "editor.delete_vertex_status": "Eliminar vértice preparado: selecciona un manejador.",
+    "editor.map_cancelled": "Edición cartográfica cancelada; el borrador no ha cambiado.",
+    "editor.schedule_loaded": "Horarios: matriz cargada para el viaje seleccionado.",
+    "editor.properties_loaded": "Propiedades cargadas para la ruta activa.",
+    "editor.no_events_between_anchors": "No hay celdas entre dos anclas horarias válidas.",
+    "editor.routes_map_updated": "Mapa actualizado.",
+    "editor.routes_map_refreshing": "Actualizando mapa…",
+    "editor.routes_map_error": "No se pudo actualizar el mapa de rutas: {message}",
+    "editor.routes_map_error_short": "No se pudo actualizar el mapa de rutas: {error}",
+    "editor.redraw_segment_tooltip": "Inserta y ajusta vértices de un tramo; cada cambio queda en un ChangeSet.",
+    "editor.open_cartographic_editor_tooltip": "Abre este mismo mapa en una ventana maximizable; conserva rutas, estado y vista.",
+    "editor.reorder_stops_tooltip": "Reordena las paradas del viaje seleccionado sin recalcular sus horarios.",
+    "editor.add_vertex_tooltip": "Activa una selección explícita sobre el tramo para añadir un único vértice.",
+    "editor.delete_vertex_tooltip": "Activa una selección explícita del vértice que se eliminará.",
+    "editor.table_routes": "Rutas",
+    "editor.table_trips": "Viajes",
+    "editor.table_stops": "Paradas",
+    "editor.table_stop_times": "Horarios de parada",
+    "editor.table_shapes": "Shapes",
+    "editor.table_calendar": "Servicios / calendario",
+    "editor.table_calendar_dates": "Excepciones de servicio",
+    "editor.table_agency": "Agencias",
+    "editor.table_attributions": "Atribuciones",
+    "editor.arrival_gtfs": "Llegada GTFS",
+    "editor.departure_gtfs": "Salida GTFS",
+    "stop.name": "Parada",
+    "stop.card_title": "Parada: {name} ({stop_id}) — horarios GTFS del feed"
+    ,"routes.open_window_accessible": "Abrir mapa en ventana independiente"
+    ,"routes.open_map_tooltip": "Abre el mapa en una ventana independiente."
+    ,"routes.workspace_accessible": "Área redimensionable de datos y mapa"
+    ,"routes.map_unavailable": "Mapa: no disponible · el explorador no incluye mapa."
+    ,"routes.map_status_unavailable": "Mapa: no disponible · estado no disponible."
+    ,"routes.service_item": "{service_id} ({count} viajes)"
+    ,"routes.direction_undeclared": "sin declarar"
+    ,"routes.direction_item": "direction_id: {direction} ({count} viajes)"
+    ,"routes.trip_item": "{name} ({trip_id})"
+    ,"routes.route_item": "{name} ({route_id}) · {type}"
+    ,"routes.route_id": "ID de ruta"
+    ,"stop.route_id": "route_id"
+    ,"stop.route": "Ruta"
+    ,"stop.previous_next": "Anterior: {previous} · Siguiente: {next}"
+    ,"stop.route_context": "{route}: {agency} · {trip} · {service}"
+    ,"stop.technical_ids": "{stop_id} · {trip_id} · {route_id} · {service_id}"
+    ,"stop.not_found": "Parada no encontrada: {stop_id}"
+    ,"stop.events_accessible": "Eventos programados de la parada"
+    ,"stop.headsign": "Destino"
+    ,"stop.other_routes": "Otras rutas"
+    ,"routes.name_unknown": "Ruta sin nombre"
+    ,"routes.trip_name_unknown": "Viaje sin nombre"
+    ,"routes.long_name_unknown": "Nombre largo no disponible"
+    ,"editor.agency_name_unknown": "Operador sin nombre"
+    ,"stop.id_unknown": "Sin ID"
+    ,"trip.timeline_accessible": "Recorrido programado del viaje"
+    ,"timetable.select_prompt": "Selecciona ruta, servicio y direction_id para ver la matriz."
+    ,"timetable.accessible": "Matriz de horarios por patrón"
+    ,"timetable.no_trips": "No hay viajes para esta selección."
+    ,"timetable.pattern_summary": "Patrón {current} de {total}; {trips} viaje(s) en total"
+    ,"timetable.pattern_truncated": "; vista previa limitada."
+    ,"timetable.stop_item": "{name} ({stop_id})"
+    ,"status.no_project": "Sin proyecto abierto."
+    ,"status.project_ready": "Proyecto abierto y listo."
+    ,"status.recovery_required": "El proyecto requiere recuperación antes de continuar."
+    ,"status.job_running": "Trabajo en curso."
+    ,"status.job_cancelling": "Cancelando trabajo en curso…"
+    ,"status.no_project_short": "Sin proyecto"
+    ,"status.ready": "Listo"
+    ,"status.recovery_short": "Recuperación necesaria"
+    ,"status.in_progress": "Trabajo en curso…"
+    ,"status.cancelling": "Cancelando…"
+    ,"content.explore": "Explore rutas, viajes, paradas y horarios programados."
+    ,"content.validation": "Revise incidencias sin puntuaciones agregadas."
+    ,"content.export": "Exporte una salida local con alcance y formato explícitos."
+    ,"project.no_open": "Sin proyecto abierto"
+    ,"project.name": "Proyecto: {name}"
+    ,"project.workspace": "Workspace: {workspace}"
+    ,"accessibility.project_workspace": "Workspace del proyecto"
+    ,"map.neutral_attribution": "Mapa sin paquete offline: fondo neutro."
+    ,"editor.add_vertex_ready": "Añadir vértice preparado: selecciona el tramo y confirma."
+    ,"editor.delete_vertex_ready": "Eliminar vértice preparado: selecciona un manejador."
+    ,"editor.add_vertex_point_ready": "Añadir vértice preparado: selecciona el punto del tramo y confirma el impacto."
+    ,"editor.delete_vertex_handle_ready": "Eliminar vértice preparado: selecciona un manejador del tramo."
+    ,"editor.shape_missing": "No se puede seleccionar el tramo: falta el shape."
+    ,"editor.segment_start_selected": "Inicio seleccionado. Selecciona ahora el final del tramo."
+    ,"editor.segment_rejected": "Selección rechazada: los dos extremos deben pertenecer al mismo shape."
+    ,"editor.segment_selected": "Tramo seleccionado. Solo este subconjunto admite edición."
+    ,"editor.edit_stops_hint": "Paradas: selecciónalas en el mapa para moverlas con Mayús+arrastrar; usa Añadir parada o Eliminar entidad para cambios reversibles."
+    ,"editor.route_not_authorized": "La ruta seleccionada no está autorizada: no puede generar ChangeSets."
+    ,"editor.stop_not_in_trip": "La parada ya no pertenece al viaje seleccionado."
+    ,"editor.reorder_stop_title": "Reordenar parada"
+    ,"editor.position_range": "Nueva posición (1-{maximum}):"
+    ,"editor.reorder_stop_error": "No se ha reordenado la parada: {error}"
+    ,"editor.reorder_stop_done": "Parada reordenada en el viaje {trip_id}."
+    ,"editor.edit_services_hint": "Servicios: selecciona un servicio de la ruta para editar calendario y excepciones."
+    ,"editor.edit_operator_hint": "Operador: edita la agencia vinculada a la ruta desde la edición avanzada."
+    ,"editor.schedule_update_error": "No se ha aplicado el horario: {error}"
+    ,"editor.interpolation_error": "No se puede calcular la interpolación: {error}"
+    ,"editor.interpolation_title": "Interpolación explícita"
+    ,"editor.interpolation_question": "Valores sugeridos (no aplicados todavía):\n{details}\n\n¿Aplicar estos valores como comandos reversibles?"
+    ,"editor.interpolation_apply_error": "No se ha aplicado la interpolación: {error}"
+    ,"editor.entity_missing": "La entidad ya no existe en el borrador; actualiza la vista."
+    ,"editor.change_error": "No se ha aplicado el cambio: {error}"
+    ,"editor.delete_title": "Confirmar eliminación"
+    ,"editor.delete_error": "No se ha aplicado la eliminación: {error}"
+    ,"editor.add_stop_route_prompt": "Selecciona una ruta con un viaje para añadir la parada a su recorrido."
+    ,"editor.trip_not_active_route": "El viaje seleccionado no pertenece a la ruta activa."
+    ,"editor.route_not_authorized_change": "La ruta seleccionada no está autorizada: una ruta bloqueada o de referencia no puede generar ChangeSets."
+    ,"editor.add_stop_title": "Añadir parada"
+    ,"editor.add_stop_name_prompt": "Nombre (opcional):"
+    ,"editor.add_stop_latitude": "Latitud WGS84:"
+    ,"editor.add_stop_longitude": "Longitud WGS84:"
+    ,"editor.add_stop_arrival": "Hora de llegada GTFS (opcional):"
+    ,"editor.add_stop_departure": "Hora de salida GTFS (opcional):"
+    ,"editor.add_stop_error": "No se ha añadido la parada: {error}"
+    ,"editor.stop_added": "Parada añadida al viaje {trip_id} como {stop_id}."
+    ,"editor.reorder_shape_title": "Reordenar vértice"
+    ,"editor.shape_reorder_error": "No se ha reordenado el vértice: {error}"
+    ,"editor.validation_issues": "Validación completa: {count} incidencias bloqueantes o de advertencia."
+    ,"editor.validation_clean": "Validación completa: sin incidencias en el borrador."
+    ,"editor.confirm_revision_error_title": "Revisión no confirmada"
+    ,"editor.revision_confirmed": "Revisión confirmada: {revision_id}. El borrador está CLEAN."
+    ,"editor.impact_preview_title": "Previsualización de impacto"
+    ,"editor.impact_requires_resolution": "La operación requiere una resolución explícita.\n{summary}\nDependencias que deben resolverse: {required_count}\nOpciones: {options}\nNo se ha ejecutado ninguna cascada automática."
+    ,"editor.impact_no_options": "ninguna"
+    ,"editor.resolve_impact_title": "Resolver impacto"
+    ,"editor.resolve_impact_prompt": "Elige una resolución explícita:"
+    ,"editor.resolve_impact_id": "Identificador de destino:"
+    ,"editor.resolution_prepare_error": "No se ha preparado la resolución: {error}"
+    ,"editor.confirm_operation_title": "Confirmar operación"
+    ,"editor.apply_command_question": "{summary}\n\n¿Aplicar el comando?"
+    ,"editor.discard_title": "Descartar borrador"
+    ,"editor.discard_message": "Se restaurará exactamente la última revisión confirmada. ¿Continuar?"
+    ,"editor.impact_one_entity": "1 entidad"
+    ,"editor.impact_no_dependencies": "sin dependencias"
+    ,"editor.impact_none": "ninguna"
+    ,"editor.impact_summary": "CAMBIOS DIRECTOS\n- {direct_count} entidad(es): {direct_labels}\nDEPENDENCIAS CONSULTADAS\n- {dependency_count} entidad(es) relacionadas en {tables}\nREUTILIZACIÓN / RELACIONES\n- {relationships}"
+    ,"editor.edit_shape_hint": "Geometría: selecciona un tramo en el mapa para editarlo de forma localizada."
+    ,"editor.redraw_segment_hint": "Redibujar tramo: selecciona el inicio y el final del subconjunto autorizado."
+    ,"editor.reorder_shape_error": "No se ha reordenado el vértice: {error}"
+    ,"editor.reorder_stop_select": "Selecciona una parada de la matriz para reordenarla."
+    ,"editor.route_state_save_error": "No se ha guardado el estado de la ruta {route_id}: {error}"
+    ,"editor.properties_user_values": "Nombre corto: {short_name}\nNombre largo: {long_name}\nOperador: {operator}\nTipo de ruta: {route_type}"
+    ,"editor.properties_technical_values": "route_id: {route_id}\nagency_id: {agency_id}"
+    ,"editor.route_context_properties": "route_short_name: {short_name}\nroute_long_name: {long_name}\nroute_id: {route_id}\nagency/operator: {operator}\n\nServicios: {services} · Viajes: {trips}\nParadas: {stops} · Shapes: {shapes}\nAtribuciones: {attributions}"
+    ,"editor.bulk_state_updated": "Estado {state} actualizado para {count} ruta(s) en una sola actualización."
+    ,"editor.visibility_many_routes_notice": "Vas a mostrar {count} rutas simultáneamente; la actualización puede tardar varios segundos."
+    ,"editor.visibility_many_routes_title": "Mostrar muchas rutas"
+    ,"editor.visibility_many_routes_question": "Vas a mostrar {count} rutas simultáneamente.\n\nEsta operación puede tardar varios segundos y aumentar el uso de memoria.\n\n¿Quieres continuar?"
+    ,"editor.operator_unknown": "Sin operador"
+    ,"trip.arrival_header": "Llegada GTFS (arrival_time)"
+    ,"trip.departure_header": "Salida GTFS (departure_time)"
+    ,"timetable.stop_header": "Parada"
+    ,"timetable.arrival_cell": "arrival_time: {value}"
+    ,"timetable.departure_cell": "departure_time: {value}"
+    ,"stop.service_id": "service_id"
+    ,"editor.map_not_applied_title": "Edición de mapa no aplicada"
+    ,"editor.map_impact_summary": "CAMBIOS DIRECTOS\n- 1 entidad: {entity}\nDEPENDENCIAS CONSULTADAS\n- {dependency_count} entidades en {tables}\nREUTILIZACIÓN / RELACIONES\n- {relationships}"
+    ,"editor.map_gesture_saved": "Gesto de mapa guardado en el borrador."
+    ,"dialog.import_kml_action": "KML/KMZ geoespacial"
+    ,"dialog.import_kml_title": "Importar KML/KMZ"
+    ,"dialog.import_kml_filter": "KML/KMZ (*.kml *.kmz)"
+    ,"dialog.kml_project_required": "Abra un proyecto antes de importar geometría KML."
+    ,"dialog.kml_mapping_title": "KML requiere mapeo explícito"
+    ,"dialog.kml_no_changes_title": "KML sin cambios"
+    ,"dialog.kml_no_changes_message": "No hay geometría aplicable."
+    ,"dialog.kml_confirm_title": "Confirmar importación KML"
+    ,"dialog.kml_confirm_message": "Se aplicarán únicamente movimientos de paradas y vértices existentes. No se crearán viajes, servicios ni horarios. ¿Continuar?"
+    ,"dialog.kml_apply_error": "No se pudo aplicar la importación KML; no se aplicó ningún comando del lote: {error}"
+    ,"dialog.kml_applied": "Geometría KML aplicada al borrador: {count} comandos reversibles."
+    ,"dialog.filter_kml": "KML (*.kml)"
+    ,"dialog.filter_kmz": "KMZ (*.kmz)"
+    ,"dialog.high_volume_title": "Volumen elevado"
+    ,"dialog.high_volume_message": "Este feed contiene un volumen elevado de datos.\n\nLa importación puede tardar varios minutos.\nPodrás seguir el progreso y cancelarla en cualquier momento."
+    ,"dialog.import_incomplete_message": "La importación no se ha completado. Estado: {state}; incidencias: {issue_count}."
+    ,"dialog.import_start_error": "No se pudo iniciar la importación: {message}"
+    ,"dialog.import_unavailable_state": "No se puede importar en el estado actual."
+    ,"dialog.project_required_import": "Abra un proyecto listo antes de importar un feed."
+    ,"dialog.kml_no_target_routes": "No hay rutas de destino en el borrador."
+    ,"dialog.kml_route_mapping_title": "Mapear KML a ruta"
+    ,"dialog.kml_route_mapping_prompt": "Ruta destino para las geometrías sin metadata:"
+    ,"dialog.kml_shape_mapping_title": "Mapear KML a shape"
+    ,"dialog.kml_shape_mapping_prompt": "Shape destino para las líneas sin shape_id (Cancelar deja solo metadata existente):"
+    ,"dialog.kml_without_shape": "(sin shape)"
+    ,"dialog.kml_summary": "Clasificación: {classification}\nPlacemark: {placemarks} · puntos: {points} · líneas: {lines}\n"
+    ,"export.route_search": "Buscar rutas"
+    ,"export.select_all_routes": "Seleccionar todas"
+    ,"export.clear_routes": "Limpiar"
+    ,"export.select_all_services": "Seleccionar todos"
+    ,"export.clear_services": "Limpiar"
+    ,"export.trips_advanced_label": "Viajes opcionales (avanzado):"
+    ,"export.version_id": "Identificador de nueva versión GTFS"
+    ,"export.version_placeholder": "p. ej. 0.2.0-editado"
+    ,"export.version_label": "Versión GTFS:"
+    ,"export.kml_profile": "Perfil KML/KMZ"
+    ,"export.kml_profile_label": "Perfil geoespacial:"
+    ,"export.profile_standard": "STANDARD_KML"
+    ,"export.profile_google_earth": "GOOGLE_EARTH"
+    ,"export.profile_google_maps": "GOOGLE_MY_MAPS"
+    ,"export.preview_missing_version": "Indique un identificador para la nueva versión GTFS."
+    ,"export.selection_summary": "{routes} rutas · {services} servicios · {trips} viajes"
+    ,"export.pack_title": "Export Pack"
+    ,"history.date_header": "Fecha y hora"
+    ,"history.type_header": "Tipo"
+    ,"history.detail_header": "Detalle"
+    ,"history.status_header": "Estado"
+    ,"history.duration_header": "Duración"
+    ,"history.empty": "No hay operaciones registradas todavía."
+    ,"history.showing": "Mostrando {count} de {total} operaciones."
+    ,"history.local_time_tooltip": "Hora local; el ledger conserva UTC"
+    ,"history.duration_unknown": "Desconocida"
+    ,"history.feed_unknown": "Feed sin nombre"
+    ,"history.issues": "incidencias"
+    ,"history.format_unavailable": "Formato no disponible"
+    ,"history.artifact_unpublished": "Artefacto no publicado"
+    ,"history.standalone_validation": "Validación standalone"
+    ,"history.status_running": "En curso"
+    ,"history.status_completed": "Completada"
+    ,"history.status_cancelled": "Cancelada"
+    ,"history.status_failed": "Fallida"
+    ,"history.status_interrupted": "Interrumpida"
+    ,"history.validation_valid": "Válido"
+    ,"history.validation_invalid": "Inválido"
+    ,"overview.project_open": "Proyecto abierto"
+    ,"overview.no_project": "Sin proyecto abierto"
+    ,"overview.project_name_label": "Nombre:"
+    ,"overview.workspace_label": "Workspace:"
+    ,"overview.service_period_label": "Periodo de servicio (fecha GTFS):"
+    ,"overview.empty_headline": "Abra un proyecto para consultar su resumen."
+    ,"overview.feed_state": "Estado del feed"
+    ,"overview.feed_label": "Feed:"
+    ,"overview.import_label": "Importación:"
+    ,"overview.validation_label": "Validación:"
+    ,"overview.issues_label": "Incidencias:"
+    ,"overview.no_feed": "Sin feed importado"
+    ,"overview.not_run": "Sin ejecutar"
+    ,"overview.metrics": "Métricas normalizadas"
+    ,"overview.period_and_validation": "Periodo y validación"
+    ,"overview.no_service_dates": "Sin fechas de servicio declaradas"
+    ,"overview.no_validation_runs": "Sin ejecuciones de validación registradas"
+    ,"overview.show_validation": "Ver incidencias de validación"
+    ,"overview.files": "Archivos inventariados"
+    ,"overview.file_header": "Archivo"
+    ,"overview.specification_header": "Especificación"
+    ,"overview.rows_header": "Filas cargadas"
+    ,"overview.files_accessible": "Archivos inventariados del feed"
+    ,"overview.welcome_title": "Explora el transporte con datos en los que puedes confiar"
+    ,"overview.welcome_description": "Una aplicación profesional para importar, explorar, validar, visualizar y exportar GTFS Schedule de forma local y offline-first."
+    ,"overview.welcome_hint": "Comienza creando o abriendo un proyecto desde la barra de acciones."
+    ,"overview.project_without_feed": "El proyecto todavía no contiene un feed importado."
+    ,"overview.technical_status": "Estado técnico de importación y resultado de validación del feed."
+    ,"overview.metrics_unavailable": "Métricas no disponibles: la importación no terminó correctamente."
+    ,"overview.not_available": "No disponible"
+    ,"overview.not_loaded": "No cargado"
+    ,"overview.known": "Conocido"
+    ,"overview.unknown": "No reconocido"
+    ,"overview.import_completed": "Completada"
+    ,"overview.import_cancelled": "Cancelada"
+    ,"overview.import_failed": "Fallida"
+    ,"settings.map_mode_error": "No se pudo cambiar el modo de mapa: {error}"
+    ,"settings.map_package_rejected": "Paquete rechazado: se mantiene el fondo neutro."
+    ,"settings.map_package_open_error": "No se pudo abrir el paquete de mapa: {error}"
+    ,"settings.map_package_installed": "Paquete local instalado. {status} · Atribución: {attribution}"
+    ,"settings.map_package_imported": "Mapa importado: {name}"
+    ,"settings.map_package_imported_unrenderable": "PMTiles válido · estilo compatible no disponible: {name}"
+    ,"settings.map_package_no_coverage": "No hay mapa offline para la zona de este proyecto."
+    ,"settings.map_package_selected": "Mapa global seleccionado: {name}"
+    ,"settings.map_package_removed": "Mapa offline eliminado."
+    ,"settings.map_available": "Disponible"
+    ,"settings.map_ready": "Listo"
+    ,"settings.map_style_unavailable": "Sin estilo compatible"
+    ,"status.importing": "Importando…"
+    ,"status.import_phase_preparation": "Preparación"
+    ,"status.import_phase_loading": "Carga"
+    ,"status.import_phase_normalizing": "Normalización"
+    ,"status.import_phase_validating": "Validación"
+    ,"status.import_phase_finalizing": "Finalización"
+    ,"status.import_phase_cleanup": "Limpieza"
+    ,"status.import_prefix_cancelling": "Cancelando…"
+    ,"status.import_prefix_importing": "Importando"
+    ,"status.import_prefix_active": "Importación activa"
+    ,"status.import_progress": "Progreso: {progress} %"
+    ,"status.import_progress_short": "{progress} %"
+    ,"status.import_activity": "Actividad: {completed} {unit}"
+    ,"status.import_activity_short": "{completed} {unit}"
+    ,"status.import_activity_in_progress": "Actividad en curso"
+    ,"status.import_in_progress_short": "en curso"
+    ,"status.import_units": "unidades"
+    ,"status.import_detail": "\nDetalle: {detail}"
+    ,"status.import_preparing": "\nPreparando importación…"
+    ,"status.import_feed": "Feed: {feed}"
+    ,"status.import_phase": "Fase: {phase}"
+    ,"status.import_elapsed": "Tiempo transcurrido: {elapsed}"
+    ,"status.import_tooltip": "{prefix}: {feed} · {phase} · {progress} · {elapsed}"
+    ,"status.import_tooltip_cancelling": "Cancelando"
+    ,"status.import_tooltip_importing": "Importando"
+    ,"history.refresh_error": "No se pudo actualizar el historial de operaciones."
+    ,"editor.entity_multiple_routes": "La entidad pertenece a varias rutas; seleccione una ruta activa como contexto."
+    ,"editor.entity_route_not_authorized": "La entidad afecta a una ruta no autorizada: todas deben estar activas, editables y desbloqueadas."
+    ,"editor.boolean_value_error": "El valor booleano debe ser 0/1 o sí/no."
+    ,"editor.vertex_missing": "El vértice ya no existe en el borrador."
+    ,"editor.workspace_history_legacy": "Cambios / historial"
+    ,"validation.all_severities": "Todas las severidades"
+    ,"validation.all_categories": "Todas las categorías"
+    ,"validation.all_files": "Todos los archivos"
+    ,"validation.severity_header": "Severidad"
+    ,"validation.category_header": "Categoría"
+    ,"validation.origin_header": "Origen"
+    ,"validation.rule_origin": "Origen de regla"
+    ,"validation.rule_header": "Regla"
+    ,"validation.file_header": "Archivo"
+    ,"validation.source_row_header": "Fila fuente"
+    ,"validation.field_header": "Campo"
+    ,"validation.entity_header": "Entidad"
+    ,"validation.message_header": "Mensaje"
+    ,"validation.no_run": "Sin corrida de validación cargada."
+    ,"validation.no_issues": "Sin incidencias cargadas."
+    ,"validation.load_error": "No se han podido cargar las incidencias de validación."
+    ,"validation.no_filtered_issues": "No hay incidencias para los filtros actuales."
+    ,"validation.summary_unavailable_view": "Resumen de corrida no disponible en esta vista."
+    ,"validation.summary_unavailable": "Resumen de corrida no disponible."
+    ,"validation.no_run_feed": "Sin corrida de validación para el feed actual."
+    ,"validation.no_status": "Sin estado"
+    ,"validation.summary_format": "Estado: {statuses} · {runs} ejecución(es) · {issues} incidencias registradas."
+    ,"validation.showing": "Mostrando {first}–{last} de {total} incidencias."
+    ,"validation.global_scope": "Alcance global"
+    ,"validation.no_physical_row": "Sin fila física"
+    ,"validation.no_physical_row_applicable": "Sin fila física aplicable"
+    ,"validation.no_gtfs_field": "Sin campo GTFS asociado"
+    ,"validation.not_available": "—"
+    ,"validation.filename_unavailable": "[nombre de archivo no disponible]"
+    ,"validation.local_data_omitted": "[dato local omitido]"
+    ,"validation.local_location_omitted": "[ubicación local omitida]"
+    ,"validation.local_help": "Ayuda local"
+    ,"validation.occurrences": "Repeticiones"
+    ,"validation.parameters": "Parámetros:"
+    ,"validation.internal_origin": "Interno",
+    "editor.stops_headers": "Secuencia|Parada|stop_id|Tipo|Llegada · salida",
+    "editor.geometry_context": "Ruta {route_id}\nShapes utilizados: {shapes}\nViajes por shape/contexto: {trips}",
+    "editor.services_context": "AGENCIA / OPERADOR\n{agency} ({agency_id})\n\nSERVICIOS\n{services}\n\nATRIBUCIONES: {attributions}",
+    "editor.history_context": "Ruta: {route_id}\nBorrador: {state}\nCambios de esta ruta: {count}"
   }
 }

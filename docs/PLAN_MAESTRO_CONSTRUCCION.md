@@ -40,7 +40,7 @@ Plantilla de inicio para cada chat de implementación:
 
 ```text
 Objetivo único: ejecutar la tarea Txxx de docs/PLAN_MAESTRO_CONSTRUCCION.md.
-Lee AGENTS.md, docs/CURRENT_STATE.md y únicamente la ficha Txxx y sus dependencias.
+Lee AGENTS.md, docs/SESSION_CONTEXT.md y únicamente la ficha Txxx y sus dependencias.
 No amplíes el alcance. No empieces otra tarea.
 Antes de modificar, confirma qué archivos están directamente relacionados.
 Al terminar informa: cambio, archivos, pruebas ejecutadas y riesgo real pendiente.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -27,6 +28,11 @@ def _orchestrator_fixture(tmp_path: Path) -> tuple[Path, Path]:
         destination = fixture_root / relative_file
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+    state_path = fixture_root / "docs" / "TASK_STATUS.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    plan_path = fixture_root / "docs" / "PLAN_MAESTRO_CONSTRUCCION.md"
+    state["plan_sha256"] = hashlib.sha256(plan_path.read_bytes()).hexdigest()
+    state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return fixture_root, fixture_root / "tools" / "plan_orchestrator.ps1"
 
 

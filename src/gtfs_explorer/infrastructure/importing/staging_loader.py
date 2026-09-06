@@ -145,10 +145,7 @@ class StagingLoader:
             ]
             self._raise_if_cancelled(is_cancelled)
             if values:
-                placeholders = ", ".join("?" for _ in values[0])
-                connection.executemany(
-                    f"INSERT INTO {_quote_identifier(table_name)} VALUES ({placeholders})", values
-                )
+                _insert_values_batch(connection, table_name, values)
                 count += len(values)
             if on_progress is not None:
                 on_progress(filename, count)
@@ -187,6 +184,21 @@ def _staging_table_name(filename: str) -> str:
 
 def _quote_identifier(value: str) -> str:
     return '"' + value.replace('"', '""') + '"'
+
+
+def _insert_values_batch(
+    connection: DatabaseConnection, table_name: str, values: list[tuple[object, ...]]
+) -> None:
+    """Inserta un lote mediante un único parámetro JSON, no una consulta por fila."""
+    columns = ["CAST(json_extract(value, '$[0]') AS BIGINT)"]
+    columns.extend(
+        f"json_extract_string(value, '$[{index}]')" for index in range(1, len(values[0]))
+    )
+    connection.execute(
+        f"INSERT INTO {_quote_identifier(table_name)} "
+        f"SELECT {', '.join(columns)} FROM (SELECT unnest(?::JSON[]) AS value)",
+        [json.dumps(values, ensure_ascii=False)],
+    )
 
 
 class _ProgressThrottle:

@@ -3,11 +3,13 @@
   "use strict";
 
   const VERSION = 1;
+  const EDIT_VERSION = 2;
   const MAX_MESSAGE_BYTES = 16 * 1024;
   const MAX_PENDING_COMMANDS = 32;
   let channelCreated = false;
   let bridge = null;
   let sequence = 0;
+  let editSequence = 0;
   let mapReady = false;
   const pending = [];
 
@@ -19,6 +21,13 @@
     const message = JSON.stringify({version: VERSION, type: "event", event, sequence: sequence++, payload});
     if (!sizeIsAllowed(message)) return false;
     bridge.receive(message);
+    return true;
+  }
+
+  function reportEdit(payload) {
+    const message = JSON.stringify({version: EDIT_VERSION, type: "event", event: "editGesture", sequence: editSequence++, payload});
+    if (!sizeIsAllowed(message) || !bridge || typeof bridge.receive_v2 !== "function") return false;
+    bridge.receive_v2(message);
     return true;
   }
 
@@ -62,6 +71,10 @@
       featureClicked: function (payload) { return mapReady && report("featureClicked", payload); },
       viewportChanged: function (payload) { return mapReady && report("viewportChanged", payload); },
       mapError: function (payload) { return report("mapError", payload); },
+      performanceTimings: function (payload) {
+        return mapReady && report("performanceTimings", payload);
+      },
+      editGesture: function (payload) { return mapReady && reportEdit(payload); },
     };
     // QWebChannel se inicializa de forma asíncrona. Las capas pueden haber
     // terminado de cargar antes; notificamos explícitamente que ya es seguro

@@ -699,6 +699,36 @@ def test_ui_error_dialog_does_not_expose_traceback(
         handler.close()
 
 
+def test_close_commit_failure_keeps_project_references_recoverable(
+    application: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class FailingSession:
+        dirty = False
+        editing_session = None
+
+        def close(self) -> None:
+            raise RuntimeError("controlled commit failure")
+
+    class OpenProject:
+        def close(self) -> None:
+            raise AssertionError("the project must remain open after commit failure")
+
+    window = MainWindow()
+    session = FailingSession()
+    opened = OpenProject()
+    window._editor_session = session  # type: ignore[assignment]
+    window._opened_project = opened  # type: ignore[assignment]
+    errors: list[str] = []
+    monkeypatch.setattr(window, "_show_error", lambda message, **_kwargs: errors.append(message))
+
+    assert not window._close_project()
+    assert window._editor_session is session
+    assert window._opened_project is opened
+    assert errors
+    window.deleteLater()
+    application.processEvents()
+
+
 def test_project_can_close_and_reopen_in_the_same_window_lifecycle(
     application: QApplication, tmp_path: Path
 ) -> None:

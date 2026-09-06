@@ -390,10 +390,32 @@ def _export_from_ui(
     # de finalización tiene cobertura focal propia.
     exporter._show_export_completed = lambda *_args: None  # type: ignore[method-assign]
     exporter._execute()
+    _wait_for_export_terminal(application=QApplication.instance(), exporter=exporter)
     assert artifact.is_file()
     manifest = artifact.with_name(f"{artifact.name}.manifest.json")
     assert manifest.is_file()
     return artifact
+
+
+def _wait_for_export_terminal(*, application: QApplication | None, exporter: object) -> None:
+    """Espera el resultado asíncrono sin depender de una pausa de máquina."""
+    assert application is not None
+    loop = QEventLoop()
+    timeout = QTimer()
+    timeout.setSingleShot(True)
+
+    def check_terminal() -> None:
+        if getattr(exporter, "_active_export_generation") is None:
+            loop.quit()
+        else:
+            QTimer.singleShot(0, check_terminal)
+
+    timeout.timeout.connect(loop.quit)
+    QTimer.singleShot(0, check_terminal)
+    timeout.start(15_000)
+    loop.exec()
+    timeout.stop()
+    assert getattr(exporter, "_active_export_generation") is None
 
 
 def _assert_manifest_private(artifact: Path, project: Path) -> dict[str, Any]:
@@ -771,11 +793,17 @@ def test_e2e_05_ui_exports_publish_manifests_history_and_reimport_mini_gtfs(
         )
         assert result.state is JobState.READY
         export_root = tmp_path / "exports"
+        editor_session = window._get_editor_session()
+        assert editor_session is not None
+        assert editor_session.working_revision_id == "original"
         formats = (
             ExportFormat.JSON,
             ExportFormat.CSV,
             ExportFormat.GEOJSON,
             ExportFormat.MINI_GTFS,
+            ExportFormat.COMPLETE_GTFS,
+            ExportFormat.KML,
+            ExportFormat.KMZ,
         )
         artifacts = {
             format_: _export_from_ui(window, format_, "A", export_root / format_.value)
@@ -790,7 +818,7 @@ def test_e2e_05_ui_exports_publish_manifests_history_and_reimport_mini_gtfs(
                 PageRequest(limit=100),
                 OperationType.EXPORT,
             ).items
-        assert len(operations) == 4
+        assert len(operations) == len(formats)
         assert all(operation.status is OperationStatus.COMPLETED for operation in operations)
         assert {operation.artifact_name for operation in operations} == {
             artifact.name for artifact in artifacts.values()

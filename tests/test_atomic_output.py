@@ -64,3 +64,27 @@ def test_rejects_destination_inside_a_protected_internal_root(tmp_path: Path) ->
 
     with pytest.raises(ExportDestinationError):
         AtomicOutputWriter(protected_roots=(protected,)).write(protected / "result.json", (b"x",))
+
+
+def test_manifest_replace_failure_restores_the_previous_coherent_pair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "export.json"
+    manifest_path = tmp_path / "export.json.manifest.json"
+    destination.write_bytes(b"previous")
+    manifest_path.write_text('{"sha256":"previous"}', encoding="utf-8")
+    writer = AtomicOutputWriter()
+    original_publish = writer._publish
+
+    def fail_manifest(temporary: Path, final: Path, overwrite: bool) -> None:
+        if final == manifest_path:
+            raise OSError("simulated manifest replacement failure")
+        original_publish(temporary, final, overwrite)
+
+    monkeypatch.setattr(writer, "_publish", fail_manifest)
+    with pytest.raises(ExportError):
+        writer.write(destination, (b"new",), overwrite=True)
+
+    assert destination.read_bytes() == b"previous"
+    assert manifest_path.read_text(encoding="utf-8") == '{"sha256":"previous"}'
+    assert not list(tmp_path.glob(".*.tmp"))

@@ -1,96 +1,80 @@
-# Instrucciones del proyecto
+# GTFS Explorer Desktop — Operating model
 
-## Principio de trabajo
+## Una tarea por chat
 
-Trabaja con el contexto mínimo suficiente para completar la tarea actual.
+Cada chat tiene un objetivo y descriptor únicos. No mezclar fases, features,
+refactors ni gates independientes; los pendientes van a otro chat.
 
-No analices todo el repositorio por defecto.
+## Disciplina de contexto
 
-Antes de modificar código:
+Usar el contexto mínimo suficiente:
 
-1. Si existe `docs/CURRENT_STATE.md`, léelo.
-2. Si no existe, identifica la documentación vigente que actúa como fuente central del proyecto y consulta únicamente la necesaria.
-3. Identifica el objetivo concreto solicitado.
-4. Localiza únicamente los archivos directamente relacionados.
-5. Consulta `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` o `docs/DOMAIN.md` solo si existen y la tarea realmente lo requiere.
-6. Amplía el contexto únicamente si existe una razón técnica concreta.
+- **HOT:** `AGENTS.md`, `docs/SESSION_CONTEXT.md`, descriptor de tarea y
+  `docs/TASK_STATUS.json` solo si aplica el orquestador legado.
+- **WARM:** bajo demanda `ARCHITECTURE.md`, `DOMAIN.md`, ADR concreto,
+  especificación, tests y módulos relacionados.
+- **COLD:** no leer por defecto. Historial, gates, incidentes, benchmarks,
+  releases y evidencias están en GTFS Explorer Engineering o Artifacts.
 
-## Una tarea = un objetivo
+No recorrer `docs/` entero ni cargar historia para una tarea ordinaria.
 
-Cada conversación de Codex debe centrarse en un único resultado principal.
+## Implementación y documentación
 
-Si durante el trabajo aparece otra funcionalidad, mejora o problema independiente:
+Conservar arquitectura, contratos y trabajo ajeno. Preferir el cambio mínimo;
+sin limpiezas generales ni dependencias innecesarias. Una tarea documental no
+modifica `src/`, runtime web, GTFS, esquema ni comportamiento de producto.
 
-- no lo implementes dentro de la tarea actual;
-- indícalo como pendiente;
-- recomienda tratarlo en un chat nuevo.
+Actualizar `CURRENT_STATE.md` solo ante cambio material actual;
+`ARCHITECTURE.md` si cambia arquitectura; `DOMAIN.md` si cambian reglas; y ADR
+para decisiones relevantes. Evidencia histórica en Engineering; binarios,
+manifests y runtime evidence en Artifacts.
 
-No amplíes el alcance de una tarea sin necesidad.
+## Modelos y escalado
 
-## Implementación
+- **Luna Medium:** mecánica, i18n, tests, documentación y bugs conocidos.
+- **Terra Medium:** varias capas, persistencia, concurrencia, lifecycle Qt,
+  diseño focal o debugging no trivial.
+- **Terra High:** excepcional y justificado; nunca por longitud.
+- **Sol:** diagnóstico complejo, arquitectura, seguridad, integridad o blocker.
+  Preferir: Sol diagnostica; Luna/Terra implementa.
+- **Astra:** deshabilitado por defecto; solo autorización explícita tras Sol y
+  riesgo serio, seguridad crítica o decisión irreversible.
 
-Prefiere el cambio mínimo, coherente y mantenible que resuelva completamente el objetivo.
+No escalar repetidamente: tras uno o dos intentos razonables, registrar el
+bloqueo o solicitar el diagnóstico adecuado. FAST MODE solo por urgencia.
 
-Conserva:
+## Verificación y salida
 
-- arquitectura existente;
-- convenciones del proyecto;
-- código funcional;
-- compatibilidad;
-- datos existentes.
+Durante desarrollo, ejecutar solo checks directamente afectados. La batería
+integrada completa pertenece al gate final salvo riesgo crítico. Build,
+packaging, Defender, publicación, commit y tag requieren su gate y autorización.
 
-Evita:
+Final compacto: estado, cambio o causa, archivos, verificación, métrica/riesgo
+importante y siguiente gate. No pegar archivos ni narrar comandos.
 
-- refactorizaciones especulativas;
-- limpiezas generales no solicitadas;
-- cambios cosméticos masivos;
-- nuevas dependencias innecesarias;
-- modificaciones fuera del alcance.
+## Condiciones de parada
 
-## Verificación
+Detenerse al cumplir aceptación. No publicar, desplegar, gastar, procesar datos
+sensibles, hacer commit/tag ni tocar releases estables sin autorización. No
+afirmar validaciones no ejecutadas.
 
-Antes de considerar terminada una tarea, ejecuta únicamente las comprobaciones relevantes disponibles para el cambio realizado.
+Propietario y autor: Yeison Arbey Carrillo Lemus.
 
-Pueden incluir:
+Todos los derechos reservados.
 
-- tests;
-- lint;
-- typecheck;
-- build;
-- prueba funcional.
+## Task Telemetry
 
-No ejecutes validaciones amplias y costosas si existe una comprobación específica suficiente.
+Cuando una tarea incluya `TASK_ID`, debe registrar su ciclo mediante el
+Control Center antes de empezar y justo antes de la respuesta final:
 
-Nunca afirmes que algo ha sido probado o verificado si realmente no se ha ejecutado.
+1. `node C:\Users\yeiso\.codex\task-telemetry.mjs start <TASK_ID> ...`
+2. Ejecutar la tarea dentro de su alcance.
+3. `node C:\Users\yeiso\.codex\task-telemetry.mjs end <TASK_ID> --status PASS|PARTIAL|BLOCKED`
 
-## Documentación
-
-Si existe `docs/CURRENT_STATE.md`, úsalo como referencia del estado actual.
-
-Si el proyecto ya dispone de otra fuente central vigente para estado, alcance o decisiones, respétala y actualízala en lugar de crear documentación duplicada.
-
-Actualiza la fuente de estado únicamente cuando una tarea cambie materialmente:
-
-- funcionalidades disponibles;
-- trabajo en curso;
-- problemas conocidos;
-- próximos pasos relevantes.
-
-Actualiza `docs/ARCHITECTURE.md` solo cuando cambie la arquitectura.
-
-Actualiza `docs/DECISIONS.md` solo cuando se tome una decisión técnica o funcional relevante que deba conservarse.
-
-Actualiza `docs/DOMAIN.md` solo cuando cambien conceptos, reglas o terminología del dominio.
-
-No dupliques información entre documentos.
-
-## Finalización
-
-Al terminar una tarea informa de forma compacta:
-
-1. qué se ha cambiado;
-2. qué archivos relevantes se han modificado;
-3. cómo se ha verificado;
-4. qué pendiente o riesgo real permanece, si existe.
-
-Después de completar el objetivo principal, considera la tarea cerrada.
+Los metadatos permitidos son pequeños y operativos (`project`, `task_type`,
+`size`, `model`, `reasoning`, `parent_task`, `feature` y `gate`). No se guarda
+contenido de prompts, respuestas, código, salidas de herramientas, secretos,
+cookies ni credenciales. Si falla el registro, debe informarse
+`TASK_TELEMETRY_STATUS=FAIL` sin inventar datos ni ocultar el trabajo realizado.
+`PASS`, `PARTIAL` y `BLOCKED` son los únicos estados de cierre; `ASTRA` sigue
+requiriendo autorización explícita.

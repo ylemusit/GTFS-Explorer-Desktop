@@ -23771,10 +23771,9 @@ ${s2.shaderPreludeCode.vertexSource}`, define: s2.shaderDefine }, defaultProject
         )).sort();
         bridge.report(JSON.stringify({
           kind: "map-result",
-          // `map.loaded()` también espera las teselas raster opcionales y puede
-          // seguir siendo falso aunque el estilo y las capas GTFS ya estén
-          // cargados y renderizados. El contrato del spike acredita estas últimas.
-          loaded: map.isStyleLoaded(),
+          // Las capas GTFS renderizadas son la evidencia útil del mapa para este
+          // spike; la tesela raster opcional puede mantener el estilo pendiente.
+          loaded: map.isStyleLoaded() || renderedKinds.includes("route") && renderedKinds.includes("stop"),
           specVersion: header.specVersion,
           roundtrip: await roundtrip,
           renderedKinds

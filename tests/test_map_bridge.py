@@ -5,12 +5,14 @@ import subprocess
 from pathlib import Path
 
 from gtfs_explorer.presentation.map_bridge.protocol import (
+    EDIT_PROTOCOL_VERSION,
     MAX_MESSAGE_BYTES,
     MAX_PENDING_COMMANDS,
     DispatchStatus,
     MapBridge,
     MapFitBounds,
     MapNavigation,
+    parse_edit_event,
     serialize_navigation,
 )
 
@@ -23,6 +25,18 @@ def _event(name: str, sequence: int, payload: dict[str, object] | None = None) -
             "event": name,
             "sequence": sequence,
             "payload": payload or {},
+        }
+    )
+
+
+def _edit_event(sequence: int, payload: dict[str, object]) -> str:
+    return json.dumps(
+        {
+            "version": EDIT_PROTOCOL_VERSION,
+            "type": "event",
+            "event": "editGesture",
+            "sequence": sequence,
+            "payload": payload,
         }
     )
 
@@ -100,6 +114,63 @@ def test_viewport_event_is_available_only_after_map_ready() -> None:
     assert [event.event for event in received] == ["mapReady", "viewportChanged"]
 
 
+def test_performance_timings_are_a_bounded_bridge_event_after_map_ready() -> None:
+    bridge = MapBridge()
+    received: list[object] = []
+    errors: list[str] = []
+    bridge.event_received.connect(received.append)
+    bridge.protocol_error.connect(errors.append)
+
+    bridge.receive(_event("performanceTimings", 0, {"generation_id": 4, "idle_final": 12.5}))
+    bridge.receive(_event("mapReady", 1))
+    bridge.receive(_event("performanceTimings", 2, {"generation_id": 4, "idle_final": 12.5}))
+
+    assert len(errors) == 1
+    assert [event.event for event in received] == ["mapReady", "performanceTimings"]
+
+
+def test_v2_edit_gesture_is_declarative_bounded_and_ordered() -> None:
+    gesture = parse_edit_event(
+        _edit_event(
+            0,
+            {
+                "action": "drag_end",
+                "entity_type": "stop",
+                "entity_id": "S1",
+                "route_id": "R1",
+                "longitude": -3.7,
+                "latitude": 40.4,
+            },
+        )
+    )
+    assert gesture.entity_id == "S1"
+    assert gesture.longitude == -3.7
+
+    bridge = MapBridge()
+    received: list[object] = []
+    errors: list[str] = []
+    bridge.edit_event_received.connect(received.append)
+    bridge.protocol_error.connect(errors.append)
+    bridge.receive(_event("mapReady", 0))
+    select = {"action": "select", "entity_type": "stop", "entity_id": "S1"}
+    bridge.receive_v2(_edit_event(0, select))
+    bridge.receive_v2(_edit_event(0, select))
+    bridge.receive_v2(
+        _edit_event(
+            1,
+            {
+                "action": "drag_end",
+                "entity_type": "stop",
+                "entity_id": "S1",
+                "longitude": 500,
+                "latitude": 40,
+            },
+        )
+    )
+    assert len(received) == 1
+    assert len(errors) == 2
+
+
 def test_javascript_contract_has_one_channel_and_same_limits() -> None:
     bridge_path = (
         Path(__file__).parents[1] / "src/gtfs_explorer/presentation/map_bridge/map_bridge.js"
@@ -108,11 +179,14 @@ def test_javascript_contract_has_one_channel_and_same_limits() -> None:
 
     assert source.count("new QWebChannel(") == 1
     assert "const VERSION = 1;" in source
+    assert "const EDIT_VERSION = 2;" in source
     assert "const MAX_MESSAGE_BYTES = 16 * 1024;" in source
     assert "const MAX_PENDING_COMMANDS = 32;" in source
     assert '["navigate", "fitBounds"].includes(command.command)' in source
     assert "bridge.command_available.connect(dispatchCommand);" in source
     assert 'new Event("gtfs-explorer-map-bridge-ready")' in source
+    assert "editGesture" in source
+    assert "performanceTimings" in source
     assert "filesystem" in source and "SQL" in source
 
     harness = f"""
@@ -167,4 +241,5 @@ def test_qt_webchannel_signal_name_matches_javascript_and_packaged_resource() ->
     }
 
     assert "command_available" in method_names
+    assert "receive_v2" in method_names
     assert bridge_path.read_bytes() == packaged_path.read_bytes()

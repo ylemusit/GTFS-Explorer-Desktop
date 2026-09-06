@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidg
 
 from gtfs_explorer.domain.ports import PagedResult
 from gtfs_explorer.domain.routes import TimelineStop, TripSummary
+from gtfs_explorer.presentation.desktop.i18n import t
 
 
 class TripTimelineWidget(QWidget):
@@ -26,17 +27,8 @@ class TripTimelineWidget(QWidget):
         layout = QVBoxLayout(self)
         self._table = QTableWidget(0, 5)
         self._table.setObjectName("tripTimeline")
-        self._table.setHorizontalHeaderLabels(
-            (
-                "Secuencia",
-                "Parada",
-                "ID",
-                "Llegada GTFS (arrival_time)",
-                "Salida GTFS (departure_time)",
-            )
-        )
+        self._set_translated_labels()
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self._table.setAccessibleName("Timeline programado del viaje")
         self._table.itemSelectionChanged.connect(self._select_stop)
         layout.addWidget(self._table)
 
@@ -51,10 +43,10 @@ class TripTimelineWidget(QWidget):
         for row, stop in enumerate(page.items):
             values = (
                 "" if stop.stop_sequence is None else str(stop.stop_sequence),
-                stop.stop_name or "Sin nombre",
-                stop.stop_id or "Sin ID",
-                stop.arrival_time or "—",
-                stop.departure_time or "—",
+                stop.stop_name or t("stop.name_unknown"),
+                stop.stop_id or t("stop.id_unknown"),
+                stop.arrival_time or t("stop.not_available"),
+                stop.departure_time or t("stop.not_available"),
             )
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
@@ -62,6 +54,30 @@ class TripTimelineWidget(QWidget):
                     item.setData(256, stop.stop_id)
                 self._table.setItem(row, column, item)
         self._table.resizeColumnsToContents()
+
+    def retranslate_ui(self) -> None:
+        """Actualiza cabeceras y los valores de reserva del timeline."""
+        selected_stop_id = None
+        selected = self._table.selectedItems()
+        if selected:
+            selected_stop_id = selected[0].data(256)
+        self._set_translated_labels()
+        if self._trip is not None:
+            self.show_trip(self._trip)
+            if isinstance(selected_stop_id, str):
+                self.select_stop(selected_stop_id)
+
+    def _set_translated_labels(self) -> None:
+        self._table.setHorizontalHeaderLabels(
+            (
+                t("stop.sequence"),
+                t("stop.name"),
+                t("stop.stop_id"),
+                t("trip.arrival_header"),
+                t("trip.departure_header"),
+            )
+        )
+        self._table.setAccessibleName(t("trip.timeline_accessible"))
 
     def select_stop(self, stop_id: str) -> None:
         """Refleja un click de mapa sin disparar una segunda consulta de parada."""

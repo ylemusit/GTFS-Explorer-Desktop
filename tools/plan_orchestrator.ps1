@@ -475,7 +475,7 @@ Objetivo único: ejecutar profesionalmente la tarea $($Task.id) del plan maestro
 Esta sesión se ha iniciado explícitamente con el modelo $script:CodexModel y razonamiento $script:CodexReasoningEffort.
 
 Reglas obligatorias:
-- Lee AGENTS.md y docs/CURRENT_STATE.md antes de modificar.
+- Lee AGENTS.md, docs/SESSION_CONTEXT.md y el descriptor de tarea antes de modificar.
 - La ficha exacta de la tarea se incluye al final. Consulta otros documentos solo si la ficha lo requiere.
 - Ejecuta únicamente $($Task.id). No empieces ni prepares la siguiente tarea.
 - Conserva todo trabajo existente y no reviertas cambios ajenos.
