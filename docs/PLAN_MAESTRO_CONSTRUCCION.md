@@ -1,19 +1,27 @@
-# GTFS Explorer Desktop — análisis y plan maestro de construcción
+# GTFS Explorer Desktop — plan maestro histórico de construcción
 
 Versión del documento: 1.0
 
 Fecha: 11/08/2026
 
-Estado: Aprobado como línea base técnica; implementación no iniciada
+Estado: Línea base histórica de planificación; no es la fuente actual de
+verdad del producto
 
 Propietario y autor del producto: Yeison Arbey Carrillo Lemus
 Todos los derechos reservados.
+
+## 0. Alcance histórico y autoridad actual
+
+Este documento conserva la especificación y el desglose de tareas usados por
+el orquestador heredado. No define la arquitectura ni el estado actual del
+producto. Para la verdad vigente deben consultarse `docs/CURRENT_STATE.md`,
+`docs/ARCHITECTURE.md`, `docs/DOMAIN.md`, las pruebas actuales y el código.
 
 ## 0. Cómo usar este documento
 
 Este documento es la especificación ejecutable inicial de GTFS Explorer Desktop. Su objetivo es que una persona o un modelo de IA de razonamiento bajo pueda construir el producto por tareas pequeñas, verificables y sin reconstruir el alcance desde conversaciones antiguas.
 
-Orden de autoridad durante la implementación:
+Orden histórico de autoridad durante la implementación original:
 
 1. Código y pruebas existentes.
 2. `AGENTS.md`.

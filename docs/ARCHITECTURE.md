@@ -115,7 +115,9 @@ de exportación.
 - Instalador objetivo: NSIS.
 - Mapas regionales y MobilityData/JRE, si se distribuyen, son paquetes separados por tamaño/licencia.
 
-El detalle vinculante y el árbol objetivo están en `PLAN_MAESTRO_CONSTRUCCION.md`.
+El detalle vigente se mantiene en esta documentación, el código y las
+pruebas. `PLAN_MAESTRO_CONSTRUCCION.md` es una línea base histórica del
+orquestador heredado y no debe usarse como autoridad arquitectónica actual.
 
 Propietario y autor: Yeison Arbey Carrillo Lemus.
 

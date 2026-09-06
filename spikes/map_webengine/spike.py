@@ -124,7 +124,11 @@ class Page(QWebEnginePage):
         self._evidence = evidence
 
     def javaScriptConsoleMessage(
-        self, level: QWebEnginePage.JavaScriptConsoleMessageLevel, message: str, line: int, source: str
+        self,
+        level: QWebEnginePage.JavaScriptConsoleMessageLevel,
+        message: str,
+        line: int,
+        source: str,
     ) -> None:  # noqa: N802 - API Qt
         self._evidence.console_messages.append(f"{level.name}:{line}:{message}:{source}")
 

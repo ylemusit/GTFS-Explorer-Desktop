@@ -2,6 +2,8 @@
 .task-*/
 .venv/
 .pytest_cache/
+.coverage
+coverage.xml
 .t004-temp/
 __pycache__/
 *.py[cod]
@@ -18,3 +20,6 @@ packaging/portable/deployment/
 packaging/portable/GTFS Explorer.dist/
 packaging/portable/GTFS Explorer Desktop.dist/
 nuitka-crash-report.xml
+*.log
+*.env
+!.env.example

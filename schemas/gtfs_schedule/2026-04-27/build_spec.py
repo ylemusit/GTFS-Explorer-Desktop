@@ -8,7 +8,6 @@ import json
 import re
 from pathlib import Path
 
-
 REVISION = "2026-04-27"
 SOURCE_URL = "https://gtfs.org/documentation/schedule/reference/"
 SOURCE_ANCHOR = "https://gtfs.org/documentation/schedule/reference/#"

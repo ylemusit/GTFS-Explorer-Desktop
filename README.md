@@ -3,8 +3,7 @@
 La fuente y el build del producto se mantienen en este repositorio. La evidencia
 histórica y las decisiones de ingeniería se separan respectivamente en los
 repositorios hermanos **GTFS Explorer Artifacts** y **GTFS Explorer Engineering**.
-Consulta `docs/SESSION_CONTEXT.md` y `docs/CURRENT_STATE.md` para retomar una
-tarea con el contexto operativo mínimo.
+La documentación canónica de desarrollo y estructura está en `docs/`.
 
 Aplicación Windows x64, portable y offline-first para explorar GTFS Schedule.
 
@@ -14,16 +13,20 @@ Versión `0.2.0`: aplicación Windows x64 portable y offline-first
 para importar, explorar, validar, visualizar y exportar GTFS Schedule. El
 release queda preparado localmente; la publicación no está iniciada.
 
-Consulta [el checklist de release](docs/RELEASE_CHECKLIST.md), el
+Consulta [el checklist de release](docs/RELEASE_CHECKLIST.md), la [estructura
+del repositorio](docs/REPOSITORY_STRUCTURE.md), el
 [historial de cambios](CHANGELOG.md) y la [matriz de smoke](tests/packaging/SMOKE_MATRIX.md).
 
 Para usar la aplicación, consulta la [guía de usuario](docs/USER_GUIDE.md).
-La documentación técnica relacionada está en [rendimiento](docs/PERFORMANCE.md),
+La documentación técnica y de desarrollo está en la [guía de desarrollo](docs/DEVELOPER_GUIDE.md),
+[arquitectura](docs/ARCHITECTURE.md), [build y release](docs/BUILD_AND_RELEASE.md),
+[rendimiento](docs/PERFORMANCE.md),
 [E2E](docs/E2E.md), [accesibilidad](docs/ACCESSIBILITY_CHECKLIST.md) y
 [mapas offline](docs/MAPS_OFFLINE.md).
 
-Para continuar el proyecto, usa el [contexto de sesión](docs/SESSION_CONTEXT.md),
-el descriptor de tarea y solo la documentación WARM relacionada.
+Para desarrollar y probar, consulta la [guía de desarrollo](docs/DEVELOPER_GUIDE.md)
+y [testing](docs/TESTING.md). El contexto operativo interno está en
+`docs/SESSION_CONTEXT.md`.
 
 ## Desarrollo local
 
