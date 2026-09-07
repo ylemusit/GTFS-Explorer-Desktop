@@ -27,6 +27,7 @@ version = {attr = "gtfs_explorer.product.PRODUCT_VERSION"}
 [tool.setuptools.package-data]
 "gtfs_explorer.resources.help" = ["*.json"]
 "gtfs_explorer.resources.i18n" = ["*.json"]
+"gtfs_explorer.resources.brand" = ["*.png"]
 
 [tool.uv]
 package = true

@@ -24,8 +24,10 @@ def test_product_ico_exists_and_contains_expected_sizes() -> None:
     assert application_icon_path() == path.resolve()
     assert _ico_sizes(path) == {
         (16, 16),
+        (20, 20),
         (24, 24),
         (32, 32),
+        (40, 40),
         (48, 48),
         (64, 64),
         (128, 128),

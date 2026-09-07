@@ -183,6 +183,18 @@ def test_run_window_requests_native_maximized_start(
     application.processEvents()
 
 
+def test_run_window_can_suppress_welcome_explicitly(
+    application: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "gtfs_explorer.presentation.desktop.main_window.StartupIntroDialog",
+        lambda: pytest.fail("No debe construirse la bienvenida"),
+    )
+    monkeypatch.setattr(QApplication, "exec", lambda _application: 0)
+
+    assert run_window(show_welcome=False) == 0
+
+
 def test_project_identity_tracks_open_close_switch_and_long_workspace(
     application: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -2900,12 +2900,14 @@ def run_window(
     logger: logging.Logger | None = None,
     logs_directory: Path | None = None,
     debug: bool = False,
+    show_welcome: bool = True,
 ) -> int:
     app = cast(QApplication, QApplication.instance() or QApplication(sys.argv))
     app.setApplicationName(IDENTITY.name)
     app.setApplicationVersion(IDENTITY.version)
     configure_application_icon(app)
-    StartupIntroDialog().exec()
+    if show_welcome:
+        StartupIntroDialog().exec()
     window = MainWindow(
         application_paths=application_paths,
         logger=logger,
