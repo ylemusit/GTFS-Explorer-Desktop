@@ -13,7 +13,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-PRODUCT_VERSION = "0.2.0"
+PRODUCT_VERSION = "0.2.1"
 GTFS_SPEC_REVISION = "2026-04-27"
 
 _BUILD_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")

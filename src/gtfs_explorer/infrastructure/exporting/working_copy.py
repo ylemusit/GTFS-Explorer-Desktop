@@ -17,6 +17,7 @@ from gtfs_explorer.infrastructure.exporting.atomic_output import (
     CancellationCheck,
 )
 from gtfs_explorer.infrastructure.exporting.revision import WorkingCopyGtfsBuilder
+from gtfs_explorer.product import IDENTITY
 
 
 class WorkingCopyExporters:
@@ -58,7 +59,7 @@ class WorkingCopyExporters:
             tables[filename].append(payload)
         payload = {
             "schema_version": "1.0.0",
-            "generator": {"name": "GTFS Explorer Desktop", "version": "0.2.0"},
+            "generator": {"name": IDENTITY.name, "version": IDENTITY.version},
             "source": source or {},
             "revision": {
                 "revision_id": revision_id,

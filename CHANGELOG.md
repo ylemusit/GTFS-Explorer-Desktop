@@ -1,5 +1,15 @@
 # Historial de cambios
 
+## 0.2.1 — Unreleased
+
+- Experiencia de bienvenida actualizada.
+- Identidad profesional unificada de GTFS Explorer Desktop.
+- Nuevo icono de aplicación GTFS Explorer.
+- Ilustración raster de bienvenida con titlebar, botón de inicio, versión y
+  copyright dinámicos.
+
+No añade nuevas capacidades funcionales GTFS ni está publicada.
+
 ## 0.1.0 — 2026-09-02
 
 Primera versión estable local de GTFS Explorer Desktop. Se distribuye como

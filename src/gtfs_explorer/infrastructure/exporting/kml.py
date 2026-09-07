@@ -19,6 +19,7 @@ from gtfs_explorer.infrastructure.exporting.atomic_output import (
     AtomicOutputWriter,
     CancellationCheck,
 )
+from gtfs_explorer.product import IDENTITY
 
 _KML_NS = "http://www.opengis.net/kml/2.2"
 _DANGEROUS_XML = re.compile(
@@ -257,7 +258,7 @@ class KmlGeometryImporter:
             for feature in preview.features
             if feature.metadata_dict.get("gtfs_explorer_version") is not None
         }
-        if version_values and version_values != {"0.2.0"}:
+        if version_values and version_values != {IDENTITY.version}:
             return KmlImportProposal(
                 preview,
                 (),
@@ -524,7 +525,7 @@ def _working_copy_kml(
     }
     root = ET.Element(f"{{{_KML_NS}}}kml")
     document = ET.SubElement(root, f"{{{_KML_NS}}}Document")
-    ET.SubElement(document, f"{{{_KML_NS}}}name").text = "GTFS Explorer 0.2.0"
+    ET.SubElement(document, f"{{{_KML_NS}}}name").text = f"{IDENTITY.name} {IDENTITY.version}"
     style_id = "gtfsRouteLine-" + profile.value.casefold()
     style = ET.SubElement(document, f"{{{_KML_NS}}}Style", id=style_id)
     line_style = ET.SubElement(style, f"{{{_KML_NS}}}LineStyle")
@@ -562,7 +563,7 @@ def _working_copy_kml(
                     routes.get(shape_routes[0], {}).get("agency_id") if shape_routes else None
                 ),
                 "revision_id": revision_id,
-                "gtfs_explorer_version": "0.2.0",
+                "gtfs_explorer_version": IDENTITY.version,
                 "kml_profile": profile.value,
             },
         )
@@ -599,7 +600,7 @@ def _working_copy_kml(
                     "stop_sequence"
                 ),
                 "revision_id": revision_id,
-                "gtfs_explorer_version": "0.2.0",
+                "gtfs_explorer_version": IDENTITY.version,
                 "kml_profile": profile.value,
             },
         )

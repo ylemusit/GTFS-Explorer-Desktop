@@ -33,7 +33,7 @@ if ($process.ExitCode -ne 0) { throw "Portable runtime smoke falló con código 
 
 $manifest = [ordered]@{
     product = 'GTFS Explorer Desktop'
-    version = '0.2.0'
+    version = '0.2.1'
     status = 'LOCAL_ONLY_NOT_PUBLISHED'
     artifacts = @(
         [ordered]@{ file = $portable.Name; bytes = $portable.Length; sha256 = Get-Sha256 $portable; packaging_type = 'portable-zip' },
