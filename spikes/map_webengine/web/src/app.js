@@ -64,17 +64,20 @@ new QWebChannel(qt.webChannelTransport, async function (channel) {
       }));
     });
 
-    map.once("idle", async function () {
+    let mapResultReported = false;
+    map.on("render", async function () {
+      if (mapResultReported) return;
       const renderedKinds = Array.from(new Set(
         map.queryRenderedFeatures(undefined, {layers: ["route", "stop"]})
           .map(function (feature) { return feature.properties.kind; })
       )).sort();
+      if (!renderedKinds.includes("route") || !renderedKinds.includes("stop")) return;
+      mapResultReported = true;
       bridge.report(JSON.stringify({
         kind: "map-result",
         // Las capas GTFS renderizadas son la evidencia útil del mapa para este
         // spike; la tesela raster opcional puede mantener el estilo pendiente.
-        loaded: map.isStyleLoaded() ||
-          (renderedKinds.includes("route") && renderedKinds.includes("stop")),
+        loaded: true,
         specVersion: header.specVersion,
         roundtrip: await roundtrip,
         renderedKinds: renderedKinds
