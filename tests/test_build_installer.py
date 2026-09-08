@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import codecs
 import importlib.util
+import struct
 import zipfile
 from pathlib import Path
 
@@ -63,7 +64,7 @@ def test_nsis_script_exposes_clear_completion_actions() -> None:
 
     assert "!insertmacro MUI_PAGE_FINISH" in script
     assert '!define MUI_FINISHPAGE_RUN "$INSTDIR\\${PRODUCT_EXECUTABLE}"' in script
-    assert '!define MUI_FINISHPAGE_RUN_TEXT "Abrir GTFS Explorer"' in script
+    assert '!define MUI_FINISHPAGE_RUN_TEXT "Abrir ${PRODUCT_NAME}"' in script
     assert '!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\\docs\\USER_GUIDE.md"' in script
     assert '!define MUI_FINISHPAGE_SHOWREADME_TEXT "Ver guía / README"' in script
 
@@ -101,6 +102,39 @@ def test_installer_identity_is_provided_by_the_build_script(
     assert 'VIAddVersionKey /LANG=3082 "CompanyName"' in script
     assert 'VIAddVersionKey /LANG=3082 "LegalCopyright"' in script
     assert '!define PRODUCT_NAME "GTFS Explorer Desktop"' not in script
+
+
+def test_nsis_script_uses_canonical_display_name_on_visible_surfaces() -> None:
+    script = Path("packaging/nsis/installer.nsi").read_text(encoding="utf-8-sig")
+
+    assert 'Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"' in script
+    assert '!define MUI_WELCOMEPAGE_TITLE "Bienvenido a ${PRODUCT_NAME}"' in script
+    assert '!define MUI_FINISHPAGE_RUN_TEXT "Abrir ${PRODUCT_NAME}"' in script
+    assert 'WriteRegStr HKCU "${PRODUCT_REGISTRY_KEY}" "DisplayName" "${PRODUCT_NAME}"' in script
+    assert (
+        'CreateShortcut "$SMPROGRAMS\\${PRODUCT_START_MENU_DIRECTORY}\\${PRODUCT_SHORTCUT_NAME}"'
+        in script
+    )
+    assert 'CreateDirectory "$SMPROGRAMS\\${PRODUCT_START_MENU_DIRECTORY}"' in script
+    assert 'Delete "$SMPROGRAMS\\GTFS Explorer\\${PRODUCT_SHORTCUT_NAME}"' in script
+    assert 'Section "Uninstall"' in script
+    assert 'Abrir GTFS Explorer"' not in script
+
+
+def test_nsis_script_uses_custom_welcome_finish_brand_artwork() -> None:
+    script = Path("packaging/nsis/installer.nsi").read_text(encoding="utf-8-sig")
+    artwork = Path("packaging/nsis/resources/installer_welcome_finish.bmp")
+
+    assert (
+        '!define INSTALLER_BRAND_ARTWORK "${__FILEDIR__}\\resources\\installer_welcome_finish.bmp"'
+        in script
+    )
+    assert '!define MUI_WELCOMEFINISHPAGE_BITMAP "${INSTALLER_BRAND_ARTWORK}"' in script
+    data = artwork.read_bytes()
+    assert data[:2] == b"BM"
+    assert struct.unpack_from("<ii", data, 18) == (164, 314)
+    assert struct.unpack_from("<H", data, 28)[0] == 24
+    assert b"GTFZ" not in data
 
 
 def test_nsis_source_is_utf8_unicode_and_keeps_installation_strings_intact() -> None:

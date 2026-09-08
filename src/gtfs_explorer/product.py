@@ -30,7 +30,7 @@ class ProductIdentity:
     rights_notice: str
     executable_name: str = "GTFS Explorer.exe"
     install_directory_name: str = "GTFS Explorer"
-    start_menu_directory_name: str = "GTFS Explorer"
+    start_menu_directory_name: str = "GTFS Explorer Desktop"
     shortcut_name: str = "GTFS Explorer Desktop.lnk"
     # Debe ser corto: Windows Explorer concatena esta raíz con el nombre
     # completo del ZIP al extraer el Portable.

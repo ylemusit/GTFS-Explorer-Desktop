@@ -31,7 +31,7 @@ def test_product_identity_has_complete_and_consistent_metadata() -> None:
     assert IDENTITY.rights_notice == "Todos los derechos reservados."
     assert IDENTITY.executable_name == "GTFS Explorer.exe"
     assert IDENTITY.install_directory_name == "GTFS Explorer"
-    assert IDENTITY.start_menu_directory_name == "GTFS Explorer"
+    assert IDENTITY.start_menu_directory_name == "GTFS Explorer Desktop"
     assert IDENTITY.shortcut_name == "GTFS Explorer Desktop.lnk"
     assert IDENTITY.portable_directory_name == "GTFS-Explorer"
     assert project["dynamic"] == ["version"]

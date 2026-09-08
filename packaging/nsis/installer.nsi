@@ -55,6 +55,8 @@ SetDateSave on
 !define PRODUCT_ICON "${PAYLOAD_DIR}\gtfs_explorer\resources\gtfs_explorer.ico"
 !define MUI_ICON "${PRODUCT_ICON}"
 !define MUI_UNICON "${PRODUCT_ICON}"
+!define INSTALLER_BRAND_ARTWORK "${__FILEDIR__}\resources\installer_welcome_finish.bmp"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "${INSTALLER_BRAND_ARTWORK}"
 
 !define PRODUCT_REGISTRY_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 
@@ -75,7 +77,7 @@ ShowUninstDetails show
 
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${PRODUCT_EXECUTABLE}"
-!define MUI_FINISHPAGE_RUN_TEXT "Abrir GTFS Explorer"
+!define MUI_FINISHPAGE_RUN_TEXT "Abrir ${PRODUCT_NAME}"
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\docs\USER_GUIDE.md"
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Ver guía / README"
 !define MUI_WELCOMEPAGE_TITLE "Bienvenido a ${PRODUCT_NAME}"
@@ -102,6 +104,9 @@ Section "${PRODUCT_NAME}" SEC_MAIN
   File /r "${PAYLOAD_DIR}\*.*"
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
+  ; Limpia el acceso heredado antes de crear la carpeta visible canónica.
+  Delete "$SMPROGRAMS\GTFS Explorer\${PRODUCT_SHORTCUT_NAME}"
+  RMDir "$SMPROGRAMS\GTFS Explorer"
   CreateDirectory "$SMPROGRAMS\${PRODUCT_START_MENU_DIRECTORY}"
   CreateShortcut "$SMPROGRAMS\${PRODUCT_START_MENU_DIRECTORY}\${PRODUCT_SHORTCUT_NAME}" "$INSTDIR\${PRODUCT_EXECUTABLE}"
   CreateShortcut "$DESKTOP\${PRODUCT_SHORTCUT_NAME}" "$INSTDIR\${PRODUCT_EXECUTABLE}"

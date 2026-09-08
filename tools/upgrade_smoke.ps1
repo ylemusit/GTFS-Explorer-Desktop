@@ -55,7 +55,7 @@ try {
     $registryKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\GTFS Explorer Desktop'
     if (-not (Test-Path -LiteralPath $registryKey)) { throw 'No existe la entrada de desinstalación HKCU esperada.' }
     $desktopShortcut = Join-Path ([Environment]::GetFolderPath('Desktop')) 'GTFS Explorer Desktop.lnk'
-    $startShortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'GTFS Explorer\GTFS Explorer Desktop.lnk'
+    $startShortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'GTFS Explorer Desktop\GTFS Explorer Desktop.lnk'
     if (-not (Test-Path -LiteralPath $desktopShortcut)) { throw 'Falta el acceso directo del escritorio.' }
     if (-not (Test-Path -LiteralPath $startShortcut)) { throw 'Falta el acceso directo del menú Inicio.' }
     $uninstaller = Join-Path $installDir 'uninstall.exe'
