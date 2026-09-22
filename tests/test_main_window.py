@@ -1,5 +1,6 @@
 import os
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from zipfile import ZipFile
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import gtfs_explorer.presentation.desktop.main_window as main_window_module
 from gtfs_explorer.application.commands.create_project import CreateProject
 from gtfs_explorer.application.commands.import_feed import ImportFeed, ImportFeedResult
 from gtfs_explorer.application.commands.open_project import OpenProject
@@ -49,7 +51,12 @@ from gtfs_explorer.infrastructure.filesystem.project_descriptor import (
 )
 from gtfs_explorer.infrastructure.logging import configure_logging
 from gtfs_explorer.presentation.desktop.exporter import ExportFormat, ExportRequest
-from gtfs_explorer.presentation.desktop.main_window import MainWindow, run_window
+from gtfs_explorer.presentation.desktop.main_window import (
+    MainWindow,
+    _ValidationReportJob,
+    _ValidationReportSignals,
+    run_window,
+)
 from tests.test_import_feed import _command, _write_fixture
 
 
@@ -1161,6 +1168,184 @@ def test_import_cancellation_reaches_worker_and_returns_to_project(
     window.close()
     window.deleteLater()
     application.processEvents()
+
+
+@contextmanager
+def _empty_connection() -> object:
+    yield object()
+
+
+@pytest.mark.parametrize(
+    ("choice", "expected_mode"),
+    (("full", "full"), ("summary", "summary"), ("cancel", None)),
+)
+def test_large_validation_report_dialog_dispatches_only_the_selected_mode(
+    application: QApplication,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    choice: str,
+    expected_mode: str | None,
+) -> None:
+    class FakeExporter:
+        def estimate(self, _connection: object, **_kwargs: object) -> tuple[int, int]:
+            return (1_001, 2_097_152)
+
+    class DecisionDialog:
+        ButtonRole = QMessageBox.ButtonRole
+        StandardButton = QMessageBox.StandardButton
+
+        def __init__(self, *_args: object) -> None:
+            self.full: object | None = None
+            self.summary: object | None = None
+            self._clicked: object | None = None
+
+        def setWindowTitle(self, _title: str) -> None:
+            pass
+
+        def setText(self, text: str) -> None:
+            assert "1,001" in text and "2.0 MB" in text
+
+        def addButton(self, label: object, _role: object = None) -> object:
+            button = object()
+            if label == "Generar informe completo":
+                self.full = button
+            elif label == "Generar solo resumen":
+                self.summary = button
+            return button
+
+        def exec(self) -> int:
+            self._clicked = {"full": self.full, "summary": self.summary, "cancel": None}[choice]
+            return 0
+
+        def clickedButton(self) -> object | None:
+            return self._clicked
+
+    started: list[object] = []
+    starter = SimpleNamespace(start=started.append)
+    monkeypatch.setattr(main_window_module, "ValidationReportExporter", FakeExporter)
+    monkeypatch.setattr(main_window_module, "QMessageBox", DecisionDialog)
+    monkeypatch.setattr(
+        main_window_module, "QThreadPool", SimpleNamespace(globalInstance=lambda: starter)
+    )
+    monkeypatch.setattr(
+        QFileDialog,
+        "getSaveFileName",
+        lambda *_args: (str(tmp_path / "validation.html"), "HTML (*.html)"),
+    )
+    window = MainWindow()
+    window._opened_project = SimpleNamespace(database=SimpleNamespace(connection=_empty_connection))
+
+    window._export_validation_report("batch", main_window_module.ValidationIssueFilter())
+
+    assert len(started) == (0 if expected_mode is None else 1)
+    if expected_mode is not None:
+        assert started[0]._mode == expected_mode
+        progress = window._validation_report_job[2]
+        window._validation_report_cancelled(progress)
+    assert getattr(window, "_validation_report_job", None) is None
+    window._opened_project = None
+    window.close()
+    window.deleteLater()
+    application.processEvents()
+
+
+def test_validation_report_progress_and_cancel_are_bound_to_the_active_worker(
+    application: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class FakeExporter:
+        def estimate(self, _connection: object, **_kwargs: object) -> tuple[int, int]:
+            return (5, 4096)
+
+    started: list[object] = []
+    monkeypatch.setattr(main_window_module, "ValidationReportExporter", FakeExporter)
+    monkeypatch.setattr(
+        main_window_module,
+        "QThreadPool",
+        SimpleNamespace(globalInstance=lambda: SimpleNamespace(start=started.append)),
+    )
+    monkeypatch.setattr(
+        QFileDialog,
+        "getSaveFileName",
+        lambda *_args: (str(tmp_path / "validation.html"), "HTML (*.html)"),
+    )
+    window = MainWindow()
+    window._opened_project = SimpleNamespace(database=SimpleNamespace(connection=_empty_connection))
+
+    window._export_validation_report("batch", main_window_module.ValidationIssueFilter())
+
+    job, signals, progress, cancel_token = window._validation_report_job
+    assert started == [job]
+    signals.progress.emit(3, 5)
+    assert (progress.value(), progress.maximum()) == (3, 5)
+    progress.canceled.emit()
+    assert cancel_token.is_set()
+    window._validation_report_cancelled(progress)
+    assert window._validation_report_job is None
+    window._opened_project = None
+    window.close()
+    window.deleteLater()
+    application.processEvents()
+
+
+def test_validation_report_worker_reports_success_failure_and_cancellation(
+    application: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list[tuple[str, object]] = []
+
+    @contextmanager
+    def connection() -> object:
+        yield object()
+
+    database = SimpleNamespace(connection=connection)
+
+    class FakeExporter:
+        outcome = "success"
+
+        def write(self, _connection: object, _destination: Path, **kwargs: object) -> None:
+            on_progress = kwargs["on_progress"]
+            assert callable(on_progress)
+            on_progress(500, 500)
+            if self.outcome == "failure":
+                raise RuntimeError("expected failure")
+
+    monkeypatch.setattr(main_window_module, "ValidationReportExporter", FakeExporter)
+
+    def run(outcome: str, cancelled: bool = False) -> None:
+        FakeExporter.outcome = outcome
+        token = threading.Event()
+        if cancelled:
+            token.set()
+        signals = _ValidationReportSignals()
+        signals.progress.connect(
+            lambda current, total: events.append(("progress", (current, total)))
+        )
+        signals.succeeded.connect(lambda path: events.append(("success", path)))
+        signals.failed.connect(lambda message: events.append(("failure", message)))
+        signals.cancelled.connect(lambda: events.append(("cancelled", None)))
+        _ValidationReportJob(
+            database,
+            tmp_path / f"{outcome}.html",
+            "batch",
+            "html",
+            main_window_module.ValidationReportFilter(),
+            "full",
+            False,
+            token,
+            signals,
+        ).run()
+
+    run("success")
+    run("failure")
+    run("success", cancelled=True)
+
+    assert events == [
+        ("progress", (500, 500)),
+        ("success", tmp_path / "success.html"),
+        ("progress", (500, 500)),
+        ("failure", "expected failure"),
+        ("progress", (500, 500)),
+        ("cancelled", None),
+    ]
 
 
 @pytest.mark.integration

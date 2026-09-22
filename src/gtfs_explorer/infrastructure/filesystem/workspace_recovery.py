@@ -178,7 +178,11 @@ def inspect_database(path: Path, *, candidate: bool = False) -> DatabaseInspecti
             ):
                 return DatabaseInspection(path, True, True, None, False, None, None, "SCHEMA")
             version = int(schema_row[0])
-            required = _MINIMUM_RESTORABLE_TABLES if candidate else _CURRENT_REQUIRED_TABLES
+            required = (
+                _MINIMUM_RESTORABLE_TABLES
+                if candidate or version < _CURRENT_MIGRATION_VERSION
+                else _CURRENT_REQUIRED_TABLES
+            )
             if not required.issubset(tables) or not 1 <= version <= _CURRENT_MIGRATION_VERSION:
                 return DatabaseInspection(path, True, True, version, False, None, None, "SCHEMA")
             project_rows = connection.execute(

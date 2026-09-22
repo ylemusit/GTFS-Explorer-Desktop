@@ -320,12 +320,14 @@ class OpenProject:
                     "recuperación validada. "
                     "Los archivos originales no se han modificado."
                 )
-            database.validate_compatible()
             if inspection.descriptor_kind == "INVALID":
                 rebuild_descriptor_from_canonical(self._project_directory)
             elif inspection.descriptor_kind == "RECOVERABLE_MISMATCH":
                 snapshot = create_recovery_snapshot(self._project_directory, include_database=False)
                 _ = snapshot
+            database.initialize()
+            database.validate_compatible()
+            database.synchronize_schema_mirror()
             with DuckDbUnitOfWork(database) as unit_of_work:
                 descriptor = reconcile_project_descriptor(self._project_directory, unit_of_work)
             migrate_editor_database(database)

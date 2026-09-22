@@ -604,7 +604,7 @@ def test_completed_export_history_survives_reopen_without_filesystem_reconstruct
         prepared.database.temporary_directory,
         settings=prepared.database.settings,
     )
-    assert reopened.validate_compatible() == 9
+    assert reopened.validate_compatible() == 11
     with DuckDbUnitOfWork(reopened) as unit_of_work:
         item_after = unit_of_work.operations.list_operations(
             prepared.project_id,

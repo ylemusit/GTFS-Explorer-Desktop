@@ -22,7 +22,12 @@ from .service_calendar import ServicePeriod
 from .source import InputSource, SourceManifest
 from .stops import StopInspection
 from .subset import CoreSubsetSource
-from .validation import ValidationIssueFilter, ValidationIssueSummary
+from .validation import (
+    ValidationIssueFilter,
+    ValidationIssueSummary,
+    ValidationRuleSummary,
+    ValidationRunSummary,
+)
 
 
 class SourceInventory(Protocol):
@@ -109,6 +114,12 @@ class ValidationRepository(Protocol):
     ) -> PagedResult[ValidationIssueSummary]: ...
 
     def files(self, report_filter: ValidationIssueFilter) -> tuple[str, ...]: ...
+
+    def run_summary(self, batch_id: str) -> ValidationRunSummary | None: ...
+
+    def rule_summaries(
+        self, report_filter: ValidationIssueFilter
+    ) -> tuple[ValidationRuleSummary, ...]: ...
 
 
 class ImportJobRepository(Protocol):

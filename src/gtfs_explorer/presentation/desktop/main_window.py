@@ -9,10 +9,11 @@ import time
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from pathlib import Path
+from threading import Event
 from typing import cast
 from zipfile import ZipFile
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import (
     QAction,
     QCloseEvent,
@@ -34,6 +35,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QProgressBar,
+    QProgressDialog,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -103,8 +105,12 @@ from gtfs_explorer.domain.source import InputSource, InputSourceKind
 from gtfs_explorer.domain.spec import ScheduleSpec, load_schedule_spec
 from gtfs_explorer.domain.stops import StopInspection
 from gtfs_explorer.domain.subset import CoreSubset, SubsetSelection
-from gtfs_explorer.domain.validation import ValidationIssueFilter, ValidationIssueSummary
-from gtfs_explorer.infrastructure.duckdb.database import DatabaseConnection
+from gtfs_explorer.domain.validation import (
+    ValidationIssueFilter,
+    ValidationIssueSummary,
+    ValidationRuleSummary,
+)
+from gtfs_explorer.infrastructure.duckdb.database import DatabaseConnection, ProjectDatabase
 from gtfs_explorer.infrastructure.duckdb.repositories import DuckDbUnitOfWork
 from gtfs_explorer.infrastructure.duckdb.repositories.editor import DuckDbEditorRepository
 from gtfs_explorer.infrastructure.exporting.csv_exporter import (
@@ -136,6 +142,7 @@ from gtfs_explorer.infrastructure.exporting.kml import (
 from gtfs_explorer.infrastructure.exporting.revision import RevisionGtfsExporter
 from gtfs_explorer.infrastructure.exporting.validation_report import (
     ReportFormat,
+    ReportMode,
     ValidationReportExporter,
     ValidationReportFilter,
 )
@@ -186,6 +193,67 @@ from gtfs_explorer.product import IDENTITY, runtime_architecture, runtime_build_
 _SPECIFICATION_PATH = application_resource_path(
     f"schemas/gtfs_schedule/{IDENTITY.gtfs_spec_revision}/spec.json"
 )
+
+_LARGE_VALIDATION_REPORT_THRESHOLD = 1_000
+
+
+class _ValidationReportSignals(QObject):
+    progress = Signal(int, int)
+    succeeded = Signal(object)
+    failed = Signal(str)
+    cancelled = Signal()
+
+
+class _ValidationReportJob(QRunnable):
+    """Genera el informe con una conexión creada y usada en el worker Qt."""
+
+    def __init__(
+        self,
+        database: ProjectDatabase,
+        destination: Path,
+        batch_id: str,
+        report_format: ReportFormat,
+        report_filter: ValidationReportFilter,
+        mode: ReportMode,
+        overwrite: bool,
+        cancelled: Event,
+        signals: _ValidationReportSignals,
+    ) -> None:
+        super().__init__()
+        self._database = database
+        self._destination = destination
+        self._batch_id = batch_id
+        self._report_format = report_format
+        self._report_filter = report_filter
+        self._mode = mode
+        self._overwrite = overwrite
+        self._cancelled = cancelled
+        self._signals = signals
+
+    def run(self) -> None:
+        try:
+            with self._database.connection() as connection:
+                ValidationReportExporter().write(
+                    connection,
+                    self._destination,
+                    batch_id=self._batch_id,
+                    report_format=self._report_format,
+                    report_filter=self._report_filter,
+                    mode=self._mode,
+                    overwrite=self._overwrite,
+                    is_cancelled=self._cancelled.is_set,
+                    on_progress=self._signals.progress.emit,
+                )
+        except Exception as error:
+            if self._cancelled.is_set():
+                self._signals.cancelled.emit()
+            else:
+                self._signals.failed.emit(str(error) or type(error).__name__)
+        else:
+            if self._cancelled.is_set():
+                self._signals.cancelled.emit()
+            else:
+                self._signals.succeeded.emit(self._destination)
 
 
 def _closed_reference_query(subset: CoreSubset, filename: str) -> tuple[str, list[object]]:
@@ -239,6 +307,9 @@ class MainWindow(QMainWindow):
         elapsed_clock: Callable[[], float] | None = None,
     ) -> None:
         super().__init__()
+        self._validation_report_job: (
+            tuple[_ValidationReportJob, _ValidationReportSignals, QProgressDialog, Event] | None
+        ) = None
         application = cast(QApplication, QApplication.instance())
         if application is None:  # pragma: no cover - QMainWindow requiere QApplication
             raise RuntimeError("MainWindow requiere una QApplication activa.")
@@ -445,6 +516,7 @@ class MainWindow(QMainWindow):
             self._query_validation,
             list_files=self._query_validation_files,
             query_summary=self._query_validation_summary,
+            query_rule_summaries=self._query_validation_rule_summaries,
             navigate_to_raw=self._show_validation_raw,
             show_help=self._show_validation_help,
             export_report=self._export_validation_report,
@@ -2153,6 +2225,19 @@ class MainWindow(QMainWindow):
         with DuckDbUnitOfWork(self._opened_project.database) as unit_of_work:
             return FeedOverviewQueries(unit_of_work.overview).get().validation
 
+    def _query_validation_rule_summaries(
+        self, report_filter: ValidationIssueFilter
+    ) -> tuple[ValidationRuleSummary, ...]:
+        if self._opened_project is None:
+            return ()
+        with DuckDbUnitOfWork(self._opened_project.database) as unit_of_work:
+            feed = unit_of_work.feeds.latest_metadata()
+            if feed is None:
+                return ()
+            return ValidationQueries(unit_of_work.validation).rule_summaries(
+                replace(report_filter, feed_id=feed.feed_id)
+            )
+
     def _show_section(self, index: int) -> None:
         index = max(0, min(index, self._page_stack.count() - 1))
         self._page_stack.setCurrentIndex(index)
@@ -2832,17 +2917,19 @@ class MainWindow(QMainWindow):
             != QMessageBox.StandardButton.Yes
         ):
             return
+        report_filter_value = ValidationReportFilter(
+            report_filter.severities,
+            report_filter.categories,
+            file_name=report_filter.file_name,
+            search_text=report_filter.search_text,
+            rule_code=report_filter.rule_code,
+            field_name=report_filter.field_name,
+            entity_id=report_filter.entity_id,
+        )
         try:
             with self._opened_project.database.connection() as connection:
-                ValidationReportExporter().write(
-                    connection,
-                    path,
-                    batch_id=batch_id,
-                    report_format=report_format,
-                    report_filter=ValidationReportFilter(
-                        report_filter.severities, report_filter.categories
-                    ),
-                    overwrite=path.exists(),
+                selected_count, estimated_bytes = ValidationReportExporter().estimate(
+                    connection, batch_id=batch_id, report_filter=report_filter_value
                 )
         except Exception as error:
             self._show_error(
@@ -2851,12 +2938,76 @@ class MainWindow(QMainWindow):
                 exception=error,
             )
             return
+        mode: ReportMode = "full"
+        if selected_count >= _LARGE_VALIDATION_REPORT_THRESHOLD:
+            decision = QMessageBox(self)
+            decision.setWindowTitle("Informe de validación extenso")
+            decision.setText(
+                f"Se exportarán {selected_count:,} incidencias "
+                f"(aprox. {estimated_bytes / 1_048_576:.1f} MB). "
+                "La generación puede tardar unos instantes."
+            )
+            full = decision.addButton("Generar informe completo", QMessageBox.ButtonRole.AcceptRole)
+            summary = decision.addButton("Generar solo resumen", QMessageBox.ButtonRole.ActionRole)
+            decision.addButton(QMessageBox.StandardButton.Cancel)
+            decision.exec()
+            if decision.clickedButton() is summary:
+                mode = "summary"
+            elif decision.clickedButton() is not full:
+                return
+        cancel_token = Event()
+        progress = QProgressDialog(
+            "Generando informe de validación", "Cancelar", 0, selected_count, self
+        )
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+        progress.canceled.connect(cancel_token.set)
+        signals = _ValidationReportSignals(self)
+
+        def update_progress(current: int, total: int) -> None:
+            progress.setMaximum(total)
+            progress.setValue(current)
+
+        signals.progress.connect(update_progress)
+        signals.succeeded.connect(lambda _result: self._validation_report_succeeded(progress, path))
+        signals.cancelled.connect(lambda: self._validation_report_cancelled(progress))
+        signals.failed.connect(lambda message: self._validation_report_failed(progress, message))
+        job = _ValidationReportJob(
+            self._opened_project.database,
+            path,
+            batch_id,
+            report_format,
+            report_filter_value,
+            mode,
+            path.exists(),
+            cancel_token,
+            signals,
+        )
+        self._validation_report_job = (job, signals, progress, cancel_token)
+        progress.show()
+        QThreadPool.globalInstance().start(job)
+
+    def _validation_report_succeeded(self, progress: QProgressDialog, path: Path) -> None:
+        progress.close()
+        self._validation_report_job = None
         self._remember_file_directory(DirectoryKind.EXPORTS, path)
         QMessageBox.information(
             self,
             t("dialog.report_exported_title"),
             t("dialog.report_exported_message", filename=path.name),
             QMessageBox.StandardButton.Ok,
+        )
+
+    def _validation_report_cancelled(self, progress: QProgressDialog) -> None:
+        progress.close()
+        self._validation_report_job = None
+
+    def _validation_report_failed(self, progress: QProgressDialog, message: str) -> None:
+        progress.close()
+        self._validation_report_job = None
+        self._show_error(
+            f"No se pudo exportar el informe: {message}", operation="export_validation_report"
         )
 
 

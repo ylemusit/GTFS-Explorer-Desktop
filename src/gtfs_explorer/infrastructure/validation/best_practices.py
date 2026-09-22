@@ -14,6 +14,7 @@ from gtfs_explorer.domain.validation import (
     ValidationSeverity,
 )
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseConnection
+from gtfs_explorer.infrastructure.validation.shape_requirements import optional_shape_trip_rows
 
 
 @dataclass(frozen=True)
@@ -75,18 +76,14 @@ class BestPracticeValidationRule:
             )
 
     def _trips_without_shape(self) -> Iterable[ValidationIssue]:
-        query = """
-            SELECT source_row, trip_id
-            FROM gtfs_trips
-            WHERE trip_id IS NOT NULL AND (shape_id IS NULL OR shape_id = '')
-            ORDER BY trip_id, source_row
-        """
-        for source_row, trip_id in self.connection.execute(query).fetchall():
+        for source_row, trip_id in optional_shape_trip_rows(self.connection):
+            if not isinstance(source_row, int):
+                raise ValueError("La base de datos devolvió una fila de origen no entera.")
             yield _issue(
                 "GTFS_BP_TRIP_WITHOUT_SHAPE",
                 "validation.best_practice_trip_without_shape",
                 "trips.txt",
-                int(source_row),
+                source_row,
                 "shape_id",
                 "trip",
                 str(trip_id),

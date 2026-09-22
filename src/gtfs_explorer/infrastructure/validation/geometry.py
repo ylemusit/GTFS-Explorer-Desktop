@@ -47,6 +47,8 @@ class GeometryValidationRule:
                 trip_id, shape_id, shape_rows.get(shape_id, ()), stop_rows
             )
             for issue in geometry.issues:
+                if issue.code == "TRIP_SHAPE_MISSING":
+                    continue
                 yield _issue(
                     "GTFS_SHAPE_GEOMETRY_INVALID",
                     ValidationSeverity.ERROR,

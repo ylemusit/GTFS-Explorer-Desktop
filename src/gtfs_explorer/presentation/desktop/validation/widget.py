@@ -28,6 +28,7 @@ from gtfs_explorer.domain.validation import (
     ValidationCategory,
     ValidationIssueFilter,
     ValidationIssueSummary,
+    ValidationRuleSummary,
     ValidationSeverity,
 )
 from gtfs_explorer.presentation.desktop.i18n import t
@@ -37,6 +38,7 @@ ValidationExecutor = Callable[
 ]
 ValidationFilesExecutor = Callable[[], tuple[str, ...]]
 ValidationSummaryExecutor = Callable[[], ValidationOverview | None]
+ValidationRuleSummaryExecutor = Callable[[ValidationIssueFilter], tuple[ValidationRuleSummary, ...]]
 NavigateToRaw = Callable[[str, str | None, str | None], None]
 ShowHelp = Callable[[str], None]
 ExportReport = Callable[[str, ValidationIssueFilter], None]
@@ -84,6 +86,7 @@ class ValidationWidget(QWidget):
         *,
         list_files: ValidationFilesExecutor | None = None,
         query_summary: ValidationSummaryExecutor | None = None,
+        query_rule_summaries: ValidationRuleSummaryExecutor | None = None,
         navigate_to_raw: NavigateToRaw | None = None,
         show_help: ShowHelp | None = None,
         export_report: ExportReport | None = None,
@@ -92,6 +95,7 @@ class ValidationWidget(QWidget):
         self._execute = execute
         self._list_files = list_files
         self._query_summary = query_summary
+        self._query_rule_summaries = query_rule_summaries
         self._issues: tuple[ValidationIssueSummary, ...] = ()
         self._issue_index: dict[str, ValidationIssueSummary] = {}
         self._known_files: set[str] = set()
@@ -217,6 +221,10 @@ class ValidationWidget(QWidget):
         self._summary.setObjectName("validationRunSummary")
         self._summary.setWordWrap(True)
         layout.addWidget(self._summary)
+        self._rule_summary = QLabel()
+        self._rule_summary.setObjectName("validationRuleSummary")
+        self._rule_summary.setWordWrap(True)
+        layout.addWidget(self._rule_summary)
         self._count = QLabel(t("validation.no_issues"))
         self._count.setObjectName("validationResultCount")
         layout.addWidget(self._count)
@@ -287,8 +295,9 @@ class ValidationWidget(QWidget):
         self._refresh_file_filter()
         self._load_summary()
         try:
+            report_filter = self._filter()
             page = self._execute(
-                self._filter(),
+                report_filter,
                 PageRequest(offset=self._offset, limit=VALIDATION_PAGE_SIZE),
             )
         except Exception:
@@ -296,6 +305,7 @@ class ValidationWidget(QWidget):
             self._update_actions()
             return
         self._issues, self._total = page.items, page.total
+        self._load_rule_summary(report_filter)
         self._remember_page_files()
         self._fill_table()
         if self._total:
@@ -307,6 +317,28 @@ class ValidationWidget(QWidget):
         self._previous.setEnabled(self._offset > 0)
         self._next.setEnabled(self._offset + len(self._issues) < self._total)
         self._update_actions()
+
+    def _load_rule_summary(self, report_filter: ValidationIssueFilter) -> None:
+        if self._query_rule_summaries is None:
+            self._rule_summary.clear()
+            return
+        try:
+            rules = self._query_rule_summaries(report_filter)
+        except Exception:
+            self._rule_summary.clear()
+            return
+        self._rule_summary.setText(
+            "\n".join(
+                f"{rule.rule_code} — {rule.severity.value} · {rule.category.value}: "
+                f"{rule.occurrence_count} incidencias"
+                + (
+                    f" · {rule.affected_entity_count} entidades"
+                    if rule.affected_entity_count
+                    else ""
+                )
+                for rule in rules[:8]
+            )
+        )
 
     def _clear_result(self) -> None:
         self._issues = ()

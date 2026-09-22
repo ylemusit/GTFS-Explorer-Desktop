@@ -16,6 +16,7 @@ from gtfs_explorer.domain.validation import (
     ValidationEntity,
     ValidationIssueFilter,
     ValidationIssueSummary,
+    ValidationRuleSummary,
     ValidationSeverity,
 )
 from gtfs_explorer.presentation.desktop.validation.widget import ValidationWidget
@@ -259,5 +260,30 @@ def test_validation_widget_does_not_materialize_large_result_and_hides_private_c
     widget.clear()
     assert widget._file_filter.currentIndex() == 0
     assert widget._search.text() == ""
+    widget.deleteLater()
+    application.processEvents()
+
+
+def test_validation_widget_displays_rule_aggregate_counts_without_conflating_them(
+    application: QApplication,
+) -> None:
+    rule = ValidationRuleSummary(
+        "GTFS_SHARED_STOP",
+        "gtfs-explorer",
+        ValidationSeverity.WARNING,
+        ValidationCategory.REFERENCE,
+        occurrence_count=7,
+        affected_entity_count=2,
+    )
+    widget = ValidationWidget(
+        lambda _filter, page: PagedResult((_issue(),), 1, page),
+        query_rule_summaries=lambda _filter: (rule,),
+    )
+
+    widget.refresh()
+
+    assert widget._rule_summary.text() == (
+        "GTFS_SHARED_STOP — WARNING · REFERENCE: 7 incidencias · 2 entidades"
+    )
     widget.deleteLater()
     application.processEvents()

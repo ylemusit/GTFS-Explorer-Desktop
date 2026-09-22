@@ -49,8 +49,12 @@ from gtfs_explorer.domain.subset import CoreStop, CoreSubsetSource, CoreTrip
 from gtfs_explorer.domain.validation import (
     ValidationCategory,
     ValidationEntity,
+    ValidationExecutionStatus,
     ValidationIssueFilter,
     ValidationIssueSummary,
+    ValidationOutcome,
+    ValidationRuleSummary,
+    ValidationRunSummary,
     ValidationSeverity,
 )
 from gtfs_explorer.infrastructure.duckdb.database import (
@@ -58,6 +62,7 @@ from gtfs_explorer.infrastructure.duckdb.database import (
     DatabaseError,
     ProjectDatabase,
 )
+from gtfs_explorer.infrastructure.duckdb.validation_filters import validation_filter_clause
 from gtfs_explorer.infrastructure.geometry import build_trip_shape_geometry
 from gtfs_explorer.product import IDENTITY
 
@@ -283,6 +288,65 @@ class DuckDbValidationRepository:
         except (DatabaseError, duckdb.Error, ValueError) as error:
             raise RepositoryError("No se han podido consultar los archivos validados.") from error
         return tuple(str(row[0]) for row in rows if row[0] is not None)
+
+    def run_summary(self, batch_id: str) -> ValidationRunSummary | None:
+        row = self._connection.execute(
+            "SELECT r.batch_id, r.feed_id, coalesce(m.execution_status, 'COMPLETED'), "
+            "m.validation_outcome, coalesce(m.detected_issue_count, r.total_issue_count), "
+            "coalesce(m.persisted_issue_count, r.total_issue_count), "
+            "coalesce(m.detail_complete, r.omitted_issue_count = 0), "
+            "coalesce(m.legacy_truncated, r.omitted_issue_count > 0) "
+            "FROM validation_runs r LEFT JOIN validation_run_metadata m ON m.batch_id = r.batch_id "
+            "WHERE r.batch_id = ?",
+            [batch_id],
+        ).fetchone()
+        if row is None:
+            return None
+        severity_rows = self._connection.execute(
+            "SELECT severity, occurrence_count FROM validation_severity_aggregates "
+            "WHERE batch_id = ?",
+            [batch_id],
+        ).fetchall()
+        return ValidationRunSummary(
+            str(row[0]),
+            str(row[1]),
+            ValidationExecutionStatus(str(row[2])),
+            ValidationOutcome(str(row[3])) if row[3] is not None else None,
+            int(row[4]),
+            int(row[5]),
+            bool(row[6]),
+            bool(row[7]),
+            {ValidationSeverity(str(k)): int(v) for k, v in severity_rows},
+        )
+
+    def rule_summaries(
+        self, report_filter: ValidationIssueFilter
+    ) -> tuple[ValidationRuleSummary, ...]:
+        conditions: list[str] = []
+        parameters: list[object] = []
+        _validation_conditions(report_filter, conditions, parameters)
+        where = " WHERE " + " AND ".join(conditions) if conditions else ""
+        rows = self._connection.execute(
+            "SELECT i.rule_code, i.validator, i.severity, i.category, sum(i.occurrence_count), "
+            "count(DISTINCT CASE WHEN i.entity_type IS NULL OR i.entity_id IS NULL THEN NULL "
+            "ELSE i.entity_type || chr(31) || i.entity_id END) "
+            "FROM validation_issues i JOIN validation_runs r ON r.batch_id = i.batch_id"
+            + where
+            + " GROUP BY i.rule_code, i.validator, i.severity, i.category "
+            "ORDER BY sum(i.occurrence_count) DESC, i.rule_code",
+            parameters,
+        ).fetchall()
+        return tuple(
+            ValidationRuleSummary(
+                str(code),
+                str(validator),
+                ValidationSeverity(str(severity)),
+                ValidationCategory(str(category)),
+                int(count),
+                int(affected),
+            )
+            for code, validator, severity, category, count, affected in rows
+        )
 
 
 class DuckDbImportJobRepository:
@@ -1340,23 +1404,9 @@ def _validation_conditions(
     parameters: list[object],
 ) -> None:
     """Construye predicados de validación con parámetros, nunca SQL de la UI."""
-    _validation_in_condition("i.severity", report_filter.severities, conditions, parameters)
-    _validation_in_condition("i.category", report_filter.categories, conditions, parameters)
-    if report_filter.file_name is not None:
-        conditions.append("i.file_name = ?")
-        parameters.append(report_filter.file_name)
-    if report_filter.feed_id is not None:
-        conditions.append("r.feed_id = ?")
-        parameters.append(report_filter.feed_id)
-    search_text = (report_filter.search_text or "").strip().lower()
-    if search_text:
-        conditions.append(
-            "(contains(lower(coalesce(i.rule_code, '')), ?) "
-            "OR contains(lower(coalesce(i.message_key, '')), ?) "
-            "OR contains(lower(coalesce(i.field_name, '')), ?) "
-            "OR contains(lower(coalesce(i.file_name, '')), ?))"
-        )
-        parameters.extend([search_text] * 4)
+    shared_conditions, shared_parameters = validation_filter_clause(report_filter)
+    conditions.extend(shared_conditions)
+    parameters.extend(shared_parameters)
 
 
 def _validation_issue_summary(row: tuple[object, ...]) -> ValidationIssueSummary:

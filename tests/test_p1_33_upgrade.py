@@ -106,11 +106,26 @@ def test_legacy_schema_8_migrates_with_data_and_is_idempotent(tmp_path: Path) ->
     database = _database(tmp_path)
     before = (tmp_path / "data.duckdb").read_bytes()
 
-    assert database.initialize() == 9
+    assert database.initialize() == 11
     backup = database.backup_path
     assert backup.read_bytes() == before
     with database.connection() as connection:
-        assert connection.execute("SELECT schema_version FROM schema_metadata").fetchone() == (9,)
+        assert connection.execute("SELECT schema_version FROM schema_metadata").fetchone() == (11,)
+        assert connection.execute(
+            "SELECT version FROM schema_migrations ORDER BY version"
+        ).fetchall() == [
+            (1,),
+            (2,),
+            (3,),
+            (4,),
+            (5,),
+            (6,),
+            (7,),
+            (8,),
+            (9,),
+            (10,),
+            (11,),
+        ]
         assert connection.execute("SELECT project_id, name FROM projects").fetchone() == (
             "legacy-project",
             "Proyecto legacy",
@@ -122,7 +137,7 @@ def test_legacy_schema_8_migrates_with_data_and_is_idempotent(tmp_path: Path) ->
         assert connection.execute("SELECT state FROM import_jobs").fetchone() == ("INVALID",)
         assert connection.execute("SELECT count(*) FROM operations").fetchone() == (0,)
     migrated = (tmp_path / "data.duckdb").read_bytes()
-    assert database.initialize() == 9
+    assert database.initialize() == 11
     assert (tmp_path / "data.duckdb").read_bytes() == migrated
 
 

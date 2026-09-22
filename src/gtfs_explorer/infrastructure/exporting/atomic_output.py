@@ -45,7 +45,7 @@ class AtomicOutputWriter:
         *,
         overwrite: bool = False,
         is_cancelled: CancellationCheck = lambda: False,
-        manifest_metadata: Mapping[str, str | bool] | None = None,
+        manifest_metadata: Mapping[str, object] | None = None,
     ) -> ExportManifest:
         """Escribe ``chunks`` y un manifiesto lateral en el directorio de destino.
 

@@ -7,7 +7,7 @@ Schedule.
 
 ## Target
 
-`0.2.0` en `feature/0.2.0-visual-editor`.
+`0.2.1` en `main`.
 
 ## Stack
 
@@ -20,15 +20,15 @@ Python 3.12, PySide6/Qt Widgets + WebEngine, DuckDB, MapLibre y PMTiles.
 - `domain` sin UI/DuckDB/filesystem; UI sin SQL.
 - Una tarea primaria por chat; tests focales durante desarrollo.
 - Validación integrada solo en su gate final.
-- Sin publicación, commit/tag, distribución ni cambios Defender sin autorización.
+- Sin publicación ni push remoto; el cierre local de la release se ejecuta solo
+  con un descriptor y autorización explícitos.
 
 ## Current critical state
 
-RC1 0.2.0 y su gate de distribución Defender: PASS histórico. La auditoría
-independiente pre-release detectó P1/P2; RC1 se conserva como evidencia pero
-no es elegible para la versión final. Tras las correcciones se requiere un
-nuevo Final Source Gate y una nueva RC. La aceptación humana nativa aún no se
-ha realizado.
+GTFS-021 y GTFS-022 están cerrados. La última certificación integrada de fuente
+registró 641 passed, 0 failed y 1 skip legítimo. La aceptación ALSA confirmó
+36.304 incidencias detectadas y persistidas, 0 omitidas y
+`VALID_WITH_NOTICES`; no debe repetirse durante el cierre de release.
 
 ## Authorized task
 

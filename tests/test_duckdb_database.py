@@ -29,7 +29,7 @@ def test_empty_database_migrates_and_context_manager_closes_connection(tmp_path:
     database = _database(tmp_path)
 
     with database.connection() as connection:
-        assert connection.execute("SELECT schema_version FROM schema_metadata").fetchone() == (9,)
+        assert connection.execute("SELECT schema_version FROM schema_metadata").fetchone() == (11,)
         assert connection.execute("SELECT current_setting('threads')").fetchone() == (1,)
 
     with pytest.raises(Exception):
@@ -53,13 +53,15 @@ def test_previous_schema_migrates_and_is_backed_up(tmp_path: Path) -> None:
     before = database_path.read_bytes()
 
     current = _database(tmp_path)
-    assert current.initialize() == 9
+    assert current.initialize() == 11
     assert current.backup_path.read_bytes() == before
     with current.connection() as connection:
-        assert connection.execute("SELECT schema_version FROM schema_metadata").fetchone() == (9,)
+        assert connection.execute("SELECT schema_version FROM schema_metadata").fetchone() == (11,)
 
 
-def test_schema_8_migrates_to_9_without_backfill_and_keeps_backup(tmp_path: Path) -> None:
+def test_schema_8_migrates_through_9_and_10_without_backfill_and_keeps_backup(
+    tmp_path: Path,
+) -> None:
     migrations = tmp_path / "schema-8"
     migrations.mkdir()
     source_directory = (
@@ -73,11 +75,22 @@ def test_schema_8_migrates_to_9_without_backfill_and_keeps_backup(tmp_path: Path
     assert schema_8.initialize() == 8
     before = schema_8.database_path.read_bytes()
 
-    schema_9 = _database(tmp_path)
+    migration_9 = source_directory / "009_operations_history.sql"
+    (migrations / migration_9.name).write_text(
+        migration_9.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    schema_9 = _database(tmp_path, migrations_directory=migrations)
     assert schema_9.initialize() == 9
     assert schema_9.backup_path.read_bytes() == before
-    with schema_9.connection() as connection:
-        assert connection.execute("SELECT schema_version FROM schema_metadata").fetchone() == (9,)
+
+    current = _database(tmp_path)
+    assert current.initialize() == 11
+    with current.connection() as connection:
+        assert connection.execute("SELECT schema_version FROM schema_metadata").fetchone() == (11,)
+        versions = connection.execute(
+            "SELECT version FROM schema_migrations ORDER BY version"
+        ).fetchall()
+        assert versions == [(1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,), (9,), (10,), (11,)]
         assert connection.execute("SELECT count(*) FROM operations").fetchone() == (0,)
 
 

@@ -35,6 +35,25 @@ class ValidationState(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class ValidationExecutionStatus(StrEnum):
+    """Estado técnico de una ejecución, independiente de la calidad del feed."""
+
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class ValidationOutcome(StrEnum):
+    """Resultado de calidad disponible solo para una ejecución terminada."""
+
+    VALID = "VALID"
+    VALID_WITH_NOTICES = "VALID_WITH_NOTICES"
+    VALID_WITH_WARNINGS = "VALID_WITH_WARNINGS"
+    INVALID = "INVALID"
+
+
 @dataclass(frozen=True)
 class LocalizedMessage:
     """Clave estable y parámetros serializables que la interfaz puede localizar."""
@@ -101,6 +120,11 @@ class ValidationIssueFilter:
     categories: frozenset[ValidationCategory] | None = None
     file_name: str | None = None
     search_text: str | None = None
+    rule_code: str | None = None
+    field_name: str | None = None
+    entity_type: str | None = None
+    entity_id: str | None = None
+    batch_id: str | None = None
     # Contexto de consulta; no es un campo persistido ni un filtro que el
     # usuario tenga que conocer. Evita mezclar lotes de feeds distintos del
     # mismo workspace.
@@ -111,6 +135,29 @@ class ValidationIssueFilter:
 class ValidationContext:
     feed_id: str
     batch_id: str
+
+
+@dataclass(frozen=True)
+class ValidationRunSummary:
+    batch_id: str
+    feed_id: str
+    execution_status: ValidationExecutionStatus
+    outcome: ValidationOutcome | None
+    detected_issue_count: int
+    persisted_issue_count: int
+    detail_complete: bool
+    legacy_truncated: bool
+    severity_counts: Mapping[ValidationSeverity, int]
+
+
+@dataclass(frozen=True)
+class ValidationRuleSummary:
+    rule_code: str
+    validator: str
+    severity: ValidationSeverity
+    category: ValidationCategory
+    occurrence_count: int
+    affected_entity_count: int | None
 
 
 class ValidationRule(Protocol):

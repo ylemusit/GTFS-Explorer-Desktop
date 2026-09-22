@@ -144,6 +144,11 @@ class ProjectDatabase:
         connection = self._open_connection()
         try:
             current_version = _current_schema_version(connection)
+            latest_version = migrations[-1].version
+            if current_version > latest_version:
+                raise DatabaseSchemaError(
+                    "La versión del esquema DuckDB no es compatible con esta apertura."
+                )
             pending = [migration for migration in migrations if migration.version > current_version]
         finally:
             connection.close()
@@ -164,6 +169,18 @@ class ProjectDatabase:
         """Inicializa la base y entrega una conexión propiedad del thread actual."""
         self.initialize()
         return DatabaseConnection(self._open_connection())
+
+    def synchronize_schema_mirror(self) -> None:
+        """Alinea el espejo de proyecto con la versión autoritativa ya validada."""
+        connection = self._open_connection()
+        try:
+            current_version = _current_schema_version(connection)
+            connection.execute(
+                "UPDATE projects SET schema_version = ? WHERE schema_version IS DISTINCT FROM ?",
+                [current_version, current_version],
+            )
+        finally:
+            connection.close()
 
     @contextmanager
     def connection(self) -> Iterator[DatabaseConnection]:

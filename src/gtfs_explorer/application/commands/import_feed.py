@@ -25,7 +25,7 @@ from gtfs_explorer.domain.project import (
 )
 from gtfs_explorer.domain.source import InputSource, InputSourceKind, SourceManifest
 from gtfs_explorer.domain.spec import ScheduleSpec
-from gtfs_explorer.domain.validation import ValidationRuleRegistry, ValidationSeverity
+from gtfs_explorer.domain.validation import ValidationRuleRegistry
 from gtfs_explorer.infrastructure.duckdb.database import ProjectDatabase
 from gtfs_explorer.infrastructure.duckdb.repositories import DuckDbUnitOfWork
 from gtfs_explorer.infrastructure.importing.directory_source import DirectorySource
@@ -39,6 +39,9 @@ from gtfs_explorer.infrastructure.validation.engine import ValidationEngine
 from gtfs_explorer.infrastructure.validation.fields import FieldValidationRule
 from gtfs_explorer.infrastructure.validation.geometry import GeometryValidationRule
 from gtfs_explorer.infrastructure.validation.references import ReferenceValidationRule
+from gtfs_explorer.infrastructure.validation.shape_requirements import (
+    ShapeRequirementValidationRule,
+)
 from gtfs_explorer.infrastructure.validation.structure import StructureValidationRule
 from gtfs_explorer.infrastructure.validation.timetable import TimetableValidationRule
 
@@ -134,15 +137,20 @@ class ImportFeed:
                 registry.register(ReferenceValidationRule(connection, self._specification))
                 registry.register(TimetableValidationRule(connection))
                 registry.register(GeometryValidationRule(connection))
+                registry.register(ShapeRequirementValidationRule(connection))
                 registry.register(BestPracticeValidationRule(connection))
-                ValidationEngine(registry).execute(
+                validation_result = ValidationEngine(registry).execute(
                     connection,
                     feed_id=self._feed_id,
                     batch_id=f"{self._job_id}:structure",
                     is_cancelled=token.is_cancelled,
                     on_progress=lambda rule: self._detail(ImportPhase.VALIDATING, rule),
                 )
-            issue_count = self._error_count()
+            issue_count = self._error_count(
+                validation_result.total_issue_count,
+                validation_result.outcome is not None
+                and validation_result.outcome.value == "INVALID",
+            )
             if issue_count:
                 self._save(JobState.INVALID, ImportPhase.VALIDATING, 4 / len(_WORK_PHASES))
                 return ImportFeedResult(self._job_id, self._feed_id, JobState.INVALID, issue_count)
@@ -263,15 +271,13 @@ class ImportFeed:
         if operation_started:
             self._operation_started = True
 
-    def _error_count(self) -> int:
+    def _error_count(self, validation_issue_count: int, validation_is_invalid: bool) -> int:
         with self._database.connection() as connection:
             row = connection.execute(
-                "SELECT (SELECT count(*) FROM normalization_issues WHERE severity = 'ERROR') + "
-                "(SELECT count(*) FROM validation_issues WHERE severity IN (?, ?))",
-                [ValidationSeverity.ERROR, ValidationSeverity.FATAL],
+                "SELECT count(*) FROM normalization_issues WHERE severity = 'ERROR'"
             ).fetchone()
         assert row is not None
-        return int(row[0])
+        return int(row[0]) + (validation_issue_count if validation_is_invalid else 0)
 
     @staticmethod
     def _raise_if_cancelled(token: CancelToken) -> None:

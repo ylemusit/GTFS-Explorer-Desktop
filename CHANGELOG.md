@@ -2,13 +2,38 @@
 
 ## 0.2.1 — Unreleased
 
-- Experiencia de bienvenida actualizada.
-- Identidad profesional unificada de GTFS Explorer Desktop.
-- Nuevo icono de aplicación GTFS Explorer.
-- Ilustración raster de bienvenida con titlebar, botón de inicio, versión y
-  copyright dinámicos.
+### Nuevo y mejorado
 
-No añade nuevas capacidades funcionales GTFS ni está publicada.
+- Experiencia de bienvenida e identidad visual actualizadas.
+- Validación escalable para conjuntos grandes de incidencias, con persistencia
+  completa de los detalles de validaciones nuevas.
+- Filtrado y paginación respaldados por base de datos, resúmenes por regla y
+  generación de informes completos en streaming con progreso y cancelación.
+
+### Corregido
+
+- Semántica coherente de búsqueda y filtros entre la interfaz y los informes
+  exportados.
+- Contadores de validación conscientes de ocurrencias y distinción explícita
+  entre integridad de ejecución e integridad de exportación.
+- Los shapes GTFS opcionales ausentes se comunican como aviso de buenas
+  prácticas cuando no son condicionalmente necesarios.
+
+### Compatibilidad y migraciones
+
+- La apertura de proyectos migra el esquema de datos mediante la cadena
+  `8 → 9 → 10 → 11`.
+- La migración 011 repara los metadatos de ocurrencias de proyectos que ya se
+  hubieran actualizado al esquema 10.
+
+### Validación e informes
+
+- Informes HTML y manifests con contexto de filtros, conteos seleccionados y
+  exportados, transparencia sobre truncados heredados e integridad de
+  exportación.
+- Esquema de informe `1.1.0` y finalización atómica de informes.
+
+La versión no está publicada.
 
 ## 0.1.0 — 2026-09-02
 
