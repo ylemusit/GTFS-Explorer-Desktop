@@ -1,50 +1,46 @@
 # Estado actual del producto
 
-## Target version
+## Línea base protegida actual
 
-`0.2.2` — hotfix GTFS-023 en `main`.
+**GTFS Explorer Desktop v0.2.2** es la línea base activa y protegida.
 
-## Product status
+- Estado de release: `RELEASE_CLOSED`.
+- Estado de línea base: `ACTIVE_PROTECTED_BASELINE`.
+- Commit de release protegido: `85c700587ffec06d73d84825e1951fb73259b62c`.
+- Árbol de release protegido: `4aa02bf1f040798fa4099a0e48ff734514e39e85`.
+- Tag protegido: `v0.2.2`.
+- Esquema de proyecto: `11`.
+- Esquema de informe: `1.1.0`.
 
-Fuente preparada para el cierre final de release. Esquema de proyecto actual: 11;
-cadena de migración: `8 → 9 → 10 → 11`; esquema de informe: `1.1.0`.
+`v0.2.2` es un release histórico inmutable. El desarrollo futuro se realizará
+en commits descendientes; cualquier cambio distribuido requiere una nueva
+versión de producto.
 
-## PASS
+## Estado funcional cerrado
 
-- Original GTFS y tablas `gtfs_*` inmutables; edición por Working Copy,
-  revisiones y ChangeSets (DEC-020).
 - GTFS-021 y GTFS-022: CLOSED.
-- GTFS-023: ACCEPTED; corrección de contratos enum y diagnóstico de importación.
-- `V0.2.2_CANONICAL_GATE_FINAL_002`: 648 passed, 0 failed, 1 skip legítimo.
-- Bizkaibus `run_004_gtfs023_candidate001`: importación completa, validación
-  `VALID`, 0 detectadas, 0 persistidas y 0 omitidas; no requiere repetición.
+- GTFS-023: `CLOSED_IN_V0.2.2`.
+- Bizkaibus, resultado aceptado actual:
+  `run_004_gtfs023_candidate001`.
+- Los 1.040.852 hallazgos históricos de Bizkaibus están clasificados como
+  `INVALIDATED_PRODUCT_FINDING` y `FALSE_POSITIVE_ENUM_CONTRACT`.
+- Bloqueadores funcionales abiertos heredados del cierre de v0.2.2: ninguno.
 
-## PARTIAL
+## Observaciones no bloqueantes
 
-- El build final, los smokes Portable/Setup, hashes, backup recuperable y
-  publicación controlada pertenecen al cierre de `0.2.2`; firma, SmartScreen y
-  revisión jurídica siguen siendo gates distintos.
+- El fixture de prueba DuckDB grande ocupa aproximadamente 54,51 MB.
+- Existe un histórico de variabilidad temporal de preparación QWebEngine/MapLibre.
+- La exportación de informe de validación sin incidencias está deshabilitada por
+  el comportamiento actual de la interfaz.
+- El release v0.2.2 no está firmado.
 
-## Open blockers
+Estas observaciones no son bloqueadores no resueltos de v0.2.2.
 
-- Ninguno de producto conocido. No se declara publicación, firma ni
-  certificación de Microsoft hasta completar sus gates correspondientes.
+## Siguiente fase de ingeniería
 
-## Deferred
-
-- La propagación avanzada de horarios queda fuera de `0.2.2`.
-
-## Last verified
-
-V0.2.2_CANONICAL_GATE_FINAL_002: PASS, exit code 0, 648 passed, 0 failed y
-1 skip legítimo. GTFS-023-CANDIDATE-001 y Bizkaibus
-`run_004_gtfs023_candidate001`: ACCEPTED.
-
-## Next authorized phase
-
-Cierre final controlado de `0.2.2`: commit limpio, build, aceptación,
-recuperación y verificación de publicación según el descriptor autorizado.
-
-Propietario y autor: Yeison Arbey Carrillo Lemus.
+`AUDIT_QUALITY_REQUIREMENT_MODEL` es la siguiente fase de ingeniería. No está
+implementada todavía y debe construirse sobre v0.2.2, manteniendo separadas la
+conformidad con la especificación GTFS, calidad de datos, buenas prácticas,
+hallazgos de auditoría y mapeos regulatorios o legales.
 
 Todos los derechos reservados.
