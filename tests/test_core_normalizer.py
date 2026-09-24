@@ -195,3 +195,69 @@ def test_normalization_rolls_back_if_insert_fails(
 
     with database.connection() as connection:
         assert connection.execute("SELECT count(*) FROM gtfs_agency").fetchone() == (1,)
+
+
+@pytest.mark.integration
+def test_gtfs_023_valid_enums_normalize_without_false_issues_and_invalid_values_remain_rejected(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write(
+        source,
+        "agency.txt",
+        "agency_name,agency_url,agency_timezone\nDemo,https://example.invalid,Europe/Madrid\n",
+    )
+    _write(
+        source,
+        "stops.txt",
+        "stop_id,stop_name,stop_lat,stop_lon,wheelchair_boarding\nS1,North,43.1,-5.8,0\n",
+    )
+    _write(
+        source,
+        "routes.txt",
+        "route_id,route_short_name,route_type,continuous_pickup,continuous_drop_off\nR1,1,3,1,1\n",
+    )
+    _write(source, "trips.txt", "route_id,service_id,trip_id\nR1,weekday,T1\n")
+    _write(
+        source,
+        "stop_times.txt",
+        "trip_id,arrival_time,departure_time,stop_id,stop_sequence,continuous_pickup,continuous_drop_off\n"
+        "T1,08:00:00,08:00:00,S1,1,1,1\n",
+    )
+    _write(
+        source,
+        "calendar.txt",
+        "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\n"
+        "weekday,1,1,1,1,1,0,0,20260101,20261231\n",
+    )
+    database = _database(tmp_path)
+    _stage(database, source)
+
+    result = CoreNormalizer().normalize(database, load_schedule_spec(SPEC_PATH))
+
+    assert result.issue_count == 0
+    with database.connection() as connection:
+        assert connection.execute(
+            "SELECT continuous_pickup, continuous_drop_off FROM gtfs_routes"
+        ).fetchone() == (1, 1)
+        assert connection.execute(
+            "SELECT continuous_pickup, continuous_drop_off FROM gtfs_stop_times"
+        ).fetchone() == (1, 1)
+        assert connection.execute("SELECT wheelchair_boarding FROM gtfs_stops").fetchone() == (0,)
+
+    _write(
+        source,
+        "routes.txt",
+        "route_id,route_short_name,route_type,continuous_pickup,continuous_drop_off\nR1,1,3,9,1\n",
+    )
+    _stage(database, source)
+    rejected = CoreNormalizer().normalize(database, load_schedule_spec(SPEC_PATH))
+
+    assert rejected.issue_count == 1
+    with database.connection() as connection:
+        assert connection.execute("SELECT continuous_pickup FROM gtfs_routes").fetchone() == (None,)
+        assert connection.execute(
+            "SELECT issue_code, raw_value FROM normalization_issues "
+            "WHERE field_name = 'continuous_pickup'"
+        ).fetchone() == ("GTFS_TYPE_CONVERSION_INVALID", "9")

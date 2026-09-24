@@ -40,9 +40,9 @@ def test_product_identity_has_complete_and_consistent_metadata() -> None:
         "gtfs_explorer.product.PRODUCT_VERSION"
     )
     assert IDENTITY.version == PRODUCT_VERSION == __version__ == json_exporter.__version__
-    assert IDENTITY.version == "0.2.1"
-    assert IDENTITY.windows_file_version == "0.2.1.0"
-    assert IDENTITY.windows_product_version == "0.2.1"
+    assert IDENTITY.version == "0.2.2"
+    assert IDENTITY.windows_file_version == "0.2.2.0"
+    assert IDENTITY.windows_product_version == "0.2.2"
 
 
 def test_identity_catalog_renders_all_product_metadata() -> None:
@@ -70,7 +70,7 @@ def test_identity_is_used_by_visible_product_surfaces(application: QApplication)
     assert help_dialog.windowTitle() == f"Ayuda de {IDENTITY.name}"
     assert about.windowTitle() == f"Acerca de {IDENTITY.name}"
     assert about._version_label.text() == f"Versión {IDENTITY.version}"
-    assert about._version_label.text() == "Versión 0.2.1"
+    assert about._version_label.text() == "Versión 0.2.2"
     assert about._build_label.text() == "build-test"
     assert IDENTITY.gtfs_spec_revision in about._gtfs_label.text()
     assert runtime_architecture() in about._architecture_label.text()

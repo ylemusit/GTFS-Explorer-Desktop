@@ -166,3 +166,11 @@ def test_missing_makensis_is_reported_as_an_explicit_skip(
 
     assert module.main() == 0
     assert capsys.readouterr().out.strip() == "SKIPPED / TOOL_NOT_AVAILABLE"
+
+
+def test_gtfs023_short_label_omits_redundant_version_from_artifact_name() -> None:
+    module = _module()
+
+    name = module._artifact_name("GTFS-Explorer-Setup", "0.2.1", "GTFS023-C1", ".exe")
+
+    assert name == "GTFS-Explorer-Setup-GTFS023-C1-win-x64.exe"

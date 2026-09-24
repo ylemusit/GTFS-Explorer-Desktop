@@ -22,4 +22,13 @@ packaging/portable/GTFS Explorer Desktop.dist/
 nuitka-crash-report.xml
 *.log
 *.env
+.env.*
 !.env.example
+*.duckdb
+*.duckdb.*
+*.zip
+*.exe
+*.pem
+*.key
+*.pfx
+*.p12

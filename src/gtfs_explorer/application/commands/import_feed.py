@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -34,6 +35,7 @@ from gtfs_explorer.infrastructure.importing.normalizers.geometry import Geometry
 from gtfs_explorer.infrastructure.importing.normalizers.optional import OptionalNormalizer
 from gtfs_explorer.infrastructure.importing.staging_loader import StagingLoader
 from gtfs_explorer.infrastructure.importing.zip_source import ZipSource
+from gtfs_explorer.infrastructure.logging import capture_application_error
 from gtfs_explorer.infrastructure.validation.best_practices import BestPracticeValidationRule
 from gtfs_explorer.infrastructure.validation.engine import ValidationEngine
 from gtfs_explorer.infrastructure.validation.fields import FieldValidationRule
@@ -88,6 +90,7 @@ class ImportFeed:
         self._manifest: SourceManifest | None = None
         self._operation_started = False
         self._staging_counts: dict[str, int] = {}
+        self._active_phase = ImportPhase.PREFLIGHT
 
     def execute(self, cancel_token: CancelToken | None = None) -> ImportFeedResult:
         """Ejecuta una vez el feed y deja siempre un estado terminal persistido."""
@@ -162,6 +165,17 @@ class ImportFeed:
             self._save(JobState.CANCELLED, ImportPhase.CLEANUP, 0.0, "CANCELLED")
             return ImportFeedResult(self._job_id, self._feed_id, JobState.CANCELLED, issue_count)
         except Exception as error:
+            capture_application_error(
+                logging.getLogger("gtfs_explorer"),
+                error_code=type(error).__name__,
+                operation="import_feed",
+                exception=error,
+                context={
+                    "job_id": self._job_id,
+                    "feed_id": self._feed_id,
+                    "phase": self._active_phase.value,
+                },
+            )
             self._save(JobState.FAILED, ImportPhase.CLEANUP, 0.0, type(error).__name__)
             return ImportFeedResult(self._job_id, self._feed_id, JobState.FAILED, issue_count)
         finally:
@@ -188,6 +202,7 @@ class ImportFeed:
         return manifest, source_directory, None
 
     def _start(self, phase: ImportPhase, token: CancelToken) -> None:
+        self._active_phase = phase
         completed = _WORK_PHASES.index(phase)
         self._save(JobState.RUNNING, phase, completed / len(_WORK_PHASES))
         self._on_progress(

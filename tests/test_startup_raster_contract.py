@@ -39,7 +39,7 @@ def test_welcome_uses_master_raster_and_normalized_dynamic_regions(application) 
         assert all(0.0 <= value <= 1.0 for value in region)
 
     assert dialog.title_label.text() == f"Bienvenido a {IDENTITY.name}"
-    assert dialog.version_label.text() == "Versión 0.2.1"
+    assert dialog.version_label.text() == "Versión 0.2.2"
     assert dialog.title_icon.accessibleName() == IDENTITY.name
     assert dialog.minimize_button.accessibleName() == "Minimize"
     assert dialog.close_button.accessibleName() == "Close"

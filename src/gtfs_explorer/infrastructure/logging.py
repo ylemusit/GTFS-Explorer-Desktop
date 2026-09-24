@@ -23,6 +23,7 @@ _ALLOWED_CONTEXT = frozenset(
         "project_id",
         "project_name",
         "feed_id",
+        "phase",
         "error_code",
         "app_state",
         "product",

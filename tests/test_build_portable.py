@@ -216,3 +216,11 @@ def test_portable_path_guard_rejects_a_regressed_long_root(
 
     with pytest.raises(RuntimeError, match="umbral seguro"):
         builder._guard_portable_paths(archive_path)
+
+
+def test_gtfs023_short_label_omits_redundant_version_from_artifact_name() -> None:
+    builder = _load_builder()
+
+    name = builder._artifact_name("GTFS-Explorer-Portable", "0.2.1", "GTFS023-C1", ".zip")
+
+    assert name == "GTFS-Explorer-Portable-GTFS023-C1-win-x64.zip"

@@ -1,6 +1,33 @@
 # Historial de cambios
 
-## 0.2.1 — Unreleased
+## 0.2.2 — 2026-09-24
+
+### Corregido
+
+- Se aceptan correctamente los valores GTFS válidos `1` de
+  `continuous_pickup` y `continuous_drop_off`, y el valor `0` de
+  `wheelchair_boarding`.
+- Se elimina la regresión de normalización enum que generaba falsos positivos
+  y se conserva contexto de fase en diagnósticos inesperados de importación.
+
+### Empaquetado y validación
+
+- El empaquetado admite etiquetas cortas de candidata sin duplicar la versión.
+- La aceptación externa de Bizkaibus confirmó importación completa y validación
+  sin incidencias bajo las reglas actuales. El esquema de proyecto permanece
+  en `11` y el esquema de informe en `1.1.0`.
+- Los 1.040.852 hallazgos históricos de Bizkaibus son hallazgos de producto
+  invalidados por el contrato enum, no evidencia de calidad del operador.
+
+### Limitaciones
+
+- Los binarios de esta versión no están firmados digitalmente.
+- Con cero incidencias, la exportación de informe de validación sigue siendo el
+  comportamiento actual de la interfaz. The previously observed
+  `duckdb.TransactionException` was not reproduced after the GTFS-023
+  correction. Esto no constituye una prueba causal.
+
+## 0.2.1 — Historical local release
 
 ### Nuevo y mejorado
 

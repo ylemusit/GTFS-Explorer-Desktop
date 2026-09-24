@@ -51,6 +51,35 @@ def test_schedule_spec_records_conditions_enums_references_and_stable_sources() 
     assert booking_rule.source.startswith("https://gtfs.org/documentation/schedule/reference/#")
 
 
+def test_gtfs_023_corrected_enum_contracts_are_exact_and_linked() -> None:
+    specification = load_schedule_spec(SPEC_PATH)
+    expected = {
+        "GTFS_ENUM_ROUTES_TXT_CONTINUOUS_PICKUP": ("0", "1", "2", "3"),
+        "GTFS_ENUM_ROUTES_TXT_CONTINUOUS_DROP_OFF": ("0", "1", "2", "3"),
+        "GTFS_ENUM_STOP_TIMES_TXT_CONTINUOUS_PICKUP": ("0", "1", "2", "3"),
+        "GTFS_ENUM_STOP_TIMES_TXT_CONTINUOUS_DROP_OFF": ("0", "1", "2", "3"),
+        "GTFS_ENUM_STOPS_TXT_WHEELCHAIR_BOARDING": ("0", "1", "2"),
+    }
+
+    assert {name: specification.enums[name] for name in expected} == expected
+    assert all(len(values) == len(set(values)) for values in expected.values())
+    assert specification.files["routes.txt"].fields["continuous_pickup"].enum == (
+        "GTFS_ENUM_ROUTES_TXT_CONTINUOUS_PICKUP"
+    )
+    assert specification.files["routes.txt"].fields["continuous_drop_off"].enum == (
+        "GTFS_ENUM_ROUTES_TXT_CONTINUOUS_DROP_OFF"
+    )
+    assert specification.files["stop_times.txt"].fields["continuous_pickup"].enum == (
+        "GTFS_ENUM_STOP_TIMES_TXT_CONTINUOUS_PICKUP"
+    )
+    assert specification.files["stop_times.txt"].fields["continuous_drop_off"].enum == (
+        "GTFS_ENUM_STOP_TIMES_TXT_CONTINUOUS_DROP_OFF"
+    )
+    assert specification.files["stops.txt"].fields["wheelchair_boarding"].enum == (
+        "GTFS_ENUM_STOPS_TXT_WHEELCHAIR_BOARDING"
+    )
+
+
 class PayloadPath:
     def __init__(self, payload: object) -> None:
         self.payload = payload

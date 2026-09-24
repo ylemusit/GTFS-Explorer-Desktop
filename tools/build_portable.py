@@ -36,6 +36,7 @@ PRODUCT_DIRECTORY = IDENTITY.portable_directory_name
 PORTABLE_WINDOWS_PATH_LIMIT = 190
 LICENSE_CHECK = ROOT / "tools" / "check_licenses.py"
 LABEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+SHORT_ARTIFACT_LABEL_PREFIXES = ("P2A-", "GTFS023-")
 
 
 def _sha256(path: Path) -> str:
@@ -90,7 +91,7 @@ def _validate_label(label: str | None) -> str | None:
 
 
 def _artifact_name(prefix: str, version: str, label: str | None, suffix: str) -> str:
-    if label and label.startswith("P2A-"):
+    if label and label.startswith(SHORT_ARTIFACT_LABEL_PREFIXES):
         return f"{prefix}-{label}-win-x64{suffix}"
     label_part = f"-{label}" if label else ""
     return f"{prefix}-{version}{label_part}-win-x64{suffix}"

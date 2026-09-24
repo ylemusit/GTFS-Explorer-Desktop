@@ -22,6 +22,7 @@ DIST_ROOT = ROOT / "dist"
 NSIS_SCRIPT = ROOT / "packaging" / "nsis" / "installer.nsi"
 PORTABLE_PREFIX = IDENTITY.portable_directory_name
 LABEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+SHORT_ARTIFACT_LABEL_PREFIXES = ("P2A-", "GTFS023-")
 TOOL_NOT_AVAILABLE = "SKIPPED / TOOL_NOT_AVAILABLE"
 
 
@@ -44,7 +45,7 @@ def _validate_label(label: str | None) -> str | None:
 
 
 def _artifact_name(prefix: str, version: str, label: str | None, suffix: str) -> str:
-    if label and label.startswith("P2A-"):
+    if label and label.startswith(SHORT_ARTIFACT_LABEL_PREFIXES):
         return f"{prefix}-{label}-win-x64{suffix}"
     label_part = f"-{label}" if label else ""
     return f"{prefix}-{version}{label_part}-win-x64{suffix}"

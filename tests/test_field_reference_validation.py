@@ -195,6 +195,37 @@ def test_conditional_stop_time_enums_remain_coherent_with_semantics() -> None:
     assert "drop_off_type=0" in (stop_times["drop_off_type"].condition or "")
 
 
+def test_gtfs_023_field_enums_accept_corrected_values_and_reject_nine(tmp_path: Path) -> None:
+    database = _database(tmp_path)
+    specification = load_schedule_spec(SPEC_PATH)
+    cases = (
+        ("stops", "wheelchair_boarding", ("0", "1", "2")),
+        ("routes", "continuous_pickup", ("0", "1", "2", "3")),
+        ("routes", "continuous_drop_off", ("0", "1", "2", "3")),
+        ("stop_times", "continuous_pickup", ("0", "1", "2", "3")),
+        ("stop_times", "continuous_drop_off", ("0", "1", "2", "3")),
+    )
+    with database.connection() as connection:
+        for table, field, values in cases:
+            connection.execute(f"CREATE TABLE stg_{table} (source_row BIGINT, {field} VARCHAR)")
+            connection.executemany(
+                f"INSERT INTO stg_{table} VALUES (?, ?)",
+                [*enumerate((*values, "", "9"), start=2)],
+            )
+            issues = tuple(
+                FieldValidationRule(connection, specification).evaluate(
+                    ValidationContext("feed", "batch")
+                )
+            )
+            assert [(issue.file_name, issue.row_number, issue.field_name) for issue in issues] == [
+                (f"{table}.txt", len(values) + 3, field)
+            ]
+            assert issues[0].severity.value == "ERROR"
+            assert issues[0].category.value == "FIELD"
+            assert issues[0].rule_code == specification.files[f"{table}.txt"].fields[field].rule_id
+            connection.execute(f"DROP TABLE stg_{table}")
+
+
 def test_reference_rule_uses_set_query_and_reports_missing_target(tmp_path: Path) -> None:
     database = _database(tmp_path)
     with database.connection() as connection:

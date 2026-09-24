@@ -9,10 +9,10 @@ Aplicación Windows x64, portable y offline-first para explorar GTFS Schedule.
 
 ## Estado
 
-Versión `0.2.1` (no publicada): aplicación Windows x64 portable y offline-first
-para importar, explorar, validar, visualizar y exportar GTFS Schedule. La
-fuente está preparada para el cierre local de release; la publicación no está
-iniciada.
+Versión `0.2.2`: aplicación Windows x64 portable y offline-first para importar,
+explorar, validar, visualizar y exportar GTFS Schedule. Este hotfix corrige la
+normalización de contratos enum GTFS y mantiene el esquema de proyecto `11` y
+el esquema de informe `1.1.0`.
 
 Consulta [el checklist de release](docs/RELEASE_CHECKLIST.md), la [estructura
 del repositorio](docs/REPOSITORY_STRUCTURE.md), el

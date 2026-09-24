@@ -273,9 +273,9 @@ def test_successful_operation_does_not_create_application_error(tmp_path: Path) 
 
 
 def test_diagnostics_keep_only_operational_context_and_redact_secrets() -> None:
-    assert safe_context({"job_id": "job-1", "source_path": "C:/private/feed.zip", "row": "x"}) == {
-        "job_id": "job-1"
-    }
+    assert safe_context(
+        {"job_id": "job-1", "phase": "VALIDATING", "source_path": "C:/private/feed.zip", "row": "x"}
+    ) == {"job_id": "job-1", "phase": "VALIDATING"}
     assert redact("token=abc password: hidden") == "[REDACTED] [REDACTED]"
 
 

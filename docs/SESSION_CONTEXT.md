@@ -7,7 +7,7 @@ Schedule.
 
 ## Target
 
-`0.2.1` en `main`.
+`0.2.2` en `main`.
 
 ## Stack
 
@@ -20,15 +20,15 @@ Python 3.12, PySide6/Qt Widgets + WebEngine, DuckDB, MapLibre y PMTiles.
 - `domain` sin UI/DuckDB/filesystem; UI sin SQL.
 - Una tarea primaria por chat; tests focales durante desarrollo.
 - Validación integrada solo en su gate final.
-- Sin publicación ni push remoto; el cierre local de la release se ejecuta solo
-  con un descriptor y autorización explícitos.
+- El commit, tag y publicación remota requieren un descriptor y autorización
+  explícitos.
 
 ## Current critical state
 
-GTFS-021 y GTFS-022 están cerrados. La última certificación integrada de fuente
-registró 641 passed, 0 failed y 1 skip legítimo. La aceptación ALSA confirmó
-36.304 incidencias detectadas y persistidas, 0 omitidas y
-`VALID_WITH_NOTICES`; no debe repetirse durante el cierre de release.
+GTFS-021, GTFS-022 y GTFS-023 están aceptados. El gate canónico final de
+`0.2.2` registró 648 passed, 0 failed y 1 skip legítimo. La aceptación externa
+de GTFS-023 corresponde a `run_004_gtfs023_candidate001` y no debe repetirse
+durante el cierre de release.
 
 ## Authorized task
 

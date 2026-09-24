@@ -2423,10 +2423,7 @@
       "4"
     ],
     "GTFS_ENUM_STOPS_TXT_WHEELCHAIR_BOARDING": [
-      "1",
-      "2",
-      "1",
-      "2",
+      "0",
       "1",
       "2"
     ],
@@ -2448,11 +2445,13 @@
     ],
     "GTFS_ENUM_ROUTES_TXT_CONTINUOUS_PICKUP": [
       "0",
+      "1",
       "2",
       "3"
     ],
     "GTFS_ENUM_ROUTES_TXT_CONTINUOUS_DROP_OFF": [
       "0",
+      "1",
       "2",
       "3"
     ],
@@ -2490,11 +2489,13 @@
     ],
     "GTFS_ENUM_STOP_TIMES_TXT_CONTINUOUS_PICKUP": [
       "0",
+      "1",
       "2",
       "3"
     ],
     "GTFS_ENUM_STOP_TIMES_TXT_CONTINUOUS_DROP_OFF": [
       "0",
+      "1",
       "2",
       "3"
     ],

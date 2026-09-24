@@ -21,6 +21,7 @@ from gtfs_explorer.domain.spec import load_schedule_spec
 from gtfs_explorer.infrastructure.duckdb.database import DatabaseSettings, ProjectDatabase
 from gtfs_explorer.infrastructure.duckdb.repositories import DuckDbUnitOfWork
 from gtfs_explorer.infrastructure.duckdb.repositories.base import DuckDbRawInspectorRepository
+from gtfs_explorer.infrastructure.logging import configure_logging
 from gtfs_explorer.infrastructure.validation.engine import ValidationEngine
 
 SPEC_PATH = Path("schemas/gtfs_schedule/2026-04-27/spec.json")
@@ -316,3 +317,77 @@ def test_simulated_disk_failure_finishes_failed_and_cleans_extraction(tmp_path: 
             OperationStatus.FAILED.value,
             "IMPORTSECURITYERROR",
         )
+
+
+@pytest.mark.integration
+def test_gtfs_023_synthetic_large_enum_fixture_has_no_false_normalization_issues(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_fixture(source)
+    for filename, fields in {
+        "stops.txt": {"wheelchair_boarding": "0"},
+        "routes.txt": {"continuous_pickup": "1", "continuous_drop_off": "1"},
+        "stop_times.txt": {"continuous_pickup": "1", "continuous_drop_off": "1"},
+    }.items():
+        path = source / filename
+        with path.open(encoding="utf-8", newline="") as input_file:
+            rows = list(csv.DictReader(input_file))
+            headers = [*rows[0], *fields]
+        for row in rows:
+            row.update(fields)
+        if filename == "stop_times.txt":
+            rows = [
+                dict(row, stop_sequence=str(index + 1)) for index, row in enumerate(rows * 1001)
+            ]
+        with path.open("w", encoding="utf-8", newline="") as output:
+            writer = csv.DictWriter(output, fieldnames=headers, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+
+    database = _database(tmp_path)
+    result = _command(database, source).execute()
+
+    assert result.state is not JobState.FAILED
+    with database.connection() as connection:
+        assert connection.execute("SELECT count(*) FROM stg_stop_times").fetchone()[0] > 1_000
+        assert connection.execute(
+            "SELECT count(*) FROM normalization_issues "
+            "WHERE issue_code = 'GTFS_TYPE_CONVERSION_INVALID' "
+            "AND field_name IN ('continuous_pickup', 'continuous_drop_off', 'wheelchair_boarding')"
+        ).fetchone() == (0,)
+        assert connection.execute("SELECT count(*) FROM validation_runs").fetchone() == (1,)
+
+
+@pytest.mark.integration
+def test_import_failure_logs_sanitized_context_traceback_and_cause(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_fixture(source)
+
+    def fail_persist(*args: object, **kwargs: object) -> None:
+        try:
+            raise ValueError("token=synthetic-secret")
+        except ValueError as cause:
+            raise RuntimeError("validation failed at C:/private/feed.zip") from cause
+
+    monkeypatch.setattr(ValidationEngine, "_persist", staticmethod(fail_persist))
+    logger = configure_logging(tmp_path / "logs")
+    try:
+        result = _command(_database(tmp_path), source).execute()
+        logger.handlers[0].flush()
+        content = (tmp_path / "logs" / "gtfs-explorer.log").read_text(encoding="utf-8")
+    finally:
+        for handler in logger.handlers:
+            handler.close()
+
+    assert result.state is JobState.FAILED
+    assert "operation': 'import_feed'" in content
+    assert "job_id': 'job-1'" in content and "feed_id': 'feed-1'" in content
+    assert "phase': 'VALIDATING'" in content
+    assert "RuntimeError" in content and "ValueError" in content
+    assert "Traceback (most recent call last)" in content
+    assert "synthetic-secret" not in content and "C:/private/feed.zip" not in content
