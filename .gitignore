@@ -32,3 +32,6 @@ nuitka-crash-report.xml
 *.key
 *.pfx
 *.p12
+
+# Local editor preferences
+.vscode/settings.json
