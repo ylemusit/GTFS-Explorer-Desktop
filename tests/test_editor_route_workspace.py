@@ -117,6 +117,16 @@ def test_mass_visibility_guard_has_no_modal_up_to_forty_routes(application, monk
     widget.deleteLater()
 
 
+def test_editor_exposes_the_explicit_save_action(application) -> None:
+    widget = EditorWidget(lambda: None)
+
+    assert widget._save_button.objectName() == "saveEditorDraft"
+    assert widget._save_button.text() == "Guardar"
+    assert widget._save_button.toolTip()
+
+    widget.deleteLater()
+
+
 def test_mass_visibility_guard_confirms_dynamic_count_and_can_cancel(
     application, monkeypatch
 ) -> None:
@@ -397,4 +407,18 @@ def test_route_workspace_reparents_the_same_map_widget(application) -> None:
     widget._editor_tabs.setCurrentIndex(0)
     application.processEvents()
     assert map_widget.parentWidget() is widget.map_host
+    widget.deleteLater()
+
+
+def test_editor_refresh_shows_pending_validation_and_current_count(application):
+    session = _Session(_working_copy(1))
+    session.validation_current = False
+    session.validation_issues = (object(), object())
+    widget = EditorWidget(lambda: session)
+    assert "pendiente de validación" in widget._status.text()
+    session.validation_current = True
+    widget.refresh()
+    assert "pendiente" not in widget._status.text()
+    assert "2" in widget._status.text()
+    widget.close()
     widget.deleteLater()

@@ -230,6 +230,10 @@
     "export.selection_more": " (+{count})",
     "export.selection_empty": "Keine Routen ausgewählt",
     "export.start": "Export starten",
+    "export.pending_changes_title": "Ausstehende Änderungen",
+    "export.pending_changes_message": "Es gibt ausstehende Änderungen. Möchten Sie diese vor dem Export anwenden?",
+    "export.save_and_export": "Speichern und exportieren",
+    "export.export_without_apply": "Ohne Anwenden exportieren",
     "export.cancel": "Export abbrechen",
     "export.browse_description": "Öffnen Sie die Auswahl, um die lokale Zieldatei auszuwählen.",
     "validation.introduction": "Nachvollziehbare Vorfälle aus dem aktuellen Feed. Die Quellzeile ist die ursprüngliche physische Zeile.",
@@ -469,6 +473,11 @@
     "editor.reorder_shape_tooltip": "Ändern Sie die Position des Scheitelpunkts und nummerieren Sie nur seine Form neu.",
     "editor.confirm_revision": "Bewertung bestätigen",
     "editor.confirm_revision_tooltip": "Validiert den Entwurf und veröffentlicht ihn als unveränderliche Arbeitsrevision.",
+    "editor.save": "Speichern",
+    "editor.save_tooltip": "Validiert und veröffentlicht ausstehende Änderungen als bestätigte Revision.",
+    "editor.save_title": "Änderungen speichern",
+    "editor.save_question": "Ausstehende Änderungen werden validiert und bei fehlenden blockierenden Fehlern als neue Revision veröffentlicht. Fortfahren?",
+    "editor.save_clean": "Es gibt keine ausstehenden GTFS-Änderungen zum Speichern.",
     "editor.history_headers": "Aktion|Befehl|Sequenz|Entitäten",
     "editor.history_accessible": "Entwurfsgeschichte",
     "editor.workspaces_accessible": "Arbeitsbereiche für Entwurfseditoren",
@@ -816,6 +825,7 @@
     "editor.stops_headers": "Reihenfolge|Stop|stop_id|Typ|Ankunft · Abfahrt",
     "editor.geometry_context": "Route {route_id}\nVerwendete Formen: {shapes}\nReisen nach Form/Kontext: {trips}",
     "editor.services_context": "AGENTUR / BETREIBER\n{agency} ({agency_id})\n\nDIENSTLEISTUNGEN\n{services}\n\nATTRIBUTIONEN: {attributions}",
-    "editor.history_context": "Route: {route_id}\nEntwurf: {state}\nÄnderungen an dieser Route: {count}"
+    "editor.history_context": "Route: {route_id}\nEntwurf: {state}\nÄnderungen an dieser Route: {count}",
+    "editor.validation_pending": "Validierung ausstehend"
   }
 }

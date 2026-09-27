@@ -13,7 +13,7 @@ from gtfs_explorer.domain.changesets import (
     RouteWorkspaceState,
     WorkingCopy,
 )
-from gtfs_explorer.domain.edit_validation import ValidationImpact, WorkingCopyValidator
+from gtfs_explorer.domain.edit_validation import WorkingCopyValidator
 from gtfs_explorer.domain.spec import ScheduleSpec
 from gtfs_explorer.domain.subset import SubsetSelection
 from gtfs_explorer.domain.validation import ValidationIssue, ValidationSeverity
@@ -120,6 +120,7 @@ class EditorSession:
     _opened_project: OpenedProject | None = None
     validation_issues: tuple[ValidationIssue, ...] = ()
     editing_session: EditSession | None = None
+    validation_current: bool = False
 
     @classmethod
     def open_project(cls, project_directory: Path) -> "EditorSession":
@@ -167,22 +168,21 @@ class EditorSession:
     def apply(
         self, command: EditorCommand, *, impact: ImpactAnalysis | None = None
     ) -> EditorCommand:
-        effective_impact = impact or self.working_copy.analyze_impact(command)
         result = (
             self.working_copy.apply_with_impact(command, impact)
             if impact is not None
             else self.working_copy.apply(command)
         )
+        self._invalidate_validation()
         self._persist()
-        self._refresh_validation(effective_impact, result.command_id)
         return result
 
     def apply_batch(self, commands: tuple[EditorCommand, ...]) -> tuple[EditorCommand, ...]:
         """Aplica un lote y lo persiste solo cuando el lote completo es válido."""
         impacts = tuple(self.working_copy.analyze_impact(command) for command in commands)
         result = self.working_copy.apply_batch(commands, impacts)
+        self._invalidate_validation()
         self._persist()
-        self.validation_issues = self.validate()
         return result
 
     @property
@@ -225,11 +225,16 @@ class EditorSession:
             self.working_copy,
             revision_id=selected_revision_id,
         )
-        self.validation_issues = ()
         return selected_revision_id
 
     def commit_revision(self, revision_id: str | None = None) -> str:
         """Alias de aplicación para el paso explícito de confirmación."""
+        return self.confirm_revision(revision_id)
+
+    def save(self, revision_id: str | None = None) -> str | None:
+        """Publica solo un borrador de datos pendiente; un editor limpio es no-op."""
+        if not self.data_draft_dirty:
+            return None
         return self.confirm_revision(revision_id)
 
     def revisions(self) -> tuple[tuple[str, str | None, str], ...]:
@@ -237,14 +242,14 @@ class EditorSession:
 
     def undo(self) -> EditorCommand:
         result = self.working_copy.undo()
+        self._invalidate_validation()
         self._persist()
-        self._refresh_validation(self.working_copy.analyze_impact(result), result.command_id)
         return result
 
     def redo(self) -> EditorCommand:
         result = self.working_copy.redo()
+        self._invalidate_validation()
         self._persist()
-        self._refresh_validation(self.working_copy.analyze_impact(result), result.command_id)
         return result
 
     def discard(self) -> None:
@@ -252,7 +257,7 @@ class EditorSession:
         DuckDbEditorRepository(self._unit_of_work.connection).discard_working_revision(
             self.working_copy
         )
-        self.validation_issues = ()
+        self._invalidate_validation()
 
     def set_route_workspace_state(self, state: RouteWorkspaceState) -> None:
         """Guarda solo el estado visual afectado dentro de la transacción abierta."""
@@ -386,9 +391,15 @@ class EditorSession:
     def can_edit_route(self, route_id: str) -> bool:
         return self.working_copy.can_edit_route(route_id)
 
-    def validate(self, impact: ValidationImpact | None = None) -> tuple[ValidationIssue, ...]:
-        """Valida el borrador efectivo; el alcance puede limitarse a un impacto."""
-        return WorkingCopyValidator().validate(self.working_copy, impact=impact)
+    def validate(self) -> tuple[ValidationIssue, ...]:
+        """Recalcula y registra la validación completa del borrador efectivo."""
+        self.validation_issues = WorkingCopyValidator().validate(self.working_copy)
+        self.validation_current = True
+        return self.validation_issues
+
+    def _invalidate_validation(self) -> None:
+        self.validation_issues = ()
+        self.validation_current = False
 
     def preview_revision_export(
         self,
@@ -405,9 +416,6 @@ class EditorSession:
 
     def _persist(self) -> None:
         DuckDbEditorRepository(self._unit_of_work.connection).persist(self.working_copy)
-
-    def _refresh_validation(self, impact: ImpactAnalysis, command_id: str) -> None:
-        self.validation_issues = self.validate(ValidationImpact.from_analysis(impact, command_id))
 
     def close(self) -> None:
         """Confirma la transacción y libera el escritor del proyecto."""

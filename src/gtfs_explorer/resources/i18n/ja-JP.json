@@ -230,6 +230,10 @@
     "export.selection_more": " (+{count})",
     "export.selection_empty": "ルートが選択されていません",
     "export.start": "エクスポートの開始",
+    "export.pending_changes_title": "保留中の変更",
+    "export.pending_changes_message": "保留中の変更があります。エクスポート前に変更を適用しますか？",
+    "export.save_and_export": "保存してエクスポート",
+    "export.export_without_apply": "適用せずにエクスポート",
     "export.cancel": "エクスポートをキャンセルする",
     "export.browse_description": "セレクターを開いて、ローカルの宛先ファイルを選択します。",
     "validation.introduction": "現在のフィードから追跡可能なインシデント。ソース行は元の物理行です。",
@@ -469,6 +473,11 @@
     "editor.reorder_shape_tooltip": "頂点の位置を変更し、その形状のみを再番号付けします。",
     "editor.confirm_revision": "レビューを確認する",
     "editor.confirm_revision_tooltip": "ドラフトを検証し、不変の作業リビジョンとして公開します。",
+    "editor.save": "保存",
+    "editor.save_tooltip": "保留中の変更を検証し、確認済みリビジョンとして公開します。",
+    "editor.save_title": "変更を保存",
+    "editor.save_question": "保留中の変更を検証し、ブロックするエラーがなければ新しいリビジョンを公開します。続行しますか？",
+    "editor.save_clean": "保存する保留中の GTFS 変更はありません。",
     "editor.history_headers": "アクション|コマンド|シーケンス|エンティティ",
     "editor.history_accessible": "ドラフト履歴",
     "editor.workspaces_accessible": "ドラフトエディターのワークスペース",
@@ -816,6 +825,7 @@
     "editor.stops_headers": "順序|停車地|stop_id|種類|到着・出発",
     "editor.geometry_context": "ルート {route_id}\n使用されるシェイプ: {shapes}\n形状/コンテキスト別の旅行: {trips}",
     "editor.services_context": "代理店 / オペレーター\n{agency} ({agency_id})\n\nサービス\n{services}\n\n属性: {attributions}",
-    "editor.history_context": "ルート: {route_id}\nドラフト: {state}\nこのルートへの変更: {count}"
+    "editor.history_context": "ルート: {route_id}\nドラフト: {state}\nこのルートへの変更: {count}",
+    "editor.validation_pending": "検証待ち"
   }
 }

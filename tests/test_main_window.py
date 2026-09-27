@@ -1349,8 +1349,9 @@ def test_validation_report_worker_reports_success_failure_and_cancellation(
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("with_clean_session", [False, True])
 def test_export_feed_connects_every_format_to_the_imported_project(
-    application: QApplication, tmp_path: Path
+    application: QApplication, tmp_path: Path, with_clean_session: bool, monkeypatch
 ) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -1360,10 +1361,26 @@ def test_export_feed_connects_every_format_to_the_imported_project(
 
     window = MainWindow()
     window._opened_project = SimpleNamespace(database=database)
+    if with_clean_session:
+        from gtfs_explorer.infrastructure.duckdb.repositories.editor import DuckDbEditorRepository
+
+        with DuckDbUnitOfWork(database) as unit_of_work:
+            working_copy = DuckDbEditorRepository(unit_of_work.connection).create_or_recover()
+        session = SimpleNamespace(
+            data_draft_dirty=False,
+            working_copy=working_copy,
+            working_revision_id=working_copy.base_revision_id,
+        )
+        window._editor_session = session
+        monkeypatch.setattr(window, "_get_editor_session", lambda: session)
     exports = (
         (ExportFormat.JSON, tmp_path / "feed.json", "derivada"),
         (ExportFormat.GEOJSON, tmp_path / "feed.geojson", "compatible"),
-        (ExportFormat.CSV, tmp_path / "routes-faithful.csv", "compatible"),
+        (
+            ExportFormat.CSV,
+            tmp_path / "routes-faithful.csv",
+            "vista CSV de la WorkingRevision" if with_clean_session else "compatible",
+        ),
         (
             ExportFormat.MINI_GTFS,
             tmp_path / "mini.zip",
@@ -1371,9 +1388,18 @@ def test_export_feed_connects_every_format_to_the_imported_project(
         ),
     )
     for format_, destination, classification in exports:
-        result = window._export_feed(
-            ExportRequest(format_, destination, route_ids=frozenset({"R1"})), lambda: False
-        )
+        request = ExportRequest(format_, destination, route_ids=frozenset({"R1"}))
+        if with_clean_session:
+            request = window._prepare_export_policy(request)
+            assert request is not None
+            if format_ is ExportFormat.CSV:
+                assert request.source_working_copy is not None
+                assert request.source_working_copy is not session.working_copy
+                assert request.source_working_copy.entities == session.working_copy.entities
+                assert not request.source_is_draft
+            else:
+                assert request.source_working_copy is None
+        result = window._export_feed(request, lambda: False)
         assert result.classification == classification
         assert destination.is_file()
         assert result.manifest.artifact_name == destination.name
@@ -1383,6 +1409,8 @@ def test_export_feed_connects_every_format_to_the_imported_project(
             "project-1", PageRequest(), OperationType.EXPORT
         )
     assert history.total == 4
+    if with_clean_session:
+        window._editor_session = None
     assert {item.export_format for item in history.items} == {
         format_.value for format_, _, _ in exports
     }

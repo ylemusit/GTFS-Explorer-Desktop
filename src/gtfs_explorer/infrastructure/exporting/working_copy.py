@@ -38,6 +38,7 @@ class WorkingCopyExporters:
         working_copy: WorkingCopy,
         *,
         revision_id: str,
+        effective_snapshot: bool = False,
         selection: SubsetSelection | None = None,
         source: dict[str, str] | None = None,
         overwrite: bool = False,
@@ -62,7 +63,12 @@ class WorkingCopyExporters:
             "generator": {"name": IDENTITY.name, "version": IDENTITY.version},
             "source": source or {},
             "revision": {
-                "revision_id": revision_id,
+                "revision_id": None if effective_snapshot else revision_id,
+                **(
+                    {"base_revision_id": revision_id, "source_state": "unpublished_effective"}
+                    if effective_snapshot
+                    else {}
+                ),
                 "scope": "selected_routes" if selection is not None else "complete_modified",
             },
             "selection": {
@@ -86,7 +92,12 @@ class WorkingCopyExporters:
             is_cancelled=is_cancelled,
             manifest_metadata={
                 "format": "json_bundle",
-                "revision_id": revision_id,
+                "revision_id": None if effective_snapshot else revision_id,
+                **(
+                    {"base_revision_id": revision_id, "source_state": "unpublished_effective"}
+                    if effective_snapshot
+                    else {}
+                ),
                 "export_scope": "selected_routes" if selection is not None else "complete_modified",
             },
         )
@@ -97,6 +108,7 @@ class WorkingCopyExporters:
         working_copy: WorkingCopy,
         *,
         revision_id: str,
+        effective_snapshot: bool = False,
         selection: SubsetSelection | None = None,
         spreadsheet_safe: bool = False,
         overwrite: bool = False,
@@ -131,7 +143,12 @@ class WorkingCopyExporters:
             is_cancelled=is_cancelled,
             manifest_metadata={
                 "format": "csv_route_view",
-                "revision_id": revision_id,
+                "revision_id": None if effective_snapshot else revision_id,
+                **(
+                    {"base_revision_id": revision_id, "source_state": "unpublished_effective"}
+                    if effective_snapshot
+                    else {}
+                ),
                 "mode": "spreadsheet-safe" if spreadsheet_safe else "faithful",
             },
         )
@@ -142,6 +159,7 @@ class WorkingCopyExporters:
         working_copy: WorkingCopy,
         *,
         revision_id: str,
+        effective_snapshot: bool = False,
         selection: SubsetSelection | None = None,
         include_bbox: bool = False,
         overwrite: bool = False,
@@ -172,8 +190,18 @@ class WorkingCopyExporters:
                         "feature_kind": "stop",
                         "stop_id": payload.get("stop_id"),
                         "stop_name": payload.get("stop_name"),
-                        "geometry_source": "working_revision",
-                        "revision_id": revision_id,
+                        "geometry_source": "effective_snapshot"
+                        if effective_snapshot
+                        else "working_revision",
+                        "revision_id": None if effective_snapshot else revision_id,
+                        **(
+                            {
+                                "base_revision_id": revision_id,
+                                "source_state": "unpublished_effective",
+                            }
+                            if effective_snapshot
+                            else {}
+                        ),
                     },
                     "geometry": {"type": "Point", "coordinates": coordinate},
                 }
@@ -203,8 +231,18 @@ class WorkingCopyExporters:
                     "properties": {
                         "feature_kind": "shape",
                         "shape_id": shape_id,
-                        "geometry_source": "working_revision",
-                        "revision_id": revision_id,
+                        "geometry_source": "effective_snapshot"
+                        if effective_snapshot
+                        else "working_revision",
+                        "revision_id": None if effective_snapshot else revision_id,
+                        **(
+                            {
+                                "base_revision_id": revision_id,
+                                "source_state": "unpublished_effective",
+                            }
+                            if effective_snapshot
+                            else {}
+                        ),
                     },
                     "geometry": {"type": "LineString", "coordinates": coordinates},
                 }
@@ -213,7 +251,12 @@ class WorkingCopyExporters:
             "type": "FeatureCollection",
             "features": features,
             "metadata": {
-                "revision_id": revision_id,
+                "revision_id": None if effective_snapshot else revision_id,
+                **(
+                    {"base_revision_id": revision_id, "source_state": "unpublished_effective"}
+                    if effective_snapshot
+                    else {}
+                ),
                 "scope": "selected_routes" if selection is not None else "complete_modified",
             },
         }
@@ -238,7 +281,12 @@ class WorkingCopyExporters:
             is_cancelled=is_cancelled,
             manifest_metadata={
                 "format": "geojson_feature_collection",
-                "revision_id": revision_id,
+                "revision_id": None if effective_snapshot else revision_id,
+                **(
+                    {"base_revision_id": revision_id, "source_state": "unpublished_effective"}
+                    if effective_snapshot
+                    else {}
+                ),
                 "export_scope": "selected_routes" if selection is not None else "complete_modified",
             },
         )

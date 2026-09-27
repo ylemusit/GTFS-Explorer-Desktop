@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from threading import Event
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
@@ -32,6 +33,9 @@ from gtfs_explorer.domain.exporting import ExportManifest
 from gtfs_explorer.presentation.desktop.i18n import t
 
 from .naming import normalize_export_destination, sanitize_export_component, suggest_export_filename
+
+if TYPE_CHECKING:
+    from gtfs_explorer.domain.changesets import WorkingCopy
 
 
 class ExportFormat(StrEnum):
@@ -60,6 +64,8 @@ class ExportRequest:
     overwrite: bool = False
     version_id: str | None = None
     kml_profile: str | None = None
+    source_working_copy: WorkingCopy | None = None
+    source_is_draft: bool = False
 
     @property
     def is_pack(self) -> bool:
@@ -105,6 +111,7 @@ class ExportFailure:
 
 Previewer = Callable[[ExportRequest], ExportPreview]
 Executor = Callable[[ExportRequest, Callable[[], bool]], ExportResult]
+Preflight = Callable[[ExportRequest], ExportRequest | None]
 
 
 class _ExportSignals(QObject):
@@ -164,6 +171,7 @@ class ExportAssistantWidget(QWidget):
         prepare_default_directory: Callable[[], Path] | None = None,
         on_destination_directory_used: Callable[[Path], None] | None = None,
         on_terminal: Callable[[], None] | None = None,
+        preflight: Preflight | None = None,
     ) -> None:
         super().__init__(parent)
         self._previewer = previewer or _default_preview
@@ -172,6 +180,7 @@ class ExportAssistantWidget(QWidget):
         self._prepare_default_directory = prepare_default_directory
         self._on_destination_directory_used = on_destination_directory_used
         self._on_terminal = on_terminal
+        self._preflight = preflight
         self._cancelled = False
         self._cancel_token: Event | None = None
         self._export_generation = 0
@@ -671,6 +680,11 @@ class ExportAssistantWidget(QWidget):
             != QMessageBox.StandardButton.Yes
         ):
             return
+        if self._preflight is not None:
+            prepared_request = self._preflight(request)
+            if prepared_request is None:
+                return
+            request = prepared_request
         self._cancelled = False
         cancel_token = Event()
         self._cancel_token = cancel_token

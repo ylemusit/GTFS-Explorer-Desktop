@@ -440,3 +440,20 @@ def test_clear_removes_all_project_export_context(
     assert request.destination == Path(".")
     assert not widget._bbox.isChecked()
     assert not widget._spreadsheet_safe.isChecked()
+
+
+def test_overwrite_rejection_precedes_publication_preflight(application, tmp_path, monkeypatch):
+    calls = []
+    widget = ExportAssistantWidget(
+        executor=lambda *args: calls.append("export"),
+        preflight=lambda request: calls.append("publish") or request,
+    )
+    destination = tmp_path / "existing.json"
+    destination.write_text("original", encoding="utf-8")
+    _configure(widget, destination)
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.No)
+    widget._execute()
+    assert calls == []
+    assert destination.read_text(encoding="utf-8") == "original"
+    assert widget._active_export_generation is None
+    widget.deleteLater()

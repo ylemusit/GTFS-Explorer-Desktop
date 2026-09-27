@@ -176,13 +176,18 @@ class RevisionGtfsExporter:
         *,
         revision_id: str,
         confirmed: bool,
+        effective_snapshot: bool = False,
         selection: SubsetSelection | None = None,
         version_id: str | None = None,
         overwrite: bool = False,
         is_cancelled: CancellationCheck = lambda: False,
     ) -> ExportManifest:
         """Escribe un ZIP solo cuando el llamador identifica una revisión confirmada."""
-        if not confirmed or not revision_id or revision_id == "draft":
+        if (
+            (not confirmed and not (effective_snapshot and selection is not None))
+            or not revision_id
+            or revision_id == "draft"
+        ):
             raise ExportError(
                 "No se puede exportar un borrador: confirme primero una revisión de trabajo."
             )
@@ -207,9 +212,12 @@ class RevisionGtfsExporter:
             overwrite=overwrite,
             is_cancelled=is_cancelled,
             manifest_metadata={
-                "revision_id": revision_id,
+                **(
+                    {"base_revision_id": revision_id, "source_state": "unpublished_effective"}
+                    if effective_snapshot
+                    else {"revision_id": revision_id, "version_id": version_id or revision_id}
+                ),
                 "export_scope": "selected_routes" if selection is not None else "complete_modified",
-                "version_id": version_id or revision_id,
             },
         )
 

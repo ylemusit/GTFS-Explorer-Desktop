@@ -571,6 +571,39 @@ def test_confirm_revision_blocks_integrity_errors(tmp_path: Path) -> None:
         assert session.dirty
 
 
+def test_save_concentrates_validation_on_dirty_publication(tmp_path: Path) -> None:
+    database = _full_database(tmp_path)
+    with DuckDbUnitOfWork(database) as unit_of_work:
+        session = EditorSession.open(unit_of_work)
+        validations: list[object] = []
+        original_validate = session.validate
+
+        def observe_validation(*args: object, **kwargs: object) -> object:
+            validations.append((args, kwargs))
+            return original_validate()
+
+        session.validate = observe_validation  # type: ignore[method-assign]
+        assert session.save() is None
+        assert validations == []
+
+        before = session.working_copy.get(("gtfs_routes", "R1"))
+        assert before is not None
+        after = dict(before)
+        after["route_long_name"] = "Pendiente"
+        command = EditorCommand(
+            EditorCommandKind.UPDATE_ROUTE, ("gtfs_routes", "R1"), before, after
+        )
+        session.apply(command, impact=session.preview_impact(command))
+        session.undo()
+        session.redo()
+        assert validations == []
+
+        revision_id = session.save("save-1")
+        assert revision_id == "save-1"
+        assert len(validations) == 1
+        assert not session.data_draft_dirty
+
+
 def test_revision_chain_reconstructs_original_plus_small_immutable_deltas(
     tmp_path: Path,
 ) -> None:
@@ -656,3 +689,37 @@ def test_legacy_stop_delta_schema_migrates_without_touching_gtfs_original(tmp_pa
         assert connection.execute(
             "SELECT stop_lat FROM gtfs_stops WHERE stop_id = 's1'"
         ).fetchone() == (40.0,)
+
+
+@pytest.mark.parametrize("operation", ["apply", "apply_batch", "undo", "redo"])
+def test_data_operations_invalidate_validation(tmp_path: Path, operation: str, monkeypatch) -> None:
+    with DuckDbUnitOfWork(_database(tmp_path)) as uow:
+        session = EditorSession.open(uow)
+        before = session.working_copy.get(("gtfs_stops", "s1"))
+        after = dict(before, stop_lat=41.0)
+        command = EditorCommand(EditorCommandKind.MOVE_STOP, ("gtfs_stops", "s1"), before, after)
+        if operation in {"undo", "redo"}:
+            session.apply(command)
+        if operation == "redo":
+            session.undo()
+        session.validate()
+        assert session.validation_current
+
+        def unexpected_validation(*args):
+            pytest.fail("Editing must not run full validation")
+
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                "gtfs_explorer.application.editor_session.WorkingCopyValidator.validate",
+                unexpected_validation,
+            )
+            if operation == "apply_batch":
+                session.apply_batch((command,))
+            elif operation == "apply":
+                session.apply(command)
+            else:
+                getattr(session, operation)()
+        assert not session.validation_current
+        assert session.validation_issues == ()
+        assert session.validate() == session.validation_issues
+        assert session.validation_current

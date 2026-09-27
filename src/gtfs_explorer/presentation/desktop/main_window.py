@@ -53,7 +53,7 @@ from gtfs_explorer.application.commands.create_project import CreateProject
 from gtfs_explorer.application.commands.import_feed import ImportFeed, ImportFeedResult
 from gtfs_explorer.application.commands.open_project import OpenedProject, OpenProject
 from gtfs_explorer.application.commands.recover_workspace import RestoreWorkspace
-from gtfs_explorer.application.editor_session import EditorSession
+from gtfs_explorer.application.editor_session import EditorSession, RevisionConfirmationError
 from gtfs_explorer.application.exporting import FeedExportLifecycle
 from gtfs_explorer.application.jobs.import_job import (
     ImportPhase,
@@ -523,6 +523,7 @@ class MainWindow(QMainWindow):
         )
         self._exporter = ExportAssistantWidget(
             executor=self._export_feed_from_ui,
+            preflight=self._prepare_export_policy,
             default_directory_resolver=lambda: self._directory_preferences.initial_directory(
                 DirectoryKind.EXPORTS
             ),
@@ -2258,11 +2259,6 @@ class MainWindow(QMainWindow):
         """Registra y ejecuta una exportación real de feed."""
         if self._opened_project is None:
             raise RuntimeError("Abra un proyecto antes de exportar.")
-        editor_session = getattr(self, "_editor_session", None)
-        if editor_session is not None and editor_session.data_draft_dirty:
-            raise ExportError(
-                "El borrador tiene cambios sin confirmar; confirme o descarte antes de exportar."
-            )
         database = self._opened_project.database
         project_id = getattr(getattr(self._opened_project, "descriptor", None), "project_id", None)
         if project_id is None:
@@ -2308,6 +2304,68 @@ class MainWindow(QMainWindow):
             return request
         return replace(request, destination=destination, overwrite=destination.exists())
 
+    def _prepare_export_policy(self, request: ExportRequest) -> ExportRequest | None:
+        """Fija la fuente en el hilo UI antes de iniciar un job asíncrono."""
+        session = self._get_editor_session()
+        if session is None:
+            return request
+        full = request.format in {ExportFormat.COMPLETE_GTFS, ExportFormat.NEW_GTFS_VERSION}
+        if full and session.data_draft_dirty:
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle(t("export.pending_changes_title"))
+            dialog.setText(t("export.pending_changes_message"))
+            save = dialog.addButton(t("export.save_and_export"), QMessageBox.ButtonRole.AcceptRole)
+            without_apply = dialog.addButton(
+                t("export.export_without_apply"), QMessageBox.ButtonRole.ActionRole
+            )
+            cancel = dialog.addButton(t("export.cancel"), QMessageBox.ButtonRole.RejectRole)
+            dialog.exec()
+            if dialog.clickedButton() is save:
+                try:
+                    session.save()
+                    self._editor.refresh()
+                except (RevisionConfirmationError, ValueError) as error:
+                    self._editor.refresh()
+                    QMessageBox.warning(self, t("editor.confirm_revision_error_title"), str(error))
+                    return None
+            elif dialog.clickedButton() is without_apply:
+                return replace(
+                    request,
+                    source_working_copy=self._export_snapshot(session, confirmed=True),
+                )
+            elif dialog.clickedButton() is cancel:
+                return None
+            else:
+                return None
+        if (
+            not full
+            and not session.data_draft_dirty
+            and request.format
+            not in {
+                ExportFormat.CSV,
+                ExportFormat.KML,
+                ExportFormat.KMZ,
+            }
+        ):
+            return request
+        return replace(
+            request,
+            source_working_copy=self._export_snapshot(session, confirmed=full),
+            source_is_draft=not full and session.data_draft_dirty,
+        )
+
+    @staticmethod
+    def _export_snapshot(session: EditorSession, *, confirmed: bool) -> WorkingCopy:
+        """Clona la fuente elegida para que el job no observe cambios posteriores."""
+        source_entities = (
+            session.working_copy.base_entities if confirmed else session.working_copy.entities
+        )
+        return WorkingCopy(
+            session.working_copy.original,
+            base_revision_id=session.working_revision_id,
+            base_entities=source_entities,
+        )
+
     def _write_feed_export(
         self, request: ExportRequest, feed_id: str, is_cancelled: Callable[[], bool]
     ) -> ExportResult:
@@ -2315,7 +2373,6 @@ class MainWindow(QMainWindow):
         if self._opened_project is None:
             raise RuntimeError("Abra un proyecto antes de exportar.")
         database = self._opened_project.database
-        editor_session = getattr(self, "_editor_session", None)
         revision_formats = {
             ExportFormat.JSON,
             ExportFormat.GEOJSON,
@@ -2326,8 +2383,19 @@ class MainWindow(QMainWindow):
             ExportFormat.KML,
             ExportFormat.KMZ,
         }
+        working_copy = request.source_working_copy
+        if working_copy is None and request.format in {
+            ExportFormat.CSV,
+            ExportFormat.COMPLETE_GTFS,
+            ExportFormat.NEW_GTFS_VERSION,
+            ExportFormat.KML,
+            ExportFormat.KMZ,
+        }:
+            editor_session = getattr(self, "_editor_session", None)
+            if editor_session is not None and not editor_session.data_draft_dirty:
+                working_copy = MainWindow._export_snapshot(editor_session, confirmed=True)
         if request.format in revision_formats and (
-            editor_session is not None
+            working_copy is not None
             or request.format
             in {
                 ExportFormat.COMPLETE_GTFS,
@@ -2336,9 +2404,12 @@ class MainWindow(QMainWindow):
                 ExportFormat.KMZ,
             }
         ):
-            if editor_session is not None:
+            if working_copy is not None:
                 return self._write_revision_export(
-                    request, editor_session.working_copy, feed_id, is_cancelled
+                    request,
+                    working_copy,
+                    feed_id,
+                    is_cancelled,
                 )
             with DuckDbUnitOfWork(database) as unit_of_work:
                 working_copy = DuckDbEditorRepository(unit_of_work.connection).create_or_recover()
@@ -2434,11 +2505,8 @@ class MainWindow(QMainWindow):
         is_cancelled: Callable[[], bool],
     ) -> ExportResult:
         """Publica cualquier salida 0.2.0 desde la WorkingRevision confirmada."""
-        if working_copy.dirty:
-            raise ExportError(
-                "El borrador tiene cambios sin confirmar; confirme o descarte antes de exportar."
-            )
         revision_id = working_copy.base_revision_id
+        source_is_draft = request.source_is_draft
         specification = load_schedule_spec(_SPECIFICATION_PATH)
         selection = None
         if request.format not in {
@@ -2457,7 +2525,8 @@ class MainWindow(QMainWindow):
                 request.destination,
                 working_copy,
                 revision_id=revision_id,
-                confirmed=True,
+                confirmed=not source_is_draft,
+                effective_snapshot=source_is_draft,
                 version_id=request.version_id,
                 overwrite=request.overwrite,
                 is_cancelled=is_cancelled,
@@ -2472,7 +2541,8 @@ class MainWindow(QMainWindow):
                 request.destination,
                 working_copy,
                 revision_id=revision_id,
-                confirmed=True,
+                confirmed=not source_is_draft,
+                effective_snapshot=source_is_draft,
                 route_ids=request.route_ids,
                 profile=profile,
                 overwrite=request.overwrite,
@@ -2486,6 +2556,7 @@ class MainWindow(QMainWindow):
                 request.destination,
                 working_copy,
                 revision_id=revision_id,
+                effective_snapshot=source_is_draft,
                 selection=selection,
                 source={"feed_id": feed_id},
                 overwrite=request.overwrite,
@@ -2497,6 +2568,7 @@ class MainWindow(QMainWindow):
                 request.destination,
                 working_copy,
                 revision_id=revision_id,
+                effective_snapshot=source_is_draft,
                 selection=selection,
                 include_bbox=request.include_bbox,
                 overwrite=request.overwrite,
@@ -2508,6 +2580,7 @@ class MainWindow(QMainWindow):
                 request.destination,
                 working_copy,
                 revision_id=revision_id,
+                effective_snapshot=source_is_draft,
                 selection=selection,
                 spreadsheet_safe=request.spreadsheet_safe,
                 overwrite=request.overwrite,
@@ -2518,7 +2591,8 @@ class MainWindow(QMainWindow):
             request.destination,
             working_copy,
             revision_id=revision_id,
-            confirmed=True,
+            confirmed=not source_is_draft,
+            effective_snapshot=source_is_draft,
             selection=selection,
             overwrite=request.overwrite,
             is_cancelled=is_cancelled,

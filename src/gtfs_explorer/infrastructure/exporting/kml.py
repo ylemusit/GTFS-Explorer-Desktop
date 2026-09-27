@@ -130,6 +130,7 @@ class WorkingCopyKmlExporter:
         *,
         revision_id: str,
         confirmed: bool,
+        effective_snapshot: bool = False,
         route_ids: frozenset[str] | None = None,
         profile: KmlProfile = KmlProfile.STANDARD_KML,
         overwrite: bool = False,
@@ -139,7 +140,7 @@ class WorkingCopyKmlExporter:
             profile = KmlProfile(profile)
         except ValueError as error:
             raise ExportError("El perfil KML/KMZ no es válido.") from error
-        if not confirmed or not revision_id or revision_id == "draft":
+        if (not confirmed and not effective_snapshot) or not revision_id or revision_id == "draft":
             raise ExportError(
                 "No se puede exportar un borrador geoespacial sin confirmar la revisión."
             )
@@ -149,7 +150,9 @@ class WorkingCopyKmlExporter:
             )
         if revision_id != working_copy.base_revision_id:
             raise ExportError("La exportación debe apuntar a la revisión activa.")
-        payload = _working_copy_kml(working_copy, revision_id, route_ids, profile)
+        payload = _working_copy_kml(
+            working_copy, revision_id, route_ids, profile, effective_snapshot=effective_snapshot
+        )
         if destination.suffix.casefold() == ".kmz":
             content = _kmz_bytes(payload)
             format_name = "kmz"
@@ -161,7 +164,15 @@ class WorkingCopyKmlExporter:
             (content,),
             overwrite=overwrite,
             is_cancelled=is_cancelled,
-            manifest_metadata={"format": format_name, "profile": profile.value},
+            manifest_metadata={
+                "format": format_name,
+                "profile": profile.value,
+                **(
+                    {"base_revision_id": revision_id, "source_state": "unpublished_effective"}
+                    if effective_snapshot
+                    else {}
+                ),
+            },
         )
 
 
@@ -480,6 +491,8 @@ def _working_copy_kml(
     revision_id: str,
     route_ids: frozenset[str] | None,
     profile: KmlProfile,
+    *,
+    effective_snapshot: bool = False,
 ) -> bytes:
     entities = working_copy.entities
     selected_routes = route_ids or frozenset(
@@ -562,7 +575,11 @@ def _working_copy_kml(
                 "agency_id": (
                     routes.get(shape_routes[0], {}).get("agency_id") if shape_routes else None
                 ),
-                "revision_id": revision_id,
+                **(
+                    {"base_revision_id": revision_id, "source_state": "unpublished_effective"}
+                    if effective_snapshot
+                    else {"revision_id": revision_id}
+                ),
                 "gtfs_explorer_version": IDENTITY.version,
                 "kml_profile": profile.value,
             },
@@ -599,7 +616,11 @@ def _working_copy_kml(
                 "stop_sequence": stop_metadata.get(str(payload.get("stop_id")), {}).get(
                     "stop_sequence"
                 ),
-                "revision_id": revision_id,
+                **(
+                    {"base_revision_id": revision_id, "source_state": "unpublished_effective"}
+                    if effective_snapshot
+                    else {"revision_id": revision_id}
+                ),
                 "gtfs_explorer_version": IDENTITY.version,
                 "kml_profile": profile.value,
             },

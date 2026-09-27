@@ -230,6 +230,10 @@
     "export.selection_more": " (+{count})",
     "export.selection_empty": "sin rutas seleccionadas",
     "export.start": "Iniciar exportación",
+    "export.pending_changes_title": "Cambios pendientes",
+    "export.pending_changes_message": "Hay cambios pendientes. ¿Deseas aplicar los cambios antes de exportar?",
+    "export.save_and_export": "Guardar y exportar",
+    "export.export_without_apply": "Exportar sin aplicar",
     "export.cancel": "Cancelar exportación",
     "export.browse_description": "Abre el selector para elegir el archivo de destino local.",
     "validation.introduction": "Incidencias trazables del feed actual. La fila fuente es la línea física original.",
@@ -469,6 +473,11 @@
     "editor.reorder_shape_tooltip": "Cambia la posición del vértice y renumera solo su shape.",
     "editor.confirm_revision": "Confirmar revisión",
     "editor.confirm_revision_tooltip": "Valida el borrador y lo publica como revisión de trabajo inmutable.",
+    "editor.save": "Guardar",
+    "editor.save_tooltip": "Valida y publica los cambios pendientes como una revisión confirmada.",
+    "editor.save_title": "Guardar cambios",
+    "editor.save_question": "Se validarán los cambios pendientes y, si no hay errores bloqueantes, se publicará una nueva revisión. ¿Deseas continuar?",
+    "editor.save_clean": "No hay cambios GTFS pendientes que guardar.",
     "editor.history_headers": "Acción|Comando|Secuencia|Entidades",
     "editor.history_accessible": "Historial del borrador",
     "editor.workspaces_accessible": "Áreas de trabajo del editor de borrador",
@@ -816,6 +825,7 @@
     "editor.stops_headers": "Secuencia|Parada|stop_id|Tipo|Llegada · salida",
     "editor.geometry_context": "Ruta {route_id}\nShapes utilizados: {shapes}\nViajes por shape/contexto: {trips}",
     "editor.services_context": "AGENCIA / OPERADOR\n{agency} ({agency_id})\n\nSERVICIOS\n{services}\n\nATRIBUCIONES: {attributions}",
-    "editor.history_context": "Ruta: {route_id}\nBorrador: {state}\nCambios de esta ruta: {count}"
+    "editor.history_context": "Ruta: {route_id}\nBorrador: {state}\nCambios de esta ruta: {count}",
+    "editor.validation_pending": "pendiente de validación"
   }
 }

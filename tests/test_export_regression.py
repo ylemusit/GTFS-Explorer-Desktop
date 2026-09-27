@@ -507,6 +507,9 @@ def test_original_working_copy_exports_through_the_editor_route(
         )
         for request in requests:
             result = harness._export_feed(request, lambda: False)
+            if request.format is ExportFormat.CSV:
+                assert result.manifest.metadata["format"] == "csv_route_view"
+                assert result.manifest.metadata["revision_id"] == "original"
             assert request.destination.is_file()
             assert request.destination.with_name(
                 f"{request.destination.name}.manifest.json"
@@ -516,6 +519,32 @@ def test_original_working_copy_exports_through_the_editor_route(
             assert history.status is OperationStatus.COMPLETED
     finally:
         session.close()
+
+
+@pytest.mark.integration
+def test_clean_editor_csv_preflight_preserves_revision_route_after_session_closes(
+    tmp_path: Path,
+) -> None:
+    prepared = prepare_contract_feed(tmp_path)
+    session = EditorSession.open(DuckDbUnitOfWork(prepared.database))
+    request = ExportRequest(ExportFormat.CSV, tmp_path / "original.csv", route_ids=frozenset({"A"}))
+    host = SimpleNamespace(
+        _get_editor_session=lambda: session,
+        _export_snapshot=MainWindow._export_snapshot,
+    )
+    try:
+        snapshot = MainWindow._prepare_export_policy(host, request)
+        assert snapshot is not None
+        assert snapshot.source_working_copy is not None
+        assert snapshot.source_working_copy is not session.working_copy
+        assert snapshot.source_working_copy.entities == session.working_copy.entities
+        assert not snapshot.source_is_draft
+    finally:
+        session.close()
+    result = _ProductiveExportHarness(prepared)._export_feed(snapshot, lambda: False)
+    assert result.manifest.metadata["format"] == "csv_route_view"
+    assert result.manifest.metadata["revision_id"] == "original"
+    assert request.destination.is_file()
 
 
 @pytest.mark.integration

@@ -672,6 +672,9 @@ class EditorWidget(QWidget):
         self._redo_button.setObjectName("redoEditorChange")
         self._discard_button = QPushButton(t("editor.discard"))
         self._discard_button.setObjectName("discardEditorChanges")
+        self._save_button = QPushButton(t("editor.save"))
+        self._save_button.setObjectName("saveEditorDraft")
+        self._save_button.setToolTip(t("editor.save_tooltip"))
         self._validate_button = QPushButton(t("editor.validate"))
         self._validate_button.setObjectName("validateEditorDraft")
         self._delete_button = QPushButton(t("editor.delete_entity"))
@@ -692,6 +695,7 @@ class EditorWidget(QWidget):
             self._undo_button,
             self._redo_button,
             self._discard_button,
+            self._save_button,
             self._validate_button,
             self._delete_button,
             self._add_stop_button,
@@ -913,6 +917,7 @@ class EditorWidget(QWidget):
         self._undo_button.clicked.connect(self._undo)
         self._redo_button.clicked.connect(self._redo)
         self._discard_button.clicked.connect(self._discard)
+        self._save_button.clicked.connect(self._save)
         self._validate_button.clicked.connect(self._validate)
         self._delete_button.clicked.connect(self._delete)
         self._add_stop_button.clicked.connect(self._add_stop)
@@ -1161,7 +1166,11 @@ class EditorWidget(QWidget):
                 if session.working_copy.dirty
                 else t("editor.draft_clean"),
                 count=entity_index.entity_count,
-                issues=len(session.validation_issues),
+                issues=(
+                    len(session.validation_issues)
+                    if getattr(session, "validation_current", False)
+                    else t("editor.validation_pending")
+                ),
             )
         )
         self._set_buttons_enabled(True)
@@ -1316,6 +1325,7 @@ class EditorWidget(QWidget):
             (self._undo_button, "editor.undo", "editor.undo_tooltip"),
             (self._redo_button, "editor.redo", "editor.redo_tooltip"),
             (self._discard_button, "editor.discard", None),
+            (self._save_button, "editor.save", "editor.save_tooltip"),
             (self._validate_button, "editor.validate", None),
             (self._delete_button, "editor.delete_entity", "editor.delete_entity_tooltip"),
             (self._add_stop_button, "editor.add_stop", "editor.add_stop_tooltip"),
@@ -2956,17 +2966,48 @@ class EditorWidget(QWidget):
         else:
             self._status.setText(t("editor.validation_clean"))
 
-    def _confirm_revision(self) -> None:
+    def _save(self) -> None:
         session = self._session_provider()
         if session is None:
             return
+        if not session.data_draft_dirty:
+            self._status.setText(t("editor.save_clean"))
+            return
+        if (
+            QMessageBox.question(
+                self,
+                t("editor.save_title"),
+                t("editor.save_question"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            != QMessageBox.StandardButton.Yes
+        ):
+            return
         try:
-            revision_id = session.confirm_revision()
+            revision_id = session.save()
         except (RevisionConfirmationError, ValueError) as error:
             QMessageBox.warning(self, t("editor.confirm_revision_error_title"), str(error))
             self.refresh()
             return
         self._status.setText(t("editor.revision_confirmed", revision_id=revision_id))
+        self.refresh()
+
+    def _confirm_revision(self) -> None:
+        session = self._session_provider()
+        if session is None:
+            return
+        try:
+            revision_id = session.save()
+        except (RevisionConfirmationError, ValueError) as error:
+            QMessageBox.warning(self, t("editor.confirm_revision_error_title"), str(error))
+            self.refresh()
+            return
+        self._status.setText(
+            t("editor.save_clean")
+            if revision_id is None
+            else t("editor.revision_confirmed", revision_id=revision_id)
+        )
         self.refresh()
 
     def _show_impact(self, impact: Any, *, requires_resolution: bool) -> None:

@@ -230,6 +230,10 @@
     "export.selection_more": " (+{count})",
     "export.selection_empty": "没有选择路线",
     "export.start": "开始导出",
+    "export.pending_changes_title": "待处理的更改",
+    "export.pending_changes_message": "有待处理的更改。是否要在导出前应用这些更改？",
+    "export.save_and_export": "保存并导出",
+    "export.export_without_apply": "不应用直接导出",
     "export.cancel": "取消导出",
     "export.browse_description": "打开选择器以选择本地目标文件。",
     "validation.introduction": "当前源中的可追踪事件。源行是原始物理行。",
@@ -469,6 +473,11 @@
     "editor.reorder_shape_tooltip": "更改顶点的位置并仅对其形状重新编号。",
     "editor.confirm_revision": "确认审核",
     "editor.confirm_revision_tooltip": "验证草稿并将其作为不可变的工作修订版发布。",
+    "editor.save": "保存",
+    "editor.save_tooltip": "验证并将待处理的更改发布为已确认的修订版。",
+    "editor.save_title": "保存更改",
+    "editor.save_question": "将验证待处理的更改；如果没有阻塞性错误，将发布新修订版。是否继续？",
+    "editor.save_clean": "没有待保存的 GTFS 更改。",
     "editor.history_headers": "动作|命令|序列|实体",
     "editor.history_accessible": "选秀历史",
     "editor.workspaces_accessible": "草稿编辑器工作区",
@@ -816,6 +825,7 @@
     "editor.stops_headers": "顺序|经停站|stop_id|类型|到达·出发",
     "editor.geometry_context": "路线 {route_id}\n使用的形状：{shapes}\n按形状/环境划分的旅行：{trips}",
     "editor.services_context": "机构/运营商\n{agency} ({agency_id})\n\n服务\n{services}\n\n属性：{attributions}",
-    "editor.history_context": "路线：{route_id}\n草案：{state}\n对此路线的更改：{count}"
+    "editor.history_context": "路线：{route_id}\n草案：{state}\n对此路线的更改：{count}",
+    "editor.validation_pending": "待验证"
   }
 }

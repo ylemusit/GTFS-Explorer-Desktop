@@ -230,6 +230,10 @@
     "export.selection_more": " (+{count})",
     "export.selection_empty": "no routes selected",
     "export.start": "Start export",
+    "export.pending_changes_title": "Pending changes",
+    "export.pending_changes_message": "There are pending changes. Do you want to apply them before exporting?",
+    "export.save_and_export": "Save and export",
+    "export.export_without_apply": "Export without applying",
     "export.cancel": "Cancel export",
     "export.browse_description": "Open the selector to choose the local destination file.",
     "validation.introduction": "Traceable incidents from the current feed. The source row is the original physical line.",
@@ -469,6 +473,11 @@
     "editor.reorder_shape_tooltip": "Change the position of the vertex and renumber only its shape.",
     "editor.confirm_revision": "Confirm review",
     "editor.confirm_revision_tooltip": "Validates the draft and publishes it as an immutable work revision.",
+    "editor.save": "Save",
+    "editor.save_tooltip": "Validates and publishes pending changes as a confirmed revision.",
+    "editor.save_title": "Save changes",
+    "editor.save_question": "Pending changes will be validated and, if there are no blocking errors, a new revision will be published. Do you want to continue?",
+    "editor.save_clean": "There are no pending GTFS changes to save.",
     "editor.history_headers": "Action|Command|Sequence|Entities",
     "editor.history_accessible": "Draft history",
     "editor.workspaces_accessible": "Draft editor workspaces",
@@ -816,6 +825,7 @@
     "editor.stops_headers": "Sequence|Stop|stop_id|Type|Arrival · departure",
     "editor.geometry_context": "Route {route_id}\nShapes used: {shapes}\nTrips by shape/context: {trips}",
     "editor.services_context": "AGENCY / OPERATOR\n{agency} ({agency_id})\n\nSERVICES\n{services}\n\nATTRIBUTIONS: {attributions}",
-    "editor.history_context": "Route: {route_id}\nDraft: {state}\nChanges to this route: {count}"
+    "editor.history_context": "Route: {route_id}\nDraft: {state}\nChanges to this route: {count}",
+    "editor.validation_pending": "pending validation"
   }
 }
