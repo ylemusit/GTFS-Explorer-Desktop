@@ -31,17 +31,11 @@ manifests y runtime evidence en Artifacts.
 
 ## Modelos y escalado
 
-- **Luna Medium:** mecánica, i18n, tests, documentación y bugs conocidos.
-- **Terra Medium:** varias capas, persistencia, concurrencia, lifecycle Qt,
-  diseño focal o debugging no trivial.
-- **Terra High:** excepcional y justificado; nunca por longitud.
-- **Sol:** diagnóstico complejo, arquitectura, seguridad, integridad o blocker.
-  Preferir: Sol diagnostica; Luna/Terra implementa.
-- **Astra:** deshabilitado por defecto; solo autorización explícita tras Sol y
-  riesgo serio, seguridad crítica o decisión irreversible.
-
-No escalar repetidamente: tras uno o dos intentos razonables, registrar el
-bloqueo o solicitar el diagnóstico adecuado. FAST MODE solo por urgencia.
+Consultar `docs/tasks/AI_EXECUTION_POLICY.md` y registrar un perfil por run.
+Escalar solo por causa demostrada; cada retry requiere evidencia o hipótesis nueva.
+El límite de ejecución es el `EXECUTION_BOUNDARY` de la tarea y aplica privilegio mínimo.
+Las reglas normativas de recursos y operaciones Git están en
+[AI_EXECUTION_POLICY.md](docs/tasks/AI_EXECUTION_POLICY.md).
 
 ## Verificación y salida
 
@@ -64,17 +58,21 @@ Todos los derechos reservados.
 
 ## Task Telemetry
 
-Cuando una tarea incluya `TASK_ID`, debe registrar su ciclo mediante el
-Control Center antes de empezar y justo antes de la respuesta final:
+La telemetría es `OPTIONAL_LOCAL_INTEGRATION`. El entorno de ejecución puede
+proporcionar una integración compatible; el repositorio no exige una ruta
+local concreta. Si está disponible y habilitada, puede registrar al inicio y
+al cierre `TASK_ID`, `RUN_ID`, intento, modelo/perfil y estados, junto con los
+metadatos operativos ya establecidos (clase, riesgo, complejidad, razonamiento,
+verificación/aceptación y causa de bloqueo).
 
-1. `node C:\Users\yeiso\.codex\task-telemetry.mjs start <TASK_ID> ...`
-2. Ejecutar la tarea dentro de su alcance.
-3. `node C:\Users\yeiso\.codex\task-telemetry.mjs end <TASK_ID> --status PASS|PARTIAL|BLOCKED`
+`TASK_ID` es estable y `RUN_ID` único por ejecución. No se guarda contenido de
+prompts, respuestas, código, salidas de herramientas, secretos, cookies ni
+credenciales. Si la integración no está disponible o falla, registrar cuando
+sea relevante `TASK_TELEMETRY_STATUS=UNAVAILABLE` y continuar el trabajo
+autorizado, sin inventar datos. La ausencia o fallo de telemetría no bloquea
+desarrollo, verificación ni documentación, ni constituye un fallo de la tarea
+salvo que la telemetría figure explícitamente en sus criterios de aceptación.
 
-Los metadatos permitidos son pequeños y operativos (`project`, `task_type`,
-`size`, `model`, `reasoning`, `parent_task`, `feature` y `gate`). No se guarda
-contenido de prompts, respuestas, código, salidas de herramientas, secretos,
-cookies ni credenciales. Si falla el registro, debe informarse
-`TASK_TELEMETRY_STATUS=FAIL` sin inventar datos ni ocultar el trabajo realizado.
-`PASS`, `PARTIAL` y `BLOCKED` son los únicos estados de cierre; `ASTRA` sigue
-requiriendo autorización explícita.
+`PASS`, `PARTIAL` y `BLOCKED` son los estados de cierre de tarea admitidos por
+la integración; no sustituyen los resultados de verificación.
+`ASTRA` sigue requiriendo autorización explícita.

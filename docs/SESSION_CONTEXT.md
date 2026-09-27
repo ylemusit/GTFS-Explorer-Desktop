@@ -5,9 +5,9 @@
 GTFS Explorer Desktop, aplicación Windows local/offline-first para GTFS
 Schedule.
 
-## Target
+## Estado vigente
 
-`0.2.2` en `main`.
+Consultar `docs/CURRENT_STATE.md` para versión, baseline, schemas, aceptación y siguiente fase. Este documento solo fija contexto operativo estable y rutas.
 
 ## Stack
 
@@ -22,13 +22,6 @@ Python 3.12, PySide6/Qt Widgets + WebEngine, DuckDB, MapLibre y PMTiles.
 - Validación integrada solo en su gate final.
 - El commit, tag y publicación remota requieren un descriptor y autorización
   explícitos.
-
-## Current critical state
-
-GTFS-021, GTFS-022 y GTFS-023 están aceptados. El gate canónico final de
-`0.2.2` registró 648 passed, 0 failed y 1 skip legítimo. La aceptación externa
-de GTFS-023 corresponde a `run_004_gtfs023_candidate001` y no debe repetirse
-durante el cierre de release.
 
 ## Authorized task
 

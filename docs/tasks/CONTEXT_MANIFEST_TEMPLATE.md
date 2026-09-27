@@ -6,11 +6,10 @@ HOT:
   - docs/SESSION_CONTEXT.md
   - task descriptor
 WARM:
-  ARCHITECTURE: false
-  DOMAIN: false
-  ADR: []
-  FILES: []
-COLD: []
+  - source: docs/ARCHITECTURE.md
+    reason: "" # cargar solo si la tarea cruza ese contrato
+    section: "" # opcional: sección o selector
+COLD: [] # historial y evidencia; solo bajo demanda
 ```
 
-Marcar solo el contexto necesario. COLD nunca se carga por defecto.
+Marcar solo el contexto necesario. `docs/CURRENT_STATE.md` es la autoridad de estado vigente y se consulta cuando la tarea lo requiere. COLD nunca se carga por defecto.
